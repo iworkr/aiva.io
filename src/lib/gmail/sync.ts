@@ -1,0 +1,297 @@
+/**
+ * Gmail Message Sync
+ * Syncs messages from Gmail to Aiva.io database
+ */
+
+'use server';
+
+import { createSupabaseUserServerActionClient } from '@/supabase-clients/user/createSupabaseUserServerActionClient';
+import {
+  getGmailAccessToken,
+  listGmailMessages,
+  getGmailMessage,
+  parseGmailMessage,
+} from './client';
+import { createMessageAction } from '@/data/user/messages';
+
+/**
+ * Sync Gmail messages for a channel connection
+ */
+export async function syncGmailMessages(
+  connectionId: string,
+  workspaceId: string,
+  options: {
+    maxMessages?: number;
+    query?: string;
+  } = {}
+) {
+  try {
+    const supabase = await createSupabaseUserServerActionClient();
+
+    // Get connection details
+    const { data: connection, error: connectionError } = await supabase
+      .from('channel_connections')
+      .select('*')
+      .eq('id', connectionId)
+      .eq('workspace_id', workspaceId)
+      .single();
+
+    if (connectionError || !connection) {
+      throw new Error('Channel connection not found');
+    }
+
+    if (connection.provider !== 'gmail') {
+      throw new Error('Connection is not a Gmail account');
+    }
+
+    // Get access token (will refresh if needed)
+    const accessToken = await getGmailAccessToken(connectionId);
+
+    // List messages
+    const messagesList = await listGmailMessages(accessToken, {
+      maxResults: options.maxMessages || 50,
+      q: options.query || 'is:unread',
+    });
+
+    if (!messagesList.messages || messagesList.messages.length === 0) {
+      return {
+        success: true,
+        syncedCount: 0,
+        newCount: 0,
+        message: 'No new messages to sync',
+      };
+    }
+
+    let syncedCount = 0;
+    let newCount = 0;
+    let errorCount = 0;
+
+    // Fetch and store each message
+    for (const messageRef of messagesList.messages) {
+      try {
+        // Get full message details
+        const gmailMessage = await getGmailMessage(accessToken, messageRef.id);
+
+        // Parse to normalized format
+        const parsed = parseGmailMessage(gmailMessage);
+
+        // Check if message already exists
+        const { data: existing } = await supabase
+          .from('messages')
+          .select('id')
+          .eq('channel_connection_id', connectionId)
+          .eq('provider_message_id', parsed.providerMessageId)
+          .single();
+
+        if (existing) {
+          syncedCount++;
+          continue; // Skip if already exists
+        }
+
+        // Store message in database
+        const result = await createMessageAction({
+          workspaceId,
+          channelConnectionId: connectionId,
+          providerMessageId: parsed.providerMessageId,
+          providerThreadId: parsed.providerThreadId,
+          subject: parsed.subject,
+          body: parsed.body,
+          bodyHtml: parsed.bodyHtml,
+          snippet: parsed.snippet,
+          senderEmail: parsed.senderEmail,
+          senderName: parsed.senderName,
+          recipients: parsed.recipients,
+          timestamp: parsed.timestamp,
+          labels: parsed.labels,
+          rawData: parsed.rawData,
+        });
+
+        if (result?.data && !result.isDuplicate) {
+          newCount++;
+        }
+        syncedCount++;
+      } catch (error) {
+        console.error(
+          `Failed to sync message ${messageRef.id}:`,
+          error
+        );
+        errorCount++;
+      }
+    }
+
+    // Update last sync time and cursor
+    await supabase
+      .from('channel_connections')
+      .update({
+        last_sync_at: new Date().toISOString(),
+        sync_cursor: messagesList.nextPageToken || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', connectionId);
+
+    return {
+      success: true,
+      syncedCount,
+      newCount,
+      errorCount,
+      hasMore: !!messagesList.nextPageToken,
+      nextPageToken: messagesList.nextPageToken,
+      message: `Synced ${syncedCount} messages (${newCount} new, ${errorCount} errors)`,
+    };
+  } catch (error) {
+    console.error('Gmail sync error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Sync all Gmail connections for a workspace
+ */
+export async function syncAllGmailConnectionsForWorkspace(workspaceId: string) {
+  const supabase = await createSupabaseUserServerActionClient();
+
+  // Get all active Gmail connections for workspace
+  const { data: connections, error } = await supabase
+    .from('channel_connections')
+    .select('id, provider_account_name')
+    .eq('workspace_id', workspaceId)
+    .eq('provider', 'gmail')
+    .eq('status', 'active');
+
+  if (error || !connections || connections.length === 0) {
+    return {
+      success: true,
+      message: 'No active Gmail connections found',
+      results: [],
+    };
+  }
+
+  const results = [];
+
+  for (const connection of connections) {
+    try {
+      const result = await syncGmailMessages(connection.id, workspaceId);
+      results.push({
+        connectionId: connection.id,
+        accountName: connection.provider_account_name,
+        ...result,
+      });
+    } catch (error) {
+      results.push({
+        connectionId: connection.id,
+        accountName: connection.provider_account_name,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  const totalNew = results.reduce((sum, r) => sum + (r.newCount || 0), 0);
+
+  return {
+    success: true,
+    connectionsProcessed: connections.length,
+    totalNewMessages: totalNew,
+    results,
+  };
+}
+
+/**
+ * Sync specific Gmail thread
+ */
+export async function syncGmailThread(
+  connectionId: string,
+  workspaceId: string,
+  threadId: string
+) {
+  try {
+    const supabase = await createSupabaseUserServerActionClient();
+
+    // Get connection details
+    const { data: connection, error: connectionError } = await supabase
+      .from('channel_connections')
+      .select('*')
+      .eq('id', connectionId)
+      .eq('workspace_id', workspaceId)
+      .single();
+
+    if (connectionError || !connection) {
+      throw new Error('Channel connection not found');
+    }
+
+    // Get access token
+    const accessToken = await getGmailAccessToken(connectionId);
+
+    // Get thread from Gmail API
+    const response = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}?format=full`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch Gmail thread');
+    }
+
+    const thread = await response.json();
+
+    let syncedCount = 0;
+    let newCount = 0;
+
+    // Process each message in the thread
+    for (const gmailMessage of thread.messages) {
+      const parsed = parseGmailMessage(gmailMessage);
+
+      // Check if message already exists
+      const { data: existing } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('channel_connection_id', connectionId)
+        .eq('provider_message_id', parsed.providerMessageId)
+        .single();
+
+      if (existing) {
+        syncedCount++;
+        continue;
+      }
+
+      // Store message
+      const result = await createMessageAction({
+        workspaceId,
+        channelConnectionId: connectionId,
+        providerMessageId: parsed.providerMessageId,
+        providerThreadId: parsed.providerThreadId,
+        subject: parsed.subject,
+        body: parsed.body,
+        bodyHtml: parsed.bodyHtml,
+        snippet: parsed.snippet,
+        senderEmail: parsed.senderEmail,
+        senderName: parsed.senderName,
+        recipients: parsed.recipients,
+        timestamp: parsed.timestamp,
+        labels: parsed.labels,
+        rawData: parsed.rawData,
+      });
+
+      if (result?.data && !result.isDuplicate) {
+        newCount++;
+      }
+      syncedCount++;
+    }
+
+    return {
+      success: true,
+      threadId,
+      syncedCount,
+      newCount,
+      message: `Synced thread with ${syncedCount} messages (${newCount} new)`,
+    };
+  } catch (error) {
+    console.error('Gmail thread sync error:', error);
+    throw error;
+  }
+}
+

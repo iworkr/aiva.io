@@ -1,0 +1,239 @@
+---
+description: Testing patterns and best practices for Nextbase
+globs: **/*.{test.ts,spec.ts,test.tsx,spec.tsx}
+---
+
+# Testing Patterns
+
+## Testing Strategy
+
+### Test Types
+- **Unit Tests**: Test individual functions and utilities
+- **Integration Tests**: Test component interactions
+- **E2E Tests**: Test complete user flows
+- **Server Action Tests**: Test server actions
+
+## Unit Testing
+
+### Testing Utilities
+```typescript
+// src/utils/helpers.test.ts
+import { describe, it, expect } from "vitest";
+import { helperFunction } from "./helpers";
+
+describe("helperFunction", () => {
+  it("should work correctly", () => {
+    const result = helperFunction(input);
+    expect(result).toBe(expected);
+  });
+
+  it("should handle edge cases", () => {
+    const result = helperFunction(edgeCase);
+    expect(result).toBeDefined();
+  });
+});
+```
+
+### Testing Server Actions
+```typescript
+import { describe, it, expect, vi } from "vitest";
+import { createFeatureAction } from "@/data/user/features";
+
+describe("createFeatureAction", () => {
+  it("should create feature successfully", async () => {
+    const result = await createFeatureAction({
+      workspaceId: "workspace-id",
+      name: "Test Feature",
+    });
+
+    expect(result).toBeDefined();
+    expect(result.name).toBe("Test Feature");
+  });
+
+  it("should validate input", async () => {
+    await expect(
+      createFeatureAction({
+        workspaceId: "invalid",
+        name: "",
+      })
+    ).rejects.toThrow();
+  });
+});
+```
+
+## E2E Testing
+
+### Playwright Setup
+```typescript
+// e2e/user/feature.spec.ts
+import { test, expect } from "@playwright/test";
+
+test.describe("Feature", () => {
+  test("should create feature", async ({ page }) => {
+    await page.goto("/workspace/test/features");
+    await page.click("text=Create Feature");
+    await page.fill('input[name="name"]', "Test Feature");
+    await page.click("button[type=submit]");
+    
+    await expect(page.locator("text=Test Feature")).toBeVisible();
+  });
+});
+```
+
+### Test Helpers
+```typescript
+// e2e/_helpers/workspace.helper.ts
+import { Page } from "@playwright/test";
+
+export async function createWorkspace(page: Page, name: string) {
+  await page.goto("/dashboard");
+  await page.click("text=Create Workspace");
+  await page.fill('input[name="name"]', name);
+  await page.click("button[type=submit]");
+  await page.waitForURL(/\/workspace\/.*/);
+}
+```
+
+### Authentication Helpers
+```typescript
+// e2e/_helpers/login-user.helper.ts
+import { Page } from "@playwright/test";
+
+export async function loginUser(page: Page, email: string, password: string) {
+  await page.goto("/login");
+  await page.fill('input[name="email"]', email);
+  await page.fill('input[name="password"]', password);
+  await page.click("button[type=submit]");
+  await page.waitForURL(/\/dashboard/);
+}
+```
+
+## Testing Patterns
+
+### Testing Forms
+```typescript
+test("should submit form", async ({ page }) => {
+  await page.goto("/form");
+  
+  // Fill form
+  await page.fill('input[name="field"]', "value");
+  
+  // Submit
+  await page.click("button[type=submit]");
+  
+  // Verify success
+  await expect(page.locator("text=Success")).toBeVisible();
+});
+```
+
+### Testing Error States
+```typescript
+test("should show validation errors", async ({ page }) => {
+  await page.goto("/form");
+  await page.click("button[type=submit]");
+  
+  await expect(page.locator("text=Required field")).toBeVisible();
+});
+```
+
+### Testing Loading States
+```typescript
+test("should show loading state", async ({ page }) => {
+  await page.goto("/form");
+  await page.click("button[type=submit]");
+  
+  await expect(page.locator("text=Loading...")).toBeVisible();
+  await expect(page.locator("text=Success")).toBeVisible();
+});
+```
+
+## Best Practices
+
+### Do's ✅
+1. Test critical user flows
+2. Test error handling
+3. Test validation
+4. Test loading states
+5. Use test helpers
+6. Keep tests focused
+7. Test edge cases
+8. Clean up test data
+9. Use descriptive test names
+10. Group related tests
+
+### Don'ts ❌
+1. Don't test implementation details
+2. Don't skip error cases
+3. Don't create flaky tests
+4. Don't duplicate test code
+5. Don't skip cleanup
+6. Don't test third-party code
+7. Don't ignore test failures
+8. Don't write slow tests unnecessarily
+9. Don't skip accessibility tests
+10. Don't forget to test security
+
+## Test Organization
+
+### File Structure
+```
+e2e/
+├── _helpers/          # Test helpers
+├── _setups/          # Test setup files
+├── admin/            # Admin tests
+├── anon/             # Anonymous user tests
+├── user/             # Authenticated user tests
+└── password-updation/ # Password update tests
+```
+
+### Test Naming
+- **Descriptive**: Clear test descriptions
+- **Grouped**: Group related tests
+- **Focused**: One assertion per test when possible
+
+## Mocking
+
+### Mock Supabase
+```typescript
+import { vi } from "vitest";
+
+vi.mock("@/supabase-clients/user/createSupabaseUserServerActionClient", () => ({
+  createSupabaseUserServerActionClient: vi.fn(() => ({
+    from: vi.fn(() => ({
+      insert: vi.fn(() => ({
+        select: vi.fn(() => ({
+          single: vi.fn(() => ({
+            data: mockData,
+            error: null,
+          })),
+        })),
+      })),
+    })),
+  })),
+}));
+```
+
+## Coverage
+
+### Target Coverage
+- **Critical Paths**: 100% coverage
+- **Utilities**: High coverage
+- **Components**: Reasonable coverage
+- **E2E**: Critical user flows
+
+## Running Tests
+
+### Commands
+```bash
+# Unit tests
+pnpm test
+
+# E2E tests
+pnpm test:e2e
+
+# E2E with UI
+pnpm test:e2e:ui
+
+# Watch mode
+pnpm test --watch
+```

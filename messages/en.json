@@ -1,0 +1,13 @@
+{
+  "HomePage": {
+    "title": "Your AI Communication Assistant for Every Channel",
+    "description": "Unify Gmail, Outlook, Slack, WhatsApp, and more into one intelligent inbox. Let AI prioritize, draft replies, and manage your messages so you can focus on what matters."
+  },
+  "LocaleSwitcher": {
+    "label": "Change language",
+    "localeLabels": {
+      "en": "English",
+      "de": "German"
+    }
+  }
+}

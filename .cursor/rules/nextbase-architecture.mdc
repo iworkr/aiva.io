@@ -1,0 +1,246 @@
+---
+description: Nextbase Ultimate architecture and design patterns (Foundation for Aiva.io)
+globs: **/*.{ts,tsx,tsx}
+---
+
+# Nextbase Ultimate Architecture Rules
+
+## Architecture Overview
+
+**Aiva.io** is built on **Nextbase Ultimate**, which uses a **server-first architecture** with Next.js 15 App Router, prioritizing Server Components and Server Actions for optimal performance and security.
+
+This architecture provides the foundation for Aiva.io's unified communication assistant features, ensuring workspace isolation, security, and scalability.
+
+## Core Architecture Principles
+
+### 1. Server-First Approach
+- **Default to Server Components**: Use Server Components unless interactivity is required
+- **Server Actions for Mutations**: Use Server Actions instead of API routes
+- **Minimal Client JavaScript**: Keep client components small and focused
+- **Data Fetching in Server**: Fetch data in Server Components, not client
+
+### 2. Multi-Tenant Architecture
+- **Workspace Isolation**: All data is workspace-scoped
+- **RLS Policies**: Database-level security via Row Level Security
+- **Workspace Context**: Always verify workspace membership
+- **Data Filtering**: Filter all queries by workspace
+
+### 3. Type Safety
+- **Generated Types**: Use database types from Supabase
+- **Zod Validation**: Validate all inputs with Zod schemas
+- **Type Inference**: Use TypeScript inference throughout
+- **No `any` Types**: Avoid `any`, use proper types
+
+## Application Layers
+
+### Presentation Layer (`src/app/`)
+- **Pages**: Next.js App Router pages (Server Components)
+- **Layouts**: Shared layouts and nested layouts
+- **Route Groups**: Organize routes with `()` groups
+- **Parallel Routes**: Complex layouts with `@slot`
+
+### Component Layer (`src/components/`)
+- **UI Components**: shadcn/ui components in `ui/`
+- **Feature Components**: Feature-specific components
+- **Layout Components**: Navigation, sidebars, headers
+- **Form Components**: Form inputs and validation
+
+### Data Layer (`src/data/`)
+- **Server Actions**: Type-safe mutations
+- **Server Queries**: Data fetching functions
+- **Client Queries**: React Query hooks (in `client/`)
+- **Organization**: By context (admin/anon/auth/user)
+
+### Infrastructure Layer (`src/supabase-clients/`, `src/middlewares/`)
+- **Supabase Clients**: Different clients for different contexts
+- **Middleware**: Request processing chain
+- **Authentication**: Auth flow management
+- **Authorization**: Permission checks
+
+## Data Flow Patterns
+
+### Read Operations
+```
+Client Request
+    ↓
+Middleware (Auth, Locale)
+    ↓
+Server Component
+    ↓
+Data Fetching Function
+    ↓
+Supabase Client (with RLS)
+    ↓
+PostgreSQL Database
+    ↓
+RLS Policy Check
+    ↓
+Return Data
+```
+
+### Write Operations
+```
+Client Form Submission
+    ↓
+Server Action (Validation)
+    ↓
+Supabase Client (with RLS)
+    ↓
+PostgreSQL Database
+    ↓
+RLS Policy Check
+    ↓
+Mutation Execution
+    ↓
+Revalidate Paths
+    ↓
+Return Result
+```
+
+## Routing Architecture
+
+### Route Structure
+```
+[locale]/
+├── (dynamic-pages)/
+│   ├── (authenticated-pages)/  # Protected routes
+│   ├── (login-pages)/         # Auth pages
+│   └── (external-pages)/      # Public pages
+└── api/                       # API routes
+```
+
+### Route Groups
+- **`(dynamic-pages)`**: Pages with dynamic content
+- **`(authenticated-pages)`**: Require authentication
+- **`(login-pages)`**: Authentication pages
+- **`(external-pages)`**: Public marketing pages
+
+### Parallel Routes
+Used for complex layouts:
+- `@navbar`: Navigation bar slot
+- `@sidebar`: Sidebar slot
+- Multiple parallel routes per layout
+
+## State Management
+
+### Server State
+- **React Query**: Client-side server state caching
+- **Server Components**: Server-side data fetching
+- **Revalidation**: Next.js revalidation strategies
+
+### Client State
+- **React Hook Form**: Form state
+- **React State**: Component state
+- **Context API**: Shared client state
+
+### Real-Time State
+- **Supabase Realtime**: Live database updates
+- **WebSocket Connections**: Persistent connections
+- **Subscription Management**: Automatic cleanup
+
+## Security Architecture
+
+### Authentication Flow
+```
+User Login
+    ↓
+Supabase Auth
+    ↓
+JWT Token Generated
+    ↓
+Token Stored (HttpOnly Cookie)
+    ↓
+Middleware Validates Token
+    ↓
+User Session Established
+```
+
+### Authorization Flow
+```
+Request Received
+    ↓
+Middleware Checks Auth
+    ↓
+Route Handler Checks Permissions
+    ↓
+Database Query with RLS
+    ↓
+RLS Policy Evaluates Access
+    ↓
+Data Returned (if authorized)
+```
+
+### Multi-Tenant Isolation
+```
+User Request
+    ↓
+Workspace Context Identified
+    ↓
+RLS Policy Checks Membership
+    ↓
+Query Filtered by Workspace
+    ↓
+Only Workspace Data Returned
+```
+
+## Performance Optimizations
+
+### 1. Server Components
+- Reduced JavaScript bundle
+- Faster initial page load
+- Better SEO
+
+### 2. Database Indexing
+- Strategic indexes on foreign keys
+- Composite indexes for common queries
+- Query optimization
+
+### 3. Caching Strategies
+- React Query caching
+- Next.js data cache
+- Static page generation where possible
+
+### 4. Code Splitting
+- Automatic route-based splitting
+- Dynamic imports for heavy components
+- Lazy loading
+
+## Extension Points
+
+### Adding New Features
+1. **Database**: Create migrations in `supabase/migrations/`
+2. **Types**: Generate types with `pnpm generate:types`
+3. **Data Layer**: Add server actions in `src/data/`
+4. **Components**: Create UI in `src/components/`
+5. **Pages**: Add routes in `src/app/`
+
+### Customizing Authentication
+- Modify `src/middlewares/auth-middleware.ts`
+- Update `src/data/auth/auth.ts`
+- Customize auth pages in `src/app/[locale]/(dynamic-pages)/(login-pages)/`
+
+### Adding Payment Gateways
+- Implement `PaymentGateway` interface
+- Add to `src/payments/`
+- Update `PAYMENT_PROVIDER` constant
+
+## Best Practices
+
+1. **Use Server Components** by default
+2. **Validate on the server** with Zod
+3. **Use RLS policies** for security
+4. **Type everything** with TypeScript
+5. **Test thoroughly** with Playwright and Vitest
+6. **Follow conventions** in the codebase
+7. **Document changes** in migrations
+
+## Anti-Patterns to Avoid
+
+1. ❌ Fetching data in client components unnecessarily
+2. ❌ Skipping server-side validation
+3. ❌ Bypassing RLS policies
+4. ❌ Using `any` types
+5. ❌ Forgetting to revalidate paths
+6. ❌ Ignoring error handling
+7. ❌ Duplicating existing patterns
+8. ❌ Breaking type safety
