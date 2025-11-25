@@ -13,8 +13,9 @@ import { redirect } from 'next/navigation';
 export default async function MessageDetailPage({
   params,
 }: {
-  params: { locale: string; messageId: string };
+  params: Promise<{ locale: string; messageId: string }>;
 }) {
+  const { messageId } = await params;
   const { data: { user } } = await getUser();
   if (!user) {
     redirect('/login');
@@ -48,7 +49,7 @@ export default async function MessageDetailPage({
       <div className="flex-1 overflow-hidden">
         <Suspense fallback={<MessageDetailSkeleton />}>
           <MessageDetailView
-            messageId={params.messageId}
+            messageId={messageId}
             workspaceId={workspace.id}
             userId={user.id}
           />
