@@ -173,8 +173,8 @@ Respond ONLY with valid JSON in this exact format:
         subject: message.subject,
         sender: message.sender_email,
         bodyLength: message.body.length,
-      },
-      output_data: result,
+      } as any,
+      output_data: result as any,
       success: true,
       processing_time_ms: processingTime,
     });

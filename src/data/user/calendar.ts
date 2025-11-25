@@ -48,7 +48,7 @@ export const createCalendarConnectionAction = authActionClient
       .from('calendar_connections')
       .select('id')
       .eq('workspace_id', workspaceId)
-      .eq('provider', provider)
+      .eq('provider', provider as any)
       .eq('provider_account_id', data.providerAccountId)
       .single();
 
@@ -77,8 +77,15 @@ export const createCalendarConnectionAction = authActionClient
       .insert({
         workspace_id: workspaceId,
         user_id: userId,
-        provider,
-        ...data,
+        provider: provider as any,
+        provider_account_id: data.providerAccountId,
+        provider_account_email: data.providerAccountEmail,
+        access_token: data.accessToken,
+        refresh_token: data.refreshToken,
+        token_expires_at: data.tokenExpiresAt,
+        scopes: data.scopes,
+        metadata: data.metadata,
+        status: 'active',
       })
       .select()
       .single();
@@ -122,7 +129,7 @@ export const createEventAction = authActionClient
           .insert({
             workspace_id: workspaceId,
             user_id: userId,
-            provider: 'aiva', // Aiva default calendar (no external integration required)
+            provider: 'aiva' as any, // Aiva default calendar (no external integration required)
             provider_account_id: `aiva-${workspaceId}`,
             provider_account_email: `aiva-calendar@${workspaceId}.aiva.io`,
             access_token: '',
@@ -381,7 +388,7 @@ export const toggleCalendarVisibilityAction = authActionClient
     // Get current visibility status
     const { data: current } = await supabase
       .from('calendar_connections')
-      .select('is_visible')
+      .select('is_visible' as any)
       .eq('id', id)
       .eq('workspace_id', workspaceId)
       .single();
@@ -389,12 +396,13 @@ export const toggleCalendarVisibilityAction = authActionClient
     if (!current) throw new Error('Calendar not found');
 
     // Toggle visibility
+    const currentVisible = (current as any)?.is_visible ?? true;
     const { data, error } = await supabase
       .from('calendar_connections')
       .update({
-        is_visible: !current.is_visible,
+        is_visible: !currentVisible,
         updated_at: new Date().toISOString(),
-      })
+      } as any)
       .eq('id', id)
       .eq('workspace_id', workspaceId)
       .select()

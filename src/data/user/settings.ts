@@ -67,13 +67,13 @@ export const updateAISettingsAction = authActionClient
       .eq('workspace_id', workspaceId)
       .single();
 
-    const currentSettings = existing?.workspace_settings || {};
+    const currentSettings = (existing?.workspace_settings || {}) as Record<string, any>;
 
     // Update AI settings
     const updatedSettings = {
       ...currentSettings,
       ai: {
-        ...(currentSettings.ai || {}),
+        ...((currentSettings.ai as Record<string, any>) || {}),
         autoClassify: settings.autoClassify,
         autoExtractTasks: settings.autoExtractTasks,
         autoCreateEvents: settings.autoCreateEvents,
@@ -83,8 +83,8 @@ export const updateAISettingsAction = authActionClient
 
     // Remove undefined values
     Object.keys(updatedSettings.ai).forEach((key) => {
-      if (updatedSettings.ai[key] === undefined) {
-        delete updatedSettings.ai[key];
+      if ((updatedSettings.ai as Record<string, any>)[key] === undefined) {
+        delete (updatedSettings.ai as Record<string, any>)[key];
       }
     });
 
@@ -122,13 +122,13 @@ export const updateNotificationSettingsAction = authActionClient
       .eq('workspace_id', workspaceId)
       .single();
 
-    const currentSettings = existing?.workspace_settings || {};
+    const currentSettings = (existing?.workspace_settings || {}) as Record<string, any>;
 
     // Update notification settings
     const updatedSettings = {
       ...currentSettings,
       notifications: {
-        ...(currentSettings.notifications || {}),
+        ...((currentSettings.notifications as Record<string, any>) || {}),
         email: settings.emailNotifications,
         push: settings.pushNotifications,
       },
@@ -136,8 +136,8 @@ export const updateNotificationSettingsAction = authActionClient
 
     // Remove undefined values
     Object.keys(updatedSettings.notifications).forEach((key) => {
-      if (updatedSettings.notifications[key] === undefined) {
-        delete updatedSettings.notifications[key];
+      if ((updatedSettings.notifications as Record<string, any>)[key] === undefined) {
+        delete (updatedSettings.notifications as Record<string, any>)[key];
       }
     });
 
@@ -210,7 +210,7 @@ export const updateWorkspaceSettingsAction = authActionClient
         .eq('workspace_id', workspaceId)
         .single();
 
-      const currentSettings = existing?.workspace_settings || {};
+      const currentSettings = (existing?.workspace_settings || {}) as Record<string, any>;
 
       const updatedSettings = {
         ...currentSettings,
@@ -255,7 +255,7 @@ export const updateSyncSettingsAction = authActionClient
         .eq('workspace_id', workspaceId)
         .single();
 
-      const currentSettings = existing?.workspace_settings || {};
+      const currentSettings = (existing?.workspace_settings || {}) as Record<string, any>;
 
       const updatedSettings = {
         ...currentSettings,

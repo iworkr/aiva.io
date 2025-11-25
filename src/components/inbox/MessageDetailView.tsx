@@ -28,6 +28,7 @@ import { toast } from 'sonner';
 import {
   markMessageAsReadAction,
   starMessageAction,
+  unstarMessageAction,
   archiveMessageAction,
 } from '@/data/user/messages';
 import { useAction } from 'next-safe-action/hooks';
@@ -67,8 +68,8 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
         setMessage(data);
         
         // Mark as read
-        if (!data.read_status) {
-          markAsRead({ messageId, workspaceId });
+        if (!data.is_read) {
+          markAsRead({ id: messageId, workspaceId });
         }
       }
       
@@ -82,17 +83,27 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
   const { execute: markAsRead } = useAction(markMessageAsReadAction, {
     onSuccess: () => {
       if (message) {
-        setMessage({ ...message, read_status: true });
+        setMessage({ ...message, is_read: true });
       }
     },
   });
 
   // Star message
-  const { execute: toggleStar } = useAction(starMessageAction, {
+  const { execute: starMessage } = useAction(starMessageAction, {
     onSuccess: () => {
       if (message) {
-        setMessage({ ...message, starred: !message.starred });
-        toast.success(message.starred ? 'Unstarred' : 'Starred');
+        setMessage({ ...message, is_starred: true });
+        toast.success('Starred');
+      }
+    },
+  });
+
+  // Unstar message
+  const { execute: unstarMessage } = useAction(unstarMessageAction, {
+    onSuccess: () => {
+      if (message) {
+        setMessage({ ...message, is_starred: false });
+        toast.success('Unstarred');
       }
     },
   });
@@ -104,6 +115,15 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
       window.history.back();
     },
   });
+
+  // Toggle star handler
+  const handleToggleStar = () => {
+    if (message?.is_starred) {
+      unstarMessage({ id: messageId, workspaceId });
+    } else {
+      starMessage({ id: messageId, workspaceId });
+    }
+  };
 
   // Create event from message
   const handleCreateEvent = async () => {
@@ -173,16 +193,16 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => toggleStar({ messageId, workspaceId, starred: !message.starred })}
+                  onClick={handleToggleStar}
                 >
                   <Star
-                    className={message.starred ? 'fill-yellow-400 text-yellow-400' : ''}
+                    className={message.is_starred ? 'fill-yellow-400 text-yellow-400' : ''}
                   />
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => archive({ messageId, workspaceId, archived: true })}
+                  onClick={() => archive({ id: messageId, workspaceId })}
                 >
                   <Archive />
                 </Button>

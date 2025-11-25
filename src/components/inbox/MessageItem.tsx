@@ -87,7 +87,7 @@ export function MessageItem({ message, workspaceId, onUpdate }: MessageItemProps
   const handleClick = () => {
     // Mark as read if unread
     if (!message.is_read) {
-      markAsRead({ messageId: message.id, workspaceId });
+      markAsRead({ id: message.id, workspaceId });
     }
     // Navigate to message detail
     router.push(`/inbox/${message.id}`);
@@ -95,22 +95,22 @@ export function MessageItem({ message, workspaceId, onUpdate }: MessageItemProps
 
   const handleStarClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    toggleStar({ messageId: message.id, workspaceId, starred: !isStarred });
+    toggleStar({ id: message.id, workspaceId });
   };
 
   const handleMarkAsRead = (e: React.MouseEvent) => {
     e.stopPropagation();
-    markAsRead({ messageId: message.id, workspaceId });
+    markAsRead({ id: message.id, workspaceId });
   };
 
   const handleMarkAsUnread = (e: React.MouseEvent) => {
     e.stopPropagation();
-    markAsUnread({ messageId: message.id, workspaceId });
+    markAsUnread({ id: message.id, workspaceId });
   };
 
   const handleArchive = (e: React.MouseEvent) => {
     e.stopPropagation();
-    archive({ messageId: message.id, workspaceId, archived: true });
+    archive({ id: message.id, workspaceId });
   };
 
   // Get provider icon

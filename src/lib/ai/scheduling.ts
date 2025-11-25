@@ -160,7 +160,7 @@ export async function autoCreateEventFromMessage(
 
     return {
       success: true,
-      event: result.data,
+      event: result?.data,
       message: 'Event created successfully',
     };
   } catch (error) {

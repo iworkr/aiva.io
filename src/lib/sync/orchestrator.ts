@@ -127,8 +127,8 @@ export async function syncChannelConnection(
       provider: connection.provider,
       connectionId,
       accountName: connection.provider_account_name,
-      success: true,
       ...syncResult,
+      success: true,
     };
   } catch (error) {
     return {

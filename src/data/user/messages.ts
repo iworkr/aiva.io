@@ -177,12 +177,26 @@ export const createMessageAction = authActionClient
       };
     }
 
-    // Create message
+    // Create message - convert camelCase to snake_case for database
     const { data, error } = await supabase
       .from('messages')
       .insert({
-        ...messageData,
         workspace_id: workspaceId,
+        channel_connection_id: messageData.channelConnectionId,
+        thread_id: messageData.threadId,
+        provider_message_id: messageData.providerMessageId,
+        provider_thread_id: messageData.providerThreadId,
+        subject: messageData.subject,
+        body: messageData.body,
+        body_html: messageData.bodyHtml,
+        snippet: messageData.snippet,
+        sender_email: messageData.senderEmail,
+        sender_name: messageData.senderName,
+        recipients: messageData.recipients,
+        timestamp: messageData.timestamp,
+        labels: messageData.labels,
+        attachments: messageData.attachments,
+        raw_data: messageData.rawData,
       })
       .select()
       .single();

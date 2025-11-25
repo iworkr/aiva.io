@@ -25,12 +25,15 @@ import { useDebouncedValue } from '@/hooks/usePrefetch';
 import { allIntegrations } from '@/lib/integrations/config';
 import { IntegrationAvatars } from '@/components/integrations/IntegrationAvatars';
 
+type MessagePriority = 'high' | 'medium' | 'low' | 'noise';
+type MessageCategory = 'sales_lead' | 'client_support' | 'internal' | 'social' | 'marketing' | 'personal' | 'other';
+
 interface InboxViewProps {
   workspaceId: string;
   userId: string;
   filters?: {
-    priority?: string;
-    category?: string;
+    priority?: MessagePriority;
+    category?: MessageCategory;
     channel?: string;
     status?: string;
   };

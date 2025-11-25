@@ -124,7 +124,6 @@ export function CreateEditContactDialog({
     if (isEditing) {
       updateContact({
         id: contact.id,
-        workspaceId,
         ...data,
       });
     } else {

@@ -71,13 +71,29 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const [settings, profile] = await Promise.all([
+        const [rawSettings, profile] = await Promise.all([
           getWorkspaceSettings(workspaceId, userId),
           getUserProfile(userId),
         ]);
 
+        // Type assertion for settings
+        const settings = rawSettings as {
+          ai?: {
+            autoClassify?: boolean;
+            autoExtractTasks?: boolean;
+            autoCreateEvents?: boolean;
+            defaultReplyTone?: string;
+          };
+          notifications?: {
+            email?: boolean;
+            push?: boolean;
+          };
+          timezone?: string;
+          syncFrequency?: number;
+        };
+
         // Set AI settings
-        if (settings.ai) {
+        if (settings?.ai) {
           setAutoClassify(settings.ai.autoClassify ?? true);
           setAutoTasks(settings.ai.autoExtractTasks ?? false);
           setAutoEvents(settings.ai.autoCreateEvents ?? false);
@@ -85,7 +101,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
         }
 
         // Set notification settings
-        if (settings.notifications) {
+        if (settings?.notifications) {
           setEmailNotifications(settings.notifications.email ?? true);
           setPushNotifications(settings.notifications.push ?? true);
         }
@@ -96,10 +112,10 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
         }
 
         // Set sync settings (timezone, sync frequency)
-        if (settings.timezone) {
+        if (settings?.timezone) {
           setTimezone(settings.timezone);
         }
-        if (settings.syncFrequency) {
+        if (settings?.syncFrequency) {
           setSyncFrequency(String(settings.syncFrequency));
         }
       } catch (error) {

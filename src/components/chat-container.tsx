@@ -49,25 +49,13 @@ export function ChatContainer({
       initialMessages,
       id,
       body: { id },
-      onFinish({ content }) {
-        messages.push(
-          {
-            role: "user",
-            content: input,
-            id: nanoid(),
-          },
-          {
-            role: "assistant",
-            content,
-            id: nanoid(),
-          },
-        );
-
+      onFinish() {
         if (pathname === `/project/${project.slug}`) {
           const chatPath = `/project/${project.slug}/chats/${id}`;
           window.history.replaceState(null, "", chatPath);
         }
 
+        // Save chat with current messages - they're already managed by useChat
         saveChat({
           chatId: id ?? nanoid(),
           projectId: project.id,

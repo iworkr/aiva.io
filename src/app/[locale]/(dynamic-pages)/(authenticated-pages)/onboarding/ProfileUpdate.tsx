@@ -30,7 +30,7 @@ export function ProfileUpdate() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const avatarUrlWithFallback = getUserAvatarUrl({
-    profileAvatarUrl: avatarURLState ?? userProfile.avatar_url,
+    profileAvatarUrl: avatarURLState ?? userProfile?.avatar_url,
     email: userEmail,
   });
 
@@ -41,7 +41,7 @@ export function ProfileUpdate() {
   const form = useForm({
     resolver: zodResolver(profileUpdateFormSchema),
     defaultValues: {
-      fullName: userProfile.full_name ?? "",
+      fullName: userProfile?.full_name ?? "",
     },
     errors: hookFormValidationErrors,
   });

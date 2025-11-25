@@ -53,11 +53,23 @@ export default async function InboxPage({
   // Await searchParams before using (Next.js 15 requirement)
   const resolvedSearchParams = await searchParams;
 
-  // Parse filters from search params
-  const priority = resolvedSearchParams.priority as string | undefined;
-  const category = resolvedSearchParams.category as string | undefined;
+  // Valid priority and category values
+  const validPriorities = ['high', 'medium', 'low', 'noise'] as const;
+  const validCategories = ['sales_lead', 'client_support', 'internal', 'social', 'marketing', 'personal', 'other'] as const;
+
+  // Parse and validate filters from search params
+  const priorityParam = resolvedSearchParams.priority as string | undefined;
+  const categoryParam = resolvedSearchParams.category as string | undefined;
   const channel = resolvedSearchParams.channel as string | undefined;
   const status = resolvedSearchParams.status === 'unread' ? 'unread' : undefined;
+
+  // Validate priority and category values
+  const priority = priorityParam && validPriorities.includes(priorityParam as any) 
+    ? priorityParam as typeof validPriorities[number] 
+    : undefined;
+  const category = categoryParam && validCategories.includes(categoryParam as any) 
+    ? categoryParam as typeof validCategories[number] 
+    : undefined;
 
   return (
     <Suspense fallback={<InboxSkeleton />}>

@@ -106,7 +106,7 @@ export async function MorningBrief() {
       .from('messages')
       .select('id, subject, body, priority, created_at, is_read, channel_connection:channel_connections(provider)')
       .eq('workspace_id', workspaceId)
-      .in('priority', ['urgent', 'high'])
+      .in('priority', ['high'])
       .eq('is_read', false)
       .order('priority', { ascending: false })
       .order('created_at', { ascending: false })

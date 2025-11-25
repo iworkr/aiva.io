@@ -33,7 +33,7 @@ async function SidebarFooterUserMenu() {
   ]);
   const avatarImage = getUserAvatarUrl({
     email: user.email,
-    profileAvatarUrl: data.avatar_url,
+    profileAvatarUrl: data?.avatar_url,
   });
   return (
     <SidebarMenu data-testid="sidebar-user-nav-menu">
@@ -48,13 +48,13 @@ async function SidebarFooterUserMenu() {
               <Avatar className="h-8 w-8 rounded-lg">
                 <AvatarImage
                   src={avatarImage}
-                  alt={data.full_name ?? user.email}
+                  alt={data?.full_name ?? user.email}
                 />
                 <AvatarFallback className="rounded-lg">CN</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">
-                  {data.full_name ?? user.email}
+                  {data?.full_name ?? user.email}
                 </span>
                 <span className="truncate text-xs">{user.email}</span>
               </div>
@@ -73,13 +73,13 @@ async function SidebarFooterUserMenu() {
                 <Avatar className="h-8 w-8 rounded-lg">
                   <AvatarImage
                     src={avatarImage}
-                    alt={data.full_name ?? user.email}
+                    alt={data?.full_name ?? user.email}
                   />
                   <AvatarFallback className="rounded-lg">CN</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">
-                    {data.full_name ?? user.email}
+                    {data?.full_name ?? user.email}
                   </span>
                   <span className="truncate text-xs">{user.email}</span>
                 </div>

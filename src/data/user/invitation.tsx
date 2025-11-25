@@ -258,7 +258,7 @@ export const acceptInvitationAction = authActionClient
       {
         workspaceId: invitation.workspace_id,
         workspaceSlug: workspace.slug,
-        inviteeFullName: userProfile.full_name ?? `User ${userProfile.id}`,
+        inviteeFullName: userProfile?.full_name ?? `User ${userProfile?.id || 'Unknown'}`,
       },
     );
 

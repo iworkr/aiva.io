@@ -69,7 +69,6 @@ export async function POST(request: NextRequest) {
     const result = await syncChannelConnection(connectionId, workspaceId, {
       maxMessages: maxMessages || 50,
       autoClassify: body.autoClassify !== false, // Default true
-      autoCreateTasks: body.autoCreateTasks === true, // Default false
     });
 
     if (!result.success) {

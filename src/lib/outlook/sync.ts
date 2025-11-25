@@ -103,7 +103,7 @@ export async function syncOutlookMessages(
           rawData: parsed.rawData,
         });
 
-        if (result?.data && !result.isDuplicate) {
+        if (result?.data && !(result.data as any).isDuplicate) {
           newCount++;
         }
         syncedCount++;

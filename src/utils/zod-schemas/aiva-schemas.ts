@@ -66,6 +66,7 @@ export const MessageActionabilitySchema = z.enum([
 ]);
 
 export const CalendarProviderSchema = z.enum([
+  'aiva',
   'google_calendar',
   'outlook_calendar',
   'apple_calendar',
@@ -228,6 +229,7 @@ export const createCalendarConnectionSchema = z.object({
 
 export const updateCalendarConnectionSchema = z.object({
   id: z.string().uuid(),
+  workspaceId: z.string().uuid(),
   accessToken: z.string().min(1).optional(),
   refreshToken: z.string().optional(),
   tokenExpiresAt: z.string().datetime().optional(),

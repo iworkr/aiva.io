@@ -106,7 +106,7 @@ export async function syncGmailMessages(
           rawData: parsed.rawData,
         });
 
-        if (result?.data && !result.isDuplicate) {
+        if (result?.data && !(result.data as any).isDuplicate) {
           newCount++;
         }
         syncedCount++;
@@ -186,7 +186,7 @@ export async function syncAllGmailConnectionsForWorkspace(workspaceId: string) {
     }
   }
 
-  const totalNew = results.reduce((sum, r) => sum + (r.newCount || 0), 0);
+  const totalNew = results.reduce((sum, r) => sum + ((r as any).newCount || 0), 0);
 
   return {
     success: true,
@@ -276,7 +276,7 @@ export async function syncGmailThread(
         rawData: parsed.rawData,
       });
 
-      if (result?.data && !result.isDuplicate) {
+      if (result?.data && !(result.data as any).isDuplicate) {
         newCount++;
       }
       syncedCount++;
