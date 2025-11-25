@@ -12,20 +12,19 @@ services:
     region: oregon # Change to your preferred region
     plan: starter # starter, standard, pro, pro plus, pro max
     branch: main
-    
+
     # Build Configuration
     buildCommand: |
       corepack enable pnpm
       pnpm install --frozen-lockfile
       pnpm build
     startCommand: pnpm start
-    
     # Health Check Configuration
     healthCheckPath: /api/health
-    
+
     # Auto-Deploy on Push
     autoDeploy: true
-    
+
     # Node.js Version
     envVars:
       - key: NODE_VERSION
@@ -34,7 +33,7 @@ services:
         value: "false"
       - key: NODE_ENV
         value: production
-      
+
       # ==========================================================================
       # SUPABASE CONFIGURATION (Required)
       # ==========================================================================
@@ -51,13 +50,13 @@ services:
         sync: false
       - key: SUPABASE_DATABASE_PASSWORD
         sync: false
-      
+
       # ==========================================================================
       # APPLICATION URLS
       # ==========================================================================
       - key: NEXT_PUBLIC_SITE_URL
         sync: false
-      
+
       # ==========================================================================
       # STRIPE (Optional - for Billing)
       # ==========================================================================
@@ -67,13 +66,13 @@ services:
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
-      
+
       # ==========================================================================
       # OPENAI (Required for AI Features)
       # ==========================================================================
       - key: OPENAI_API_KEY
         sync: false
-      
+
       # ==========================================================================
       # GOOGLE INTEGRATION (Gmail & Calendar)
       # ==========================================================================
@@ -83,7 +82,7 @@ services:
         sync: false
       - key: GOOGLE_PUBSUB_TOPIC
         sync: false
-      
+
       # ==========================================================================
       # MICROSOFT INTEGRATION (Outlook & Calendar)
       # ==========================================================================
@@ -97,7 +96,7 @@ services:
         sync: false
       - key: MICROSOFT_CLIENT_SECRET
         sync: false
-      
+
       # ==========================================================================
       # SLACK INTEGRATION (Optional)
       # ==========================================================================
@@ -107,19 +106,19 @@ services:
         sync: false
       - key: SLACK_SIGNING_SECRET
         sync: false
-      
+
       # ==========================================================================
       # EMAIL SERVICE
       # ==========================================================================
       - key: RESEND_API_KEY
         sync: false
-      
+
       # ==========================================================================
       # ADMIN CONFIGURATION
       # ==========================================================================
       - key: ADMIN_EMAIL
         sync: false
-      
+
       # ==========================================================================
       # ANALYTICS (Optional)
       # ==========================================================================
@@ -131,7 +130,7 @@ services:
         sync: false
       - key: NEXT_PUBLIC_GA_ID
         sync: false
-      
+
       # ==========================================================================
       # ERROR TRACKING (Optional)
       # ==========================================================================
@@ -139,7 +138,7 @@ services:
         sync: false
       - key: NEXT_PUBLIC_SENTRY_DSN
         sync: false
-      
+
       # ==========================================================================
       # API KEY MANAGEMENT (Optional)
       # ==========================================================================
@@ -147,7 +146,7 @@ services:
         sync: false
       - key: UNKEY_API_ID
         sync: false
-      
+
       # ==========================================================================
       # OAUTH PROVIDERS (Optional)
       # ==========================================================================
@@ -207,7 +206,6 @@ envVarGroups:
     envVars:
       - key: NODE_ENV
         value: production
-
 # ============================================================================
 # DEPLOYMENT NOTES
 # ============================================================================
