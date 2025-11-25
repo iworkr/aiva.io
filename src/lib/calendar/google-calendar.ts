@@ -11,7 +11,7 @@ import { createCalendarConnectionAction } from '@/data/user/calendar';
 /**
  * Initiate Google Calendar OAuth
  */
-export function getGoogleCalendarAuthUrl(workspaceId: string, userId: string): string {
+export async function getGoogleCalendarAuthUrl(workspaceId: string, userId: string): Promise<string> {
   const clientId = process.env.GOOGLE_CLIENT_ID!;
   const redirectUri = `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/calendar/google/callback`;
 

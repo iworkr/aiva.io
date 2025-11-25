@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseUserServerComponentClient } from '@/supabase-clients/user/createSupabaseUserServerComponentClient';
-import { getSoloWorkspace } from '@/rsc-data/user/get-solo-workspace';
+import { getSoloWorkspace } from '@/data/user/workspaces';
 import { runAllTests } from '@/lib/test-utils/aiva-tests';
 
 export async function GET(request: NextRequest) {

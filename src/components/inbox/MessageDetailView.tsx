@@ -6,7 +6,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createSupabaseUserBrowserClient } from '@/supabase-clients/user/createSupabaseUserBrowserClient';
+import { supabaseUserClientComponent } from '@/supabase-clients/user/supabaseUserClientComponent';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -48,7 +48,7 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
   // Fetch message
   useEffect(() => {
     const fetchMessage = async () => {
-      const supabase = createSupabaseUserBrowserClient();
+      const supabase = supabaseUserClientComponent;
       
       const { data, error } = await supabase
         .from('messages')
