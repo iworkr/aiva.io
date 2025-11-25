@@ -89,9 +89,26 @@ Vercel is the recommended platform for Next.js applications.
   package = "@netlify/plugin-nextjs"
 ```
 
-### Render
+### Render (Blueprint Deployment)
 
-#### Setup
+Aiva.io includes a `render.yaml` Blueprint specification for one-click deployment.
+
+#### Quick Deploy
+
+1. **Deploy with Blueprint**:
+   - Go to [render.com/blueprints](https://dashboard.render.com/blueprints)
+   - Click "New Blueprint Instance"
+   - Connect your GitHub repository
+   - Render auto-detects `render.yaml`
+
+2. **Configure Environment Variables**:
+   - Set required variables in Render Dashboard
+   - See `.env.example` for complete list
+
+3. **Verify Deployment**:
+   - Check health endpoint: `https://your-app.onrender.com/api/health`
+
+#### Manual Setup (Alternative)
 
 1. **Create Web Service**:
    - Go to [render.com](https://render.com)
@@ -99,17 +116,20 @@ Vercel is the recommended platform for Next.js applications.
    - Connect repository
 
 2. **Configure Service**:
-   - **Build Command**: `pnpm install && pnpm build`
+   - **Build Command**: `pnpm install --frozen-lockfile && pnpm build`
    - **Start Command**: `pnpm start`
-   - **Environment**: Node
+   - **Environment**: Node 20
+   - **Health Check Path**: `/api/health`
 
 3. **Environment Variables**:
    - Go to Environment → Environment Variables
-   - Add all required variables
+   - Add all required variables (see [RENDER-DEPLOYMENT.md](./RENDER-DEPLOYMENT.md))
 
 4. **Deploy**:
    - Auto-deploys on push to main
    - Manual deploy available
+
+**For detailed Render deployment instructions, see [RENDER-DEPLOYMENT.md](./RENDER-DEPLOYMENT.md)**
 
 ## Pre-Deployment Checklist
 

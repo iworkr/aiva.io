@@ -44,19 +44,44 @@ Built on **Nextbase Ultimate v3.1.0** - a production-ready SaaS foundation.
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Start development server
-npm run dev
+pnpm dev
 
 # Generate TypeScript types from Supabase
-npm run generate:types
+pnpm generate:types
 
 # Run tests
-npm test
+pnpm test
 ```
 
 See [docs/development.md](./docs/development.md) for complete development guide.
+
+## 🚀 Deployment
+
+### Deploy to Render (Recommended)
+
+One-click deployment using Blueprint:
+
+1. Push code to GitHub
+2. Go to [Render Blueprints](https://dashboard.render.com/blueprints)
+3. Click "New Blueprint Instance"
+4. Connect your repository (Render auto-detects `render.yaml`)
+5. Configure environment variables
+6. Deploy!
+
+```bash
+# Verify deployment
+curl https://your-app.onrender.com/api/health
+```
+
+### Other Platforms
+
+- **Vercel**: `vercel deploy`
+- **Netlify**: Auto-deploys with `netlify.toml`
+
+See [docs/RENDER-DEPLOYMENT.md](./docs/RENDER-DEPLOYMENT.md) for detailed deployment guide.
 
 ## 🔑 Important Notes
 

@@ -256,16 +256,23 @@
     "dev:debug": "NODE_OPTIONS='--inspect' next dev --turbo",
     "email:dev": "email dev",
     "start": "next start",
+    "start:production": "NODE_ENV=production next start -p ${PORT:-3000}",
     "generate:types": "supabase gen types typescript --linked --schema public > src/lib/database.types.ts",
     "generate:types:local": "supabase gen types typescript --local > src/lib/database.types.ts",
     "build": "content-collections build && next build",
+    "build:production": "NODE_ENV=production content-collections build && next build",
+    "postbuild": "echo 'Build completed successfully'",
     "test:e2e": "cross-env NODE_ENV=test playwright test",
     "test:e2e:ui": "cross-env NODE_ENV=test playwright test --ui",
     "test": "vitest --root src",
     "lint:eslint": "pnpm eslint --fix src",
     "lint:prettier": "prettier --write src",
     "lint": "pnpm lint:eslint && pnpm lint:prettier",
-    "tsc": "tsc"
+    "lint:ci": "pnpm eslint src && pnpm tsc --noEmit",
+    "tsc": "tsc",
+    "health": "curl -s http://localhost:3000/api/health | jq",
+    "db:push": "supabase db push",
+    "db:migrate": "supabase migration up"
   },
   "overrides": {
     "eslint": "$eslint"

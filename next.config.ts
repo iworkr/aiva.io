@@ -85,6 +85,10 @@ export default async function config(
     },
 
     reactStrictMode: true,
+    
+    // Enable standalone output for Docker/container deployments
+    output: process.env.DOCKER_BUILD === "true" ? "standalone" : undefined,
+    
     turbopack: {
       rules: {
         "*.svg": {
@@ -99,6 +103,10 @@ export default async function config(
     eslint: {
       ignoreDuringBuilds: true,
     },
+    
+    // Production optimizations
+    poweredByHeader: false,
+    compress: true,
   };
   if (phase === PHASE_DEVELOPMENT_SERVER) {
     // If you want to use sentry, uncomment the following line

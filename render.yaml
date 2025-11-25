@@ -1,0 +1,228 @@
+# Aiva.io Render Blueprint Specification
+# Deploy: Create a new Blueprint Instance at https://dashboard.render.com/blueprints
+# Documentation: https://render.com/docs/blueprint-spec
+
+services:
+  # ============================================================================
+  # MAIN WEB SERVICE - Next.js Application
+  # ============================================================================
+  - type: web
+    name: aiva-web
+    runtime: node
+    region: oregon # Change to your preferred region
+    plan: starter # starter, standard, pro, pro plus, pro max
+    branch: main
+    
+    # Build Configuration
+    buildCommand: |
+      corepack enable pnpm
+      pnpm install --frozen-lockfile
+      pnpm build
+    startCommand: pnpm start
+    
+    # Health Check Configuration
+    healthCheckPath: /api/health
+    
+    # Auto-Deploy on Push
+    autoDeploy: true
+    
+    # Node.js Version
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NPM_CONFIG_PRODUCTION
+        value: "false"
+      - key: NODE_ENV
+        value: production
+      
+      # ==========================================================================
+      # SUPABASE CONFIGURATION (Required)
+      # ==========================================================================
+      # Get from: https://supabase.com/dashboard/project/[project-id]/settings/api
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_PROJECT_REF
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: SUPABASE_DATABASE_PASSWORD
+        sync: false
+      
+      # ==========================================================================
+      # APPLICATION URLS
+      # ==========================================================================
+      - key: NEXT_PUBLIC_SITE_URL
+        sync: false
+      
+      # ==========================================================================
+      # STRIPE (Optional - for Billing)
+      # ==========================================================================
+      - key: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      
+      # ==========================================================================
+      # OPENAI (Required for AI Features)
+      # ==========================================================================
+      - key: OPENAI_API_KEY
+        sync: false
+      
+      # ==========================================================================
+      # GOOGLE INTEGRATION (Gmail & Calendar)
+      # ==========================================================================
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_PUBSUB_TOPIC
+        sync: false
+      
+      # ==========================================================================
+      # MICROSOFT INTEGRATION (Outlook & Calendar)
+      # ==========================================================================
+      - key: AZURE_CLIENT_ID
+        sync: false
+      - key: AZURE_CLIENT_SECRET
+        sync: false
+      - key: AZURE_TENANT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_SECRET
+        sync: false
+      
+      # ==========================================================================
+      # SLACK INTEGRATION (Optional)
+      # ==========================================================================
+      - key: SLACK_CLIENT_ID
+        sync: false
+      - key: SLACK_CLIENT_SECRET
+        sync: false
+      - key: SLACK_SIGNING_SECRET
+        sync: false
+      
+      # ==========================================================================
+      # EMAIL SERVICE
+      # ==========================================================================
+      - key: RESEND_API_KEY
+        sync: false
+      
+      # ==========================================================================
+      # ADMIN CONFIGURATION
+      # ==========================================================================
+      - key: ADMIN_EMAIL
+        sync: false
+      
+      # ==========================================================================
+      # ANALYTICS (Optional)
+      # ==========================================================================
+      - key: NEXT_PUBLIC_POSTHOG_API_KEY
+        sync: false
+      - key: NEXT_PUBLIC_POSTHOG_APP_ID
+        sync: false
+      - key: NEXT_PUBLIC_POSTHOG_HOST
+        sync: false
+      - key: NEXT_PUBLIC_GA_ID
+        sync: false
+      
+      # ==========================================================================
+      # ERROR TRACKING (Optional)
+      # ==========================================================================
+      - key: SENTRY_DSN
+        sync: false
+      - key: NEXT_PUBLIC_SENTRY_DSN
+        sync: false
+      
+      # ==========================================================================
+      # API KEY MANAGEMENT (Optional)
+      # ==========================================================================
+      - key: UNKEY_ROOT_KEY
+        sync: false
+      - key: UNKEY_API_ID
+        sync: false
+      
+      # ==========================================================================
+      # OAUTH PROVIDERS (Optional)
+      # ==========================================================================
+      - key: TWITTER_API_KEY
+        sync: false
+      - key: TWITTER_API_SECRET
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+
+    # Scaling Configuration (adjust based on your plan)
+    scaling:
+      minInstances: 1
+      maxInstances: 3
+      targetMemoryPercent: 80
+      targetCPUPercent: 80
+
+    # Headers Configuration
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+
+  # ============================================================================
+  # CRON SERVICE - Background Jobs (Optional)
+  # ============================================================================
+  # Uncomment if you need scheduled jobs
+  # - type: cron
+  #   name: aiva-cleanup
+  #   runtime: node
+  #   schedule: "0 0 * * *" # Daily at midnight
+  #   buildCommand: |
+  #     corepack enable pnpm
+  #     pnpm install --frozen-lockfile
+  #   startCommand: node scripts/cleanup.js
+  #   envVars:
+  #     - key: NODE_VERSION
+  #       value: "20"
+  #     - key: NEXT_PUBLIC_SUPABASE_URL
+  #       sync: false
+  #     - key: SUPABASE_SERVICE_ROLE_KEY
+  #       sync: false
+
+# ============================================================================
+# ENVIRONMENT GROUPS (for shared secrets across services)
+# ============================================================================
+envVarGroups:
+  - name: aiva-production-secrets
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+# ============================================================================
+# DEPLOYMENT NOTES
+# ============================================================================
+# 1. Before deploying:
+#    - Ensure all environment variables are set in Render Dashboard
+#    - Update NEXT_PUBLIC_SITE_URL to your Render URL or custom domain
+#    - Configure Supabase redirect URLs for OAuth
+#
+# 2. After deploying:
+#    - Set up Stripe webhook endpoint: https://your-app.onrender.com/api/stripe/webhooks
+#    - Configure OAuth callback URLs in Google/Microsoft/Slack consoles
+#    - Verify health check at: https://your-app.onrender.com/api/health
+#
+# 3. Custom Domain:
+#    - Go to Settings → Custom Domains in Render Dashboard
+#    - Add your domain and configure DNS
+#    - Update NEXT_PUBLIC_SITE_URL environment variable
+
