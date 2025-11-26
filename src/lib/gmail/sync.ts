@@ -12,6 +12,7 @@ import {
   getGmailMessage,
   parseGmailMessage,
 } from './client';
+import { createMessageAction } from '@/data/user/messages';
 
 /**
  * Sync Gmail messages for a channel connection
@@ -111,16 +112,17 @@ export async function syncGmailMessages(
             channel_connection_id: connectionId,
             provider_message_id: parsed.providerMessageId,
             provider_thread_id: parsed.providerThreadId,
-          subject: parsed.subject,
-          body: parsed.body,
+            subject: parsed.subject,
+            body: parsed.body,
             body_html: parsed.bodyHtml,
-          snippet: parsed.snippet,
+            snippet: parsed.snippet,
             sender_email: parsed.senderEmail,
             sender_name: parsed.senderName,
-          recipients: parsed.recipients,
-          timestamp: parsed.timestamp,
-          labels: parsed.labels,
-            raw_data: parsed.rawData,
+            recipients: parsed.recipients,
+            timestamp: parsed.timestamp,
+            labels: parsed.labels,
+            // Cast to any to satisfy Supabase Json type
+            raw_data: parsed.rawData as any,
           })
           .select('id')
           .single();

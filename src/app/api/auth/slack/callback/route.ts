@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
     }
 
     const accessToken = tokenJson.access_token as string;
-    const botToken = tokenJson.bot_user_id ? tokenJson.access_token : undefined;
+    const botToken = tokenJson.bot_user_id ? (tokenJson.access_token as string) : undefined;
     const team = tokenJson.team || {};
     const authedUser = tokenJson.authed_user || {};
 
@@ -103,8 +103,9 @@ export async function GET(request: NextRequest) {
       providerAccountId: team.id || authedUser.id,
       providerAccountName: team.name || 'Slack Workspace',
       accessToken,
+      // Slack v2 OAuth tokens are typically long‑lived; omit explicit expiry if none provided
       refreshToken: undefined,
-      tokenExpiresAt: null,
+      tokenExpiresAt: undefined,
       scopes: (tokenJson.scope as string | undefined)?.split(',') || [],
       metadata: {
         team,

@@ -117,6 +117,9 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
         toast.error(error.serverError || 'Failed to sync channels');
         console.error('syncWorkspaceConnectionsAction error', error);
       },
+      onSettled: () => {
+        setSyncing(false);
+      },
     }
   );
 
@@ -196,20 +199,13 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
   ]);
 
   // Sync all channels
-  const handleSync = async () => {
+  const handleSync = () => {
     setSyncing(true);
-    syncWorkspaceConnections(
-      {
-        workspaceId,
-        maxMessagesPerConnection: 50,
-        autoClassify: true,
-      },
-      {
-        onSettled: () => {
-          setSyncing(false);
-        },
-      }
-    );
+    syncWorkspaceConnections({
+      workspaceId,
+      maxMessagesPerConnection: 50,
+      autoClassify: true,
+    });
   };
 
   // Filter messages by search query (memoized with debounced search)

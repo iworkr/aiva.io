@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
     const expiresIn = tokenJson.expires_in as number | undefined;
     const tokenExpiresAt = expiresIn
       ? new Date(Date.now() + expiresIn * 1000).toISOString()
-      : null;
+      : undefined;
 
     // Fetch basic user info for display name
     const profileRes = await fetch('https://graph.microsoft.com/v1.0/me', {
