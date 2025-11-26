@@ -56,12 +56,13 @@ export async function GET(request: NextRequest) {
       'https://www.googleapis.com/auth/userinfo.profile',
     ];
 
-    // Build OAuth URL with state
+    // Build OAuth URL with state (include redirectUri to ensure exact match in callback)
     const state = Buffer.from(
       JSON.stringify({
         workspaceId,
         userId: user.id,
         timestamp: Date.now(),
+        redirectUri, // Store the exact redirect URI used
       })
     ).toString('base64');
 

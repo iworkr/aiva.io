@@ -71,7 +71,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Decode state
-    let stateData: { workspaceId: string; userId: string; timestamp: number };
+    let stateData: { 
+      workspaceId: string; 
+      userId: string; 
+      timestamp: number;
+      redirectUri?: string; // Optional for backward compatibility
+    };
     try {
       stateData = JSON.parse(Buffer.from(state, 'base64').toString());
     } catch {
@@ -104,9 +109,17 @@ export async function GET(request: NextRequest) {
     // Exchange code for tokens
     const clientId = process.env.GOOGLE_CLIENT_ID!;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
-    // Ensure no double slashes - remove trailing slash from base URL if present
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '');
-    const redirectUri = `${baseUrl}/api/auth/gmail/callback`;
+    // Use the exact redirect URI from state if available, otherwise construct it
+    // This ensures we use the EXACT same redirect URI that was sent to Google
+    const redirectUri = stateData.redirectUri || 
+      `${process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '')}/api/auth/gmail/callback`;
+
+    console.log('🟡 Token exchange request:', {
+      redirectUri,
+      clientId: clientId?.substring(0, 20) + '...',
+      hasCode: !!code,
+      codeLength: code?.length,
+    });
 
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -114,7 +127,7 @@ export async function GET(request: NextRequest) {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        code,
+        code: code!,
         client_id: clientId,
         client_secret: clientSecret,
         redirect_uri: redirectUri,
@@ -123,10 +136,27 @@ export async function GET(request: NextRequest) {
     });
 
     if (!tokenResponse.ok) {
-      const errorData = await tokenResponse.json();
-      console.error('Token exchange failed:', errorData);
+      const errorText = await tokenResponse.text();
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: errorText };
+      }
+      
+      console.error('❌ Token exchange failed:', {
+        status: tokenResponse.status,
+        statusText: tokenResponse.statusText,
+        error: errorData,
+        redirectUri,
+        requestUrl: request.url,
+      });
+      
+      // Return more specific error message
+      const errorMessage = errorData.error || 'token_exchange_failed';
+      const errorDescription = errorData.error_description || 'Unknown error';
       return NextResponse.redirect(
-        toSiteURL(`${locale}/inbox?error=token_exchange_failed`)
+        toSiteURL(`${locale}/inbox?error=${encodeURIComponent(errorMessage)}&details=${encodeURIComponent(errorDescription)}`)
       );
     }
 
