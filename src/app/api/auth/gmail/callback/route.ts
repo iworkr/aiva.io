@@ -173,12 +173,12 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    if (!result?.data) {
+    if (!result?.data?.data) {
       console.error('Failed to store Gmail connection:', result);
       throw new Error('Failed to store connection');
     }
 
-    console.log('Gmail connection stored successfully:', result.data.id);
+    console.log('Gmail connection stored successfully:', result.data.data.id);
 
     // Redirect to inbox page with success message
     return NextResponse.redirect(
