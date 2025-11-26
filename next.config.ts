@@ -77,6 +77,18 @@ export default async function config(
         },
         {
           protocol: "https",
+          hostname: "www.tryaiva.io",
+          port: "",
+          pathname: "/**",
+        },
+        {
+          protocol: "https",
+          hostname: "tryaiva.io",
+          port: "",
+          pathname: "/**",
+        },
+        {
+          protocol: "https",
           hostname: "oaidalleapiprodscus.blob.core.windows.net",
           port: "",
           pathname: "/**",

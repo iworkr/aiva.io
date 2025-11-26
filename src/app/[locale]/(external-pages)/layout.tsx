@@ -1,6 +1,7 @@
 import { ExternalNavigation } from "@/components/NavigationMenu/ExternalNavbar/ExternalNavigation";
 import { routing } from "@/i18n/routing";
 import { unstable_setRequestLocale } from "next-intl/server";
+import { EnableScrolling } from "./EnableScrolling";
 import "./layout.css";
 export const dynamic = "force-static";
 export const revalidate = 60;
@@ -20,9 +21,12 @@ export default async function Layout(props: {
 
   unstable_setRequestLocale(locale);
   return (
-    <div>
-      <ExternalNavigation />
-      {children}
-    </div>
+    <>
+      <EnableScrolling />
+      <div>
+        <ExternalNavigation />
+        {children}
+      </div>
+    </>
   );
 }
