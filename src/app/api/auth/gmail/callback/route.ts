@@ -4,8 +4,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseUserServerComponentClient } from '@/supabase-clients/user/createSupabaseUserServerComponentClient';
+import { createSupabaseUserRouteHandlerClient } from '@/supabase-clients/user/createSupabaseUserRouteHandlerClient';
 import { createChannelConnectionAction } from '@/data/user/channels';
+import { toSiteURL } from '@/utils/helpers';
+
+// Ensure this route is dynamic and not cached
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 interface GoogleTokenResponse {
   access_token: string;
@@ -21,23 +26,47 @@ interface GoogleUserInfo {
   picture?: string;
 }
 
+// Test endpoint to verify route is accessible
+export async function POST(request: NextRequest) {
+  return NextResponse.json({ 
+    message: 'Gmail callback route is accessible',
+    pathname: request.nextUrl.pathname,
+    timestamp: new Date().toISOString()
+  });
+}
+
 export async function GET(request: NextRequest) {
+  console.log('🔵 Gmail callback route hit!', {
+    url: request.url,
+    pathname: request.nextUrl.pathname,
+    fullUrl: request.nextUrl.toString(),
+    searchParams: Object.fromEntries(request.nextUrl.searchParams),
+    headers: {
+      'user-agent': request.headers.get('user-agent'),
+      'referer': request.headers.get('referer'),
+    }
+  });
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const code = searchParams.get('code');
     const state = searchParams.get('state');
     const error = searchParams.get('error');
 
+    console.log('🔵 Gmail callback params:', { code: !!code, state: !!state, error });
+
+    const locale = 'en'; // Default locale, could be extracted from state if needed
+
     // Handle OAuth errors
     if (error) {
       return NextResponse.redirect(
-        new URL(`/channels?error=${error}`, request.url)
+        toSiteURL(`${locale}/inbox?error=${encodeURIComponent(error)}`)
       );
     }
 
     if (!code || !state) {
       return NextResponse.redirect(
-        new URL('/channels?error=missing_parameters', request.url)
+        toSiteURL(`${locale}/inbox?error=missing_parameters`)
       );
     }
 
@@ -47,32 +76,37 @@ export async function GET(request: NextRequest) {
       stateData = JSON.parse(Buffer.from(state, 'base64').toString());
     } catch {
       return NextResponse.redirect(
-        new URL('/channels?error=invalid_state', request.url)
+        toSiteURL(`${locale}/inbox?error=invalid_state`)
       );
     }
 
     // Validate state timestamp (5 minutes expiry)
     if (Date.now() - stateData.timestamp > 5 * 60 * 1000) {
       return NextResponse.redirect(
-        new URL('/channels?error=expired_state', request.url)
+        toSiteURL(`${locale}/inbox?error=expired_state`)
       );
     }
 
-    // Get authenticated user
-    const supabase = await createSupabaseUserServerComponentClient();
+    // Get authenticated user using route handler client (properly handles cookies)
+    const supabase = await createSupabaseUserRouteHandlerClient();
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser();
 
     if (authError || !user || user.id !== stateData.userId) {
-      return NextResponse.redirect(new URL('/login', request.url));
+      console.error('Auth error in Gmail callback:', authError);
+      return NextResponse.redirect(
+        toSiteURL(`${locale}/login?error=session_expired`)
+      );
     }
 
     // Exchange code for tokens
     const clientId = process.env.GOOGLE_CLIENT_ID!;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
-    const redirectUri = `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/gmail/callback`;
+    // Ensure no double slashes - remove trailing slash from base URL if present
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '');
+    const redirectUri = `${baseUrl}/api/auth/gmail/callback`;
 
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -92,7 +126,7 @@ export async function GET(request: NextRequest) {
       const errorData = await tokenResponse.json();
       console.error('Token exchange failed:', errorData);
       return NextResponse.redirect(
-        new URL('/channels?error=token_exchange_failed', request.url)
+        toSiteURL(`${locale}/inbox?error=token_exchange_failed`)
       );
     }
 
@@ -109,8 +143,9 @@ export async function GET(request: NextRequest) {
     );
 
     if (!userInfoResponse.ok) {
+      console.error('Failed to fetch user info from Google');
       return NextResponse.redirect(
-        new URL('/channels?error=userinfo_failed', request.url)
+        toSiteURL(`${locale}/inbox?error=userinfo_failed`)
       );
     }
 
@@ -122,6 +157,7 @@ export async function GET(request: NextRequest) {
     ).toISOString();
 
     // Store connection in database using server action
+    console.log('Storing Gmail connection for user:', user.id, 'workspace:', stateData.workspaceId);
     const result = await createChannelConnectionAction({
       workspaceId: stateData.workspaceId,
       provider: 'gmail',
@@ -138,17 +174,21 @@ export async function GET(request: NextRequest) {
     });
 
     if (!result?.data) {
+      console.error('Failed to store Gmail connection:', result);
       throw new Error('Failed to store connection');
     }
 
-    // Redirect to channels page with success
+    console.log('Gmail connection stored successfully:', result.data.id);
+
+    // Redirect to inbox page with success message
     return NextResponse.redirect(
-      new URL('/channels?success=gmail_connected', request.url)
+      toSiteURL(`${locale}/inbox?success=gmail_connected`)
     );
   } catch (error) {
     console.error('Gmail OAuth callback error:', error);
+    const locale = 'en';
     return NextResponse.redirect(
-      new URL('/channels?error=connection_failed', request.url)
+      toSiteURL(`${locale}/inbox?error=${encodeURIComponent(error instanceof Error ? error.message : 'connection_failed')}`)
     );
   }
 }
