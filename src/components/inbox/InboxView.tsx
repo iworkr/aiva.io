@@ -13,8 +13,10 @@ import { ChannelSidebar } from './ChannelSidebar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RefreshCw, Search, Inbox as InboxIcon, Plus } from 'lucide-react';
-import { getMessagesAction } from '@/data/user/messages';
-import { syncAllWorkspaceConnections } from '@/lib/sync/orchestrator';
+import {
+  getMessagesAction,
+  syncWorkspaceConnectionsAction,
+} from '@/data/user/messages';
 import { getUserChannelConnections } from '@/data/user/channels';
 import { ConnectChannelDialog } from '@/components/channels/ConnectChannelDialog';
 import { toast } from 'sonner';
@@ -88,6 +90,36 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
     },
   });
 
+  // Sync all workspace connections (server action)
+  const { execute: syncWorkspaceConnections, status: syncStatus } = useAction(
+    syncWorkspaceConnectionsAction,
+    {
+      onSuccess: ({ data }) => {
+        if (data) {
+          toast.success(
+            `Synced ${data.totalNewMessages ?? 0} new message(s) from ${
+              data.totalConnections ?? 0
+            } channel(s)`
+          );
+        }
+        // Refresh messages after sync
+        fetchMessages({
+          workspaceId,
+          channelConnectionId: selectedChannel || undefined,
+          priority: filters?.priority,
+          category: filters?.category,
+          isRead: filters?.status === 'unread' ? false : undefined,
+          limit: 100,
+          offset: 0,
+        });
+      },
+      onError: ({ error }) => {
+        toast.error(error.serverError || 'Failed to sync channels');
+        console.error('syncWorkspaceConnectionsAction error', error);
+      },
+    }
+  );
+
   // Check if user has any channels connected
   useEffect(() => {
     const checkChannels = async () => {
@@ -103,7 +135,7 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
     checkChannels();
   }, [workspaceId, userId]);
 
-  // Load messages on mount and when filters change
+  // Load messages on mount and when filters / channel change
   useEffect(() => {
     // Only fetch messages if user has channels
     if (hasChannels === false) {
@@ -118,8 +150,11 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
     }
 
     setLoading(true);
+
+    // Update URL query params only when they actually change,
+    // to avoid an infinite loop of rerenders + POST /en/inbox calls.
     const params = new URLSearchParams();
-    
+
     if (selectedChannel) {
       params.set('channel', selectedChannel);
     }
@@ -132,50 +167,49 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
     if (filters?.status === 'unread') {
       params.set('status', 'unread');
     }
-    
-    router.push(`?${params.toString()}`);
+
+    const newQuery = params.toString();
+    const currentQuery = searchParams.toString();
+
+    if (newQuery !== currentQuery) {
+      router.replace(`?${newQuery}`);
+    }
 
     fetchMessages({
       workspaceId,
       channelConnectionId: selectedChannel || undefined,
-        priority: filters?.priority,
-        category: filters?.category,
+      priority: filters?.priority,
+      category: filters?.category,
       isRead: filters?.status === 'unread' ? false : undefined,
-        limit: 100,
+      limit: 100,
       offset: 0,
     });
-  }, [workspaceId, selectedChannel, filters?.priority, filters?.category, filters?.status, hasChannels]);
+  }, [
+    workspaceId,
+    selectedChannel,
+    filters?.priority,
+    filters?.category,
+    filters?.status,
+    hasChannels,
+    searchParams,
+    router,
+  ]);
 
   // Sync all channels
   const handleSync = async () => {
     setSyncing(true);
-    try {
-      const result = await syncAllWorkspaceConnections(workspaceId, {
+    syncWorkspaceConnections(
+      {
+        workspaceId,
         maxMessagesPerConnection: 50,
         autoClassify: true,
-      });
-
-      if (result.success) {
-        toast.success(
-          `Synced ${result.totalNewMessages} new message(s) from ${result.totalConnections} channel(s)`
-        );
-        // Refresh messages
-        fetchMessages({
-          workspaceId,
-          channelConnectionId: selectedChannel || undefined,
-            priority: filters?.priority,
-            category: filters?.category,
-          isRead: filters?.status === 'unread' ? false : undefined,
-            limit: 100,
-          offset: 0,
-        });
+      },
+      {
+        onSettled: () => {
+          setSyncing(false);
+        },
       }
-    } catch (error) {
-      toast.error('Failed to sync channels');
-      console.error(error);
-    } finally {
-      setSyncing(false);
-    }
+    );
   };
 
   // Filter messages by search query (memoized with debounced search)
@@ -216,14 +250,19 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
                 className="pl-9"
               />
             </div>
-          <Button
+            <Button
               variant="outline"
-            size="sm"
-            onClick={handleSync}
-            disabled={syncing}
-          >
-              <RefreshCw className={cn('h-4 w-4', syncing && 'animate-spin')} />
-          </Button>
+              size="sm"
+              onClick={handleSync}
+              disabled={syncing || syncStatus === 'executing'}
+            >
+              <RefreshCw
+                className={cn(
+                  'h-4 w-4',
+                  (syncing || syncStatus === 'executing') && 'animate-spin'
+                )}
+              />
+            </Button>
         </div>
       </div>
 
@@ -278,14 +317,19 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
               </p>
                 {!searchQuery && (
               <Button
-                className="mt-4"
-                    variant="outline"
-                onClick={handleSync}
-                    disabled={syncing}
-              >
-                      <RefreshCw className={cn('mr-2 h-4 w-4', syncing && 'animate-spin')} />
-                      Sync Messages
-              </Button>
+                  className="mt-4"
+                  variant="outline"
+                  onClick={handleSync}
+                  disabled={syncing || syncStatus === 'executing'}
+                >
+                  <RefreshCw
+                    className={cn(
+                      'mr-2 h-4 w-4',
+                      (syncing || syncStatus === 'executing') && 'animate-spin'
+                    )}
+                  />
+                  Sync Messages
+                </Button>
                 )}
             </div>
           </div>

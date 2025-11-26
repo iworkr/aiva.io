@@ -33,9 +33,10 @@ export async function GET(request: NextRequest) {
     // Check if Google OAuth credentials are configured
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    // Ensure no double slashes - remove trailing slash from base URL if present
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '');
-    const redirectUri = `${baseUrl}/api/auth/gmail/callback`;
+    // Build redirect URI dynamically from the current request origin
+    // This ensures localhost uses localhost callback, and production uses production callback
+    const origin = request.nextUrl.origin; // e.g. http://localhost:3000 or https://www.tryaiva.io
+    const redirectUri = `${origin}/api/auth/gmail/callback`;
 
     if (!clientId || !clientSecret) {
       return NextResponse.json(
@@ -68,11 +69,10 @@ export async function GET(request: NextRequest) {
 
     console.log('🔵 Gmail OAuth initiation:', {
       redirectUri,
-      expectedCallbackUrl: `${baseUrl}/api/auth/gmail/callback`,
       clientId: clientId?.substring(0, 20) + '...',
       workspaceId,
       userId: user.id,
-      baseUrl,
+      origin,
     });
 
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');

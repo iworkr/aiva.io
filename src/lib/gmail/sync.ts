@@ -12,7 +12,6 @@ import {
   getGmailMessage,
   parseGmailMessage,
 } from './client';
-import { createMessageAction } from '@/data/user/messages';
 
 /**
  * Sync Gmail messages for a channel connection
@@ -44,13 +43,29 @@ export async function syncGmailMessages(
       throw new Error('Connection is not a Gmail account');
     }
 
+    console.log('📥 Gmail sync starting', {
+      connectionId,
+      workspaceId,
+      maxMessages: options.maxMessages,
+      query: options.query,
+    });
+
     // Get access token (will refresh if needed)
     const accessToken = await getGmailAccessToken(connectionId);
 
     // List messages
     const messagesList = await listGmailMessages(accessToken, {
       maxResults: options.maxMessages || 50,
-      q: options.query || 'is:unread',
+      // If a specific query is provided, use it; otherwise fetch recent messages
+      // Leaving q empty lets Gmail return recent mail instead of only unread
+      q: options.query ?? '',
+    });
+
+    console.log('📥 Gmail messages listed', {
+      connectionId,
+      workspaceId,
+      totalRefs: messagesList.messages?.length ?? 0,
+      nextPageToken: messagesList.nextPageToken,
     });
 
     if (!messagesList.messages || messagesList.messages.length === 0) {
@@ -88,25 +103,38 @@ export async function syncGmailMessages(
           continue; // Skip if already exists
         }
 
-        // Store message in database
-        const result = await createMessageAction({
-          workspaceId,
-          channelConnectionId: connectionId,
-          providerMessageId: parsed.providerMessageId,
-          providerThreadId: parsed.providerThreadId,
+        // Store message in database directly (system sync, not user-initiated action)
+        const { data: inserted, error: insertError } = await supabase
+          .from('messages')
+          .insert({
+            workspace_id: workspaceId,
+            channel_connection_id: connectionId,
+            provider_message_id: parsed.providerMessageId,
+            provider_thread_id: parsed.providerThreadId,
           subject: parsed.subject,
           body: parsed.body,
-          bodyHtml: parsed.bodyHtml,
+            body_html: parsed.bodyHtml,
           snippet: parsed.snippet,
-          senderEmail: parsed.senderEmail,
-          senderName: parsed.senderName,
+            sender_email: parsed.senderEmail,
+            sender_name: parsed.senderName,
           recipients: parsed.recipients,
           timestamp: parsed.timestamp,
           labels: parsed.labels,
-          rawData: parsed.rawData,
-        });
+            raw_data: parsed.rawData,
+          })
+          .select('id')
+          .single();
 
-        if (result?.data && !(result.data as any).isDuplicate) {
+        if (insertError) {
+          console.error(
+            `Failed to insert Gmail message ${messageRef.id} into messages:`,
+            insertError
+          );
+          errorCount++;
+          continue;
+        }
+
+        if (inserted?.id) {
           newCount++;
         }
         syncedCount++;

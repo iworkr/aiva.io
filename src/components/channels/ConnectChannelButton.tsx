@@ -5,7 +5,8 @@
 
 'use client';
 
-import { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -14,17 +15,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import {
+  Facebook,
+  Instagram,
+  Linkedin,
+  Lock,
   Mail,
   MessageSquare,
-  Linkedin,
-  Instagram,
-  Facebook,
-  Lock,
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { useState } from 'react';
 
 interface ConnectChannelButtonProps {
   workspaceId: string;
@@ -69,16 +68,16 @@ export function ConnectChannelButton({
       name: 'Slack',
       description: 'Manage Slack messages and channels',
       icon: <MessageSquare className="h-6 w-6" />,
-      available: false,
-      comingSoon: true,
+      available: true,
+      href: `/api/auth/slack?workspace_id=${workspaceId}`,
     },
     {
       id: 'teams',
       name: 'Microsoft Teams',
       description: 'Connect to Microsoft Teams chat',
       icon: <MessageSquare className="h-6 w-6" />,
-      available: false,
-      comingSoon: true,
+      available: true,
+      href: `/api/auth/teams?workspace_id=${workspaceId}`,
     },
     {
       id: 'whatsapp',
@@ -142,9 +141,8 @@ export function ConnectChannelButton({
           {channels.map((channel) => (
             <Card
               key={channel.id}
-              className={`cursor-pointer hover:shadow-md transition-all ${
-                !channel.available ? 'opacity-60 cursor-not-allowed' : ''
-              }`}
+              className={`cursor-pointer hover:shadow-md transition-all ${!channel.available ? 'opacity-60 cursor-not-allowed' : ''
+                }`}
               onClick={() => handleConnect(channel)}
             >
               <CardContent className="p-6">

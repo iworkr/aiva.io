@@ -69,7 +69,8 @@ export async function syncChannelConnection(
       case 'gmail':
         syncResult = await syncGmailMessages(connectionId, workspaceId, {
           maxMessages: options.maxMessages || 50,
-          query: 'is:unread',
+          // NOTE: Do not force 'is:unread' here, so we sync recent history
+          // If a custom query is desired in the future, pass it via options
         });
         break;
 

@@ -6,6 +6,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
 import { createSupabaseUserServerActionClient } from '@/supabase-clients/user/createSupabaseUserServerActionClient';
 import { authActionClient } from '@/lib/safe-action';
 import {
@@ -14,6 +15,7 @@ import {
   getMessagesSchema,
 } from '@/utils/zod-schemas/aiva-schemas';
 import { isWorkspaceMember } from '../user/workspaces';
+import { syncAllWorkspaceConnections } from '@/lib/sync/orchestrator';
 
 // ============================================================================
 // GET MESSAGES
@@ -89,8 +91,29 @@ export const getMessagesAction = authActionClient
     const { data, error, count } = await query;
 
     if (error) {
+      console.error('📨 getMessagesAction error:', {
+        workspaceId,
+        channelConnectionId,
+        status,
+        priority,
+        category,
+        isRead,
+        limit,
+        offset,
+        orderBy,
+        orderDirection,
+        error,
+      });
       throw new Error(`Failed to fetch messages: ${error.message}`);
     }
+
+    console.log('📨 getMessagesAction result:', {
+      workspaceId,
+      channelConnectionId,
+      total: count,
+      returned: data?.length ?? 0,
+      hasMore: count ? offset + limit < count : false,
+    });
 
     return {
       messages: data,
@@ -605,5 +628,43 @@ export const archiveMessageAction = authActionClient
       success: true,
       data,
     };
+  });
+
+// ============================================================================
+// SYNC ALL WORKSPACE CONNECTIONS (EXPOSED AS SERVER ACTION)
+// ============================================================================
+
+export const syncWorkspaceConnectionsAction = authActionClient
+  .schema(
+    z.object({
+      workspaceId: getMessagesSchema.shape.workspaceId,
+      maxMessagesPerConnection: z.number().int().positive().max(200).optional(),
+      autoClassify: z.boolean().optional(),
+    })
+  )
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    const { workspaceId, maxMessagesPerConnection, autoClassify } = parsedInput;
+
+    const isMember = await isWorkspaceMember(userId, workspaceId);
+    if (!isMember) {
+      throw new Error('You are not a member of this workspace');
+    }
+
+    const result = await syncAllWorkspaceConnections(workspaceId, {
+      maxMessagesPerConnection: maxMessagesPerConnection ?? 50,
+      autoClassify: autoClassify ?? true,
+    });
+
+    console.log('📥 syncWorkspaceConnectionsAction result', {
+      workspaceId,
+      totalConnections: result.totalConnections,
+      totalNewMessages: result.totalNewMessages,
+    });
+
+    // Revalidate inbox view
+    revalidatePath(`/inbox`);
+    revalidatePath(`/workspace/${workspaceId}`);
+
+    return result;
   });
 
