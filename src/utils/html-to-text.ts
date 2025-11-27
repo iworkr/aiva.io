@@ -74,6 +74,12 @@ export function htmlToPlainText(html: string): string {
   // Remove HTML comments
   text = text.replace(/<!--[\s\S]*?-->/g, '');
 
+  // Remove DOCTYPE declarations
+  text = text.replace(/<!DOCTYPE[^>]*>/gi, '');
+
+  // Remove XML declarations
+  text = text.replace(/<\?xml[^>]*\?>/gi, '');
+
   // Convert common HTML elements to plain text equivalents
   text = text
     // Headers

@@ -168,14 +168,36 @@ export function parseOutlookMessage(outlookMessage: any) {
 
   // Extract body
   const body = outlookMessage.body?.content || '';
-  const bodyHtml = outlookMessage.body?.contentType === 'html' ? body : undefined;
-  const bodyPlain = outlookMessage.body?.contentType === 'text' ? body : undefined;
+  const contentType = outlookMessage.body?.contentType || '';
+  
+  // Check if body contains HTML tags (regardless of contentType)
+  const hasHtmlTags = /<[^>]+>/g.test(body);
+  const isHtmlContent = contentType === 'html' || hasHtmlTags;
 
-  // Convert HTML to plain text if we only have HTML
-  let plainTextBody = bodyPlain || (bodyHtml ? htmlToPlainText(bodyHtml) : body.replace(/<[^>]*>/g, ''));
+  // Always convert HTML to plain text if it contains HTML tags or is marked as HTML
+  let plainTextBody: string;
+  if (isHtmlContent) {
+    // Body contains HTML - convert it
+    plainTextBody = htmlToPlainText(body);
+  } else if (contentType === 'text') {
+    // Plain text - but still decode entities and check for any stray tags
+    plainTextBody = body.replace(/<[^>]*>/g, ''); // Remove any stray tags
+    plainTextBody = decodeHtmlEntities(plainTextBody);
+  } else {
+    // Unknown content type - check for HTML and convert if found
+    if (hasHtmlTags) {
+      plainTextBody = htmlToPlainText(body);
+    } else {
+      plainTextBody = body.replace(/<[^>]*>/g, '');
+      plainTextBody = decodeHtmlEntities(plainTextBody);
+    }
+  }
 
-  // Decode HTML entities in the final text (even plain text might contain entities)
+  // Final decode of HTML entities (in case any were missed)
   plainTextBody = decodeHtmlEntities(plainTextBody);
+
+  // Create clean snippet from the converted plain text
+  const cleanSnippet = plainTextBody.substring(0, 200).replace(/\s+/g, ' ').trim();
 
   return {
     providerMessageId: outlookMessage.id,
@@ -183,7 +205,7 @@ export function parseOutlookMessage(outlookMessage: any) {
     subject: outlookMessage.subject || '(no subject)',
     body: plainTextBody,
     bodyHtml: undefined, // Don't store HTML - we've converted it to plain text
-    snippet: body.substring(0, 200),
+    snippet: cleanSnippet,
     senderEmail: outlookMessage.from?.emailAddress?.address || '',
     senderName: outlookMessage.from?.emailAddress?.name || '',
     recipients,

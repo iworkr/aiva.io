@@ -181,7 +181,14 @@ export function parseGmailMessage(gmailMessage: GmailMessage) {
 
   const extractBody = (part: any): void => {
     if (part.mimeType === 'text/plain' && part.body?.data) {
-      body = Buffer.from(part.body.data, 'base64').toString('utf-8');
+      const decoded = Buffer.from(part.body.data, 'base64').toString('utf-8');
+      // Check if plain text actually contains HTML tags
+      if (/<[^>]+>/g.test(decoded)) {
+        // Plain text part contains HTML - treat as HTML
+        bodyHtml = decoded;
+      } else {
+        body = decoded;
+      }
     } else if (part.mimeType === 'text/html' && part.body?.data) {
       bodyHtml = Buffer.from(part.body.data, 'base64').toString('utf-8');
     } else if (part.parts) {
@@ -190,13 +197,19 @@ export function parseGmailMessage(gmailMessage: GmailMessage) {
   };
 
   if (gmailMessage.payload.body?.data) {
-    body = Buffer.from(gmailMessage.payload.body.data, 'base64').toString('utf-8');
+    const decoded = Buffer.from(gmailMessage.payload.body.data, 'base64').toString('utf-8');
+    // Check if it contains HTML tags
+    if (/<[^>]+>/g.test(decoded)) {
+      bodyHtml = decoded;
+    } else {
+      body = decoded;
+    }
   } else if (gmailMessage.payload.parts) {
     gmailMessage.payload.parts.forEach(extractBody);
   }
 
-  // Convert HTML to plain text if we only have HTML
-  if (!body && bodyHtml) {
+  // Convert HTML to plain text if we have HTML
+  if (bodyHtml) {
     body = htmlToPlainText(bodyHtml);
   }
 
@@ -233,13 +246,16 @@ export function parseGmailMessage(gmailMessage: GmailMessage) {
   const senderEmail = senderMatch ? senderMatch[2].trim() : fromHeader;
   const senderName = senderMatch ? senderMatch[1].trim() : fromHeader;
 
+  // Create clean snippet from the converted body (remove any HTML that might be in snippet)
+  const cleanSnippet = body.trim().substring(0, 200).replace(/\s+/g, ' ').trim() || gmailMessage.snippet || '';
+
   return {
     providerMessageId: gmailMessage.id,
     providerThreadId: gmailMessage.threadId,
     subject: getHeader('Subject'),
     body: body.trim(),
     bodyHtml: undefined, // Don't store HTML - we've converted it to plain text
-    snippet: gmailMessage.snippet,
+    snippet: cleanSnippet,
     senderEmail,
     senderName,
     recipients,
