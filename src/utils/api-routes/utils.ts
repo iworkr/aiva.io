@@ -78,25 +78,25 @@ export async function sendEmail(options: EmailOptions) {
   try {
     const resend = new Resend(resendApiKey);
     const result = await resend.emails.send(options);
-    
+
     // Check if Resend returned an error in the response
     if (result.error) {
       console.error("❌ Resend API returned an error:", result.error);
       throw new Error(`Resend API error: ${JSON.stringify(result.error)}`);
     }
-    
+
     // Verify we got a successful response with an ID
     if (!result.data?.id) {
       console.error("❌ Resend API response missing email ID:", result);
       throw new Error("Resend API did not return a valid email ID");
     }
-    
+
     console.log("📧 Resend email sent successfully:", {
       emailId: result.data.id,
       to: options.to,
       subject: options.subject,
     });
-    
+
     return result;
   } catch (error: any) {
     // If it's the "Missing API key" error, provide helpful message

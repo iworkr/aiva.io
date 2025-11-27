@@ -10,7 +10,8 @@ If you're still seeing the "Missing API key" error after adding the variable, fo
 2. Select your project (`aiva.io` or similar)
 3. Go to **Settings** → **Environment Variables**
 4. Look for `RESEND_API_KEY` in the list
-5. **Verify the value** is exactly: `re_U3wbepDx_8jGmrWhM5JZhvy2UmebYBMDa`
+5. **Verify the value** matches Supabase SMTP password: `re_5qiqzKmo_6QX7QxtE6Z1cwGALvs71eysu`
+6. Also check for `ADMIN_EMAIL` - should be: `admin@tryaiva.io` (must use verified domain)
 
 ### Step 2: Check Environment Scope
 
@@ -63,8 +64,13 @@ After redeploying, check the logs:
 - No spaces, no underscores in wrong places
 
 #### Issue 4: Value Has Extra Spaces
-- **Solution**: Copy the exact value: `re_U3wbepDx_8jGmrWhM5JZhvy2UmebYBMDa`
+- **Solution**: Copy the exact value: `re_5qiqzKmo_6QX7QxtE6Z1cwGALvs71eysu`
 - No leading/trailing spaces
+
+#### Issue 5: Domain Not Verified
+- **Error**: "The aiva.io domain is not verified"
+- **Solution**: Update `ADMIN_EMAIL` to use verified domain: `admin@tryaiva.io`
+- The "from" email must be from a domain verified in Resend
 
 ### Quick Test
 
@@ -98,7 +104,11 @@ vercel login
 # Set environment variable
 vercel env add RESEND_API_KEY production
 
-# When prompted, paste: re_U3wbepDx_8jGmrWhM5JZhvy2UmebYBMDa
+# When prompted, paste: re_5qiqzKmo_6QX7QxtE6Z1cwGALvs71eysu
+
+# Also set ADMIN_EMAIL
+vercel env add ADMIN_EMAIL production
+# When prompted, paste: admin@tryaiva.io
 
 # Redeploy
 vercel --prod

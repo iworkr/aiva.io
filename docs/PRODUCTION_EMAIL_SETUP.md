@@ -18,7 +18,11 @@ This means the `RESEND_API_KEY` environment variable is not set in your producti
 3. Click **Add New**
 4. Add:
    - **Key**: `RESEND_API_KEY`
-   - **Value**: `re_U3wbepDx_8jGmrWhM5JZhvy2UmebYBMDa`
+   - **Value**: `re_5qiqzKmo_6QX7QxtE6Z1cwGALvs71eysu` (use the same key as Supabase SMTP)
+   - **Environment**: Select all (Production, Preview, Development)
+5. Also add/update:
+   - **Key**: `ADMIN_EMAIL`
+   - **Value**: `admin@tryaiva.io` (must use verified domain: tryaiva.io)
    - **Environment**: Select all (Production, Preview, Development)
 5. Click **Save**
 6. **Redeploy** your application
@@ -54,7 +58,7 @@ After adding the environment variable and redeploying:
 
 Make sure these are also set in production:
 
-- `ADMIN_EMAIL` - Your admin email address (e.g., `admin@aiva.io`)
+- `ADMIN_EMAIL` - Your admin email address (must use verified domain: `admin@tryaiva.io`)
 - `NEXT_PUBLIC_SITE_URL` - Your production URL (e.g., `https://www.tryaiva.io`)
 
 ## Need Help?

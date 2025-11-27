@@ -19,7 +19,7 @@ Add your Resend API key to your environment variables:
 ```bash
 # .env or .env.local
 RESEND_API_KEY=re_U3wbepDx_8jGmrWhM5JZhvy2UmebYBMDa
-ADMIN_EMAIL=admin@aiva.io  # Or your verified Resend domain email
+ADMIN_EMAIL=admin@tryaiva.io  # Must use verified domain: tryaiva.io
 ```
 
 ## Step 2: Configure Supabase SMTP (Recommended)

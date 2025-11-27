@@ -16,7 +16,7 @@ import PasswordUpdated from '../../emails/password-update';
 import WelcomeEmail from '../../emails/welcome';
 
 const APP_NAME = 'Aiva.io';
-const SUPPORT_EMAIL = process.env.ADMIN_EMAIL || 'support@tryaiva.io';
+const SUPPORT_EMAIL = process.env.ADMIN_EMAIL || 'admin@tryaiva.io';
 
 export type EmailType =
   | 'email_confirmation'
@@ -165,11 +165,11 @@ export async function sendAuthEmail(options: SendAuthEmailOptions) {
     try {
       const result = await sendEmail({
         to,
-        from: process.env.ADMIN_EMAIL || 'noreply@tryaiva.io',
+        from: process.env.ADMIN_EMAIL || 'admin@tryaiva.io',
         subject,
         html,
       });
-      
+
       // Verify the email was actually sent
       // Resend returns { data: { id: string } } on success
       // Or { id: string, message: string } if skipped
