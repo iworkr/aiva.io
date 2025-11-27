@@ -125,17 +125,27 @@ export async function GET(request: NextRequest) {
         redirectUri = getOAuthRedirectUri(origin, '/api/auth/gmail/callback');
         console.log('🟡 Using localhost redirect URI:', redirectUri);
       } else if (process.env.NEXT_PUBLIC_SITE_URL) {
-        // Production: use configured site URL - normalize it (same logic as initiation)
+        // Production: use configured site URL - normalize it EXACTLY (same logic as initiation)
         let siteUrl = process.env.NEXT_PUBLIC_SITE_URL.trim();
-        siteUrl = siteUrl.replace(/\/$/, '');
-        if (!siteUrl.startsWith('http://') && !siteUrl.startsWith('https://')) {
-          siteUrl = `https://${siteUrl}`;
-        }
-        if (siteUrl.startsWith('http://')) {
-          siteUrl = siteUrl.replace('http://', 'https://');
-        }
+        
+        // Remove all trailing slashes
+        siteUrl = siteUrl.replace(/\/+$/, '');
+        
+        // Remove protocol if present (we'll add https://)
+        siteUrl = siteUrl.replace(/^https?:\/\//, '');
+        
+        // Always use HTTPS for production
+        siteUrl = `https://${siteUrl}`;
+        
+        // Ensure no trailing slash
+        siteUrl = siteUrl.replace(/\/+$/, '');
+        
+        // Construct redirect URI - ensure exact format
         redirectUri = `${siteUrl}/api/auth/gmail/callback`;
+        
         console.log('🟡 Constructed redirect URI from NEXT_PUBLIC_SITE_URL:', redirectUri);
+        console.log('🟡 Expected format: https://www.tryaiva.io/api/auth/gmail/callback');
+        console.log('🟡 Match:', redirectUri === 'https://www.tryaiva.io/api/auth/gmail/callback' ? '✅ EXACT MATCH' : '❌ MISMATCH');
       } else {
         // Fallback: use request origin
         redirectUri = getOAuthRedirectUri(origin, '/api/auth/gmail/callback');
