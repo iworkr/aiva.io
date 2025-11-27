@@ -272,12 +272,14 @@
     "tsc": "tsc",
     "health": "curl -s http://localhost:3000/api/health | jq",
     "db:push": "supabase db push",
-    "db:migrate": "supabase migration up"
+    "db:migrate": "supabase migration up",
+    "generate:email-templates": "tsx scripts/generate-supabase-email-templates.ts"
   },
   "overrides": {
     "eslint": "$eslint"
   },
   "devDependencies": {
-    "supabase": "^2.58.5"
+    "supabase": "^2.58.5",
+    "tsx": "^4.20.6"
   }
 }
