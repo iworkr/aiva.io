@@ -35,18 +35,36 @@ export async function GET(request: NextRequest) {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
     
-    // Build redirect URI - use NEXT_PUBLIC_SITE_URL for production, origin for localhost
-    // This ensures consistency with Google Cloud Console configuration
+    // Build redirect URI - ALWAYS use NEXT_PUBLIC_SITE_URL if set (for consistency with Google Cloud Console)
+    // This ensures the redirect URI matches exactly what's configured in Google Cloud Console
     let redirectUri: string;
-    if (process.env.NEXT_PUBLIC_SITE_URL && !request.nextUrl.origin.includes('localhost')) {
-      // Production: use configured site URL
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, '');
+    if (process.env.NEXT_PUBLIC_SITE_URL) {
+      // Use configured site URL - normalize it
+      let siteUrl = process.env.NEXT_PUBLIC_SITE_URL.trim();
+      // Remove trailing slash
+      siteUrl = siteUrl.replace(/\/$/, '');
+      // Ensure it starts with https:// (for production)
+      if (!siteUrl.startsWith('http://') && !siteUrl.startsWith('https://')) {
+        siteUrl = `https://${siteUrl}`;
+      }
+      // For production, always use HTTPS (convert http:// to https://)
+      if (siteUrl.startsWith('http://') && !siteUrl.includes('localhost')) {
+        siteUrl = siteUrl.replace('http://', 'https://');
+      }
       redirectUri = `${siteUrl}/api/auth/gmail/callback`;
     } else {
-      // Development: use request origin
+      // Fallback: use request origin (for localhost development only)
       const origin = request.nextUrl.origin;
       redirectUri = getOAuthRedirectUri(origin, '/api/auth/gmail/callback');
     }
+    
+    // CRITICAL: Log the exact redirect URI being used for debugging
+    console.log('🔵 Gmail OAuth Redirect URI:', {
+      redirectUri,
+      nextPublicSiteUrl: process.env.NEXT_PUBLIC_SITE_URL,
+      requestOrigin: request.nextUrl.origin,
+      requestUrl: request.url,
+    });
 
     if (!clientId || !clientSecret) {
       return NextResponse.json(
@@ -85,6 +103,12 @@ export async function GET(request: NextRequest) {
       origin: request.nextUrl.origin,
       siteUrl: process.env.NEXT_PUBLIC_SITE_URL,
       isProduction: !request.nextUrl.origin.includes('localhost'),
+      fullUrl: request.url,
+      headers: {
+        host: request.headers.get('host'),
+        'x-forwarded-proto': request.headers.get('x-forwarded-proto'),
+        'x-forwarded-host': request.headers.get('x-forwarded-host'),
+      },
     });
 
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');

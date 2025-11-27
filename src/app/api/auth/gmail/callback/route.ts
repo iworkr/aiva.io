@@ -114,14 +114,24 @@ export async function GET(request: NextRequest) {
     let redirectUri: string;
     if (stateData.redirectUri) {
       redirectUri = stateData.redirectUri;
-    } else if (process.env.NEXT_PUBLIC_SITE_URL && !request.nextUrl.origin.includes('localhost')) {
-      // Production: use configured site URL
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, '');
+      console.log('🟡 Using redirect URI from state:', redirectUri);
+    } else if (process.env.NEXT_PUBLIC_SITE_URL) {
+      // Use configured site URL - normalize it (same logic as initiation)
+      let siteUrl = process.env.NEXT_PUBLIC_SITE_URL.trim();
+      siteUrl = siteUrl.replace(/\/$/, '');
+      if (!siteUrl.startsWith('http://') && !siteUrl.startsWith('https://')) {
+        siteUrl = `https://${siteUrl}`;
+      }
+      if (siteUrl.startsWith('http://') && !siteUrl.includes('localhost')) {
+        siteUrl = siteUrl.replace('http://', 'https://');
+      }
       redirectUri = `${siteUrl}/api/auth/gmail/callback`;
+      console.log('🟡 Constructed redirect URI from NEXT_PUBLIC_SITE_URL:', redirectUri);
     } else {
-      // Development: use request origin
+      // Fallback: use request origin (for localhost development only)
       const origin = request.nextUrl.origin;
       redirectUri = getOAuthRedirectUri(origin, '/api/auth/gmail/callback');
+      console.log('🟡 Using fallback redirect URI from origin:', redirectUri);
     }
 
     console.log('🟡 Token exchange request:', {

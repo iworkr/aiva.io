@@ -60,9 +60,20 @@ export async function GET(request: NextRequest) {
     const clientSecret = process.env.MICROSOFT_CLIENT_SECRET!;
     // Use the exact redirect URI from state if available, otherwise construct it
     // This ensures we use the EXACT same redirect URI that was sent to Microsoft
-    const origin = request.nextUrl.origin;
-    const redirectUri = stateData.redirectUri || 
-      getOAuthRedirectUri(origin, '/api/auth/outlook/callback');
+    let redirectUri: string;
+    if (stateData.redirectUri) {
+      redirectUri = stateData.redirectUri;
+    } else if (process.env.NEXT_PUBLIC_SITE_URL) {
+      // Use configured site URL (removes trailing slash, ensures HTTPS)
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL.trim().replace(/\/$/, '');
+      // Ensure HTTPS for production URLs
+      const normalizedUrl = siteUrl.startsWith('http') ? siteUrl : `https://${siteUrl}`;
+      redirectUri = `${normalizedUrl}/api/auth/outlook/callback`;
+    } else {
+      // Fallback: use request origin (for localhost development)
+      const origin = request.nextUrl.origin;
+      redirectUri = getOAuthRedirectUri(origin, '/api/auth/outlook/callback');
+    }
 
     console.log('🟡 Token exchange request:', {
       redirectUri,

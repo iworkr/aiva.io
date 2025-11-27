@@ -45,10 +45,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Build redirect URI dynamically from the current request origin
-    // This ensures localhost uses localhost callback, and production uses HTTPS
-    const origin = request.nextUrl.origin; // e.g. http://localhost:3000 or https://www.tryaiva.io
-    const redirectUri = getOAuthRedirectUri(origin, '/api/auth/teams/callback');
+    // Build redirect URI - ALWAYS use NEXT_PUBLIC_SITE_URL if set (for consistency)
+    // Only fall back to request origin for localhost development
+    let redirectUri: string;
+    if (process.env.NEXT_PUBLIC_SITE_URL) {
+      // Use configured site URL (removes trailing slash, ensures HTTPS)
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL.trim().replace(/\/$/, '');
+      // Ensure HTTPS for production URLs
+      const normalizedUrl = siteUrl.startsWith('http') ? siteUrl : `https://${siteUrl}`;
+      redirectUri = `${normalizedUrl}/api/auth/teams/callback`;
+    } else {
+      // Fallback: use request origin (for localhost development)
+      const origin = request.nextUrl.origin;
+      redirectUri = getOAuthRedirectUri(origin, '/api/auth/teams/callback');
+    }
 
     // Build OAuth URL with state (include redirectUri to ensure exact match in callback)
     const state = Buffer.from(
