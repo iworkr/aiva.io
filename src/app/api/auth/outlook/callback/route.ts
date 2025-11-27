@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseUserServerComponentClient } from '@/supabase-clients/user/createSupabaseUserServerComponentClient';
 import { createChannelConnectionAction } from '@/data/user/channels';
-import { toSiteURL } from '@/utils/helpers';
+import { toSiteURL, getOAuthRedirectUri } from '@/utils/helpers';
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Decode state
-    let stateData: { workspaceId: string; userId: string; timestamp: number };
+    let stateData: { workspaceId: string; userId: string; timestamp: number; redirectUri?: string };
     try {
       stateData = JSON.parse(Buffer.from(state, 'base64').toString());
     } catch {
@@ -58,7 +58,18 @@ export async function GET(request: NextRequest) {
     // Exchange code for tokens
     const clientId = process.env.MICROSOFT_CLIENT_ID!;
     const clientSecret = process.env.MICROSOFT_CLIENT_SECRET!;
-    const redirectUri = `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/outlook/callback`;
+    // Use the exact redirect URI from state if available, otherwise construct it
+    // This ensures we use the EXACT same redirect URI that was sent to Microsoft
+    const origin = request.nextUrl.origin;
+    const redirectUri = stateData.redirectUri || 
+      getOAuthRedirectUri(origin, '/api/auth/outlook/callback');
+
+    console.log('🟡 Token exchange request:', {
+      redirectUri,
+      clientId: clientId?.substring(0, 20) + '...',
+      hasCode: !!code,
+      hasState: !!state,
+    });
 
     const tokenResponse = await fetch(
       'https://login.microsoftonline.com/common/oauth2/v2.0/token',

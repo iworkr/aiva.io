@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseUserServerComponentClient } from '@/supabase-clients/user/createSupabaseUserServerComponentClient';
+import { getOAuthRedirectUri } from '@/utils/helpers';
 
 export async function GET(request: NextRequest) {
   try {
@@ -32,7 +33,10 @@ export async function GET(request: NextRequest) {
     // Check if Microsoft OAuth credentials are configured
     const clientId = process.env.MICROSOFT_CLIENT_ID;
     const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
-    const redirectUri = `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/outlook/callback`;
+    // Build redirect URI dynamically from the current request origin
+    // This ensures localhost uses localhost callback, and production uses HTTPS
+    const origin = request.nextUrl.origin; // e.g. http://localhost:3000 or https://www.tryaiva.io
+    const redirectUri = getOAuthRedirectUri(origin, '/api/auth/outlook/callback');
 
     if (!clientId || !clientSecret) {
       return NextResponse.json(
@@ -53,14 +57,23 @@ export async function GET(request: NextRequest) {
       'offline_access', // For refresh token
     ];
 
-    // Build OAuth URL with state
+    // Build OAuth URL with state (include redirectUri to ensure exact match in callback)
     const state = Buffer.from(
       JSON.stringify({
         workspaceId,
         userId: user.id,
         timestamp: Date.now(),
+        redirectUri, // Store the exact redirect URI used
       })
     ).toString('base64');
+
+    console.log('🔵 Outlook OAuth initiation:', {
+      redirectUri,
+      clientId: clientId?.substring(0, 20) + '...',
+      workspaceId,
+      userId: user.id,
+      origin,
+    });
 
     const authUrl = new URL('https://login.microsoftonline.com/common/oauth2/v2.0/authorize');
     authUrl.searchParams.append('client_id', clientId);
@@ -70,6 +83,7 @@ export async function GET(request: NextRequest) {
     authUrl.searchParams.append('response_mode', 'query');
     authUrl.searchParams.append('state', state);
 
+    console.log('🔵 Redirecting to Microsoft OAuth:', authUrl.toString().substring(0, 200) + '...');
     return NextResponse.redirect(authUrl.toString());
   } catch (error) {
     console.error('Outlook OAuth initiation error:', error);

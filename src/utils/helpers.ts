@@ -18,6 +18,31 @@ export const toSiteURL = (path: string) => {
   return urlJoin(url, path);
 };
 
+/**
+ * Gets the redirect URI for OAuth callbacks
+ * Ensures HTTPS for production URLs (except localhost)
+ * @param origin - The request origin (e.g., from request.nextUrl.origin)
+ * @param callbackPath - The callback path (e.g., '/api/auth/outlook/callback')
+ * @returns The full redirect URI with proper protocol
+ */
+export const getOAuthRedirectUri = (origin: string, callbackPath: string): string => {
+  // Normalize origin to ensure HTTPS for production
+  let normalizedOrigin = origin;
+  
+  // If it's not localhost and not already HTTPS, convert to HTTPS
+  if (!origin.includes('localhost') && !origin.startsWith('https://')) {
+    normalizedOrigin = origin.replace(/^http:/, 'https:');
+  }
+  
+  // Remove trailing slash from origin if present
+  normalizedOrigin = normalizedOrigin.replace(/\/$/, '');
+  
+  // Ensure callback path starts with /
+  const normalizedPath = callbackPath.startsWith('/') ? callbackPath : `/${callbackPath}`;
+  
+  return `${normalizedOrigin}${normalizedPath}`;
+};
+
 export const toDateTime = (secs: number) => {
   const t = new Date("1970-01-01T00:30:00Z"); // Unix epoch start.
   t.setSeconds(secs);

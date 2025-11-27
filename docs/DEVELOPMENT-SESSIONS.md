@@ -37,6 +37,32 @@ This directory contains detailed briefings from major development sessions. Each
 
 ---
 
+### [November 26, 2025 - Session Understanding Brief](./development-briefings/2025-11-26-session-understanding-brief.md)
+**Status**: ✅ Complete  
+**Purpose**: Comprehensive project context pickup from previous development handover  
+**Scope**: Full project understanding and context establishment
+
+**Key Sections**:
+- ✅ Complete project status overview
+- ✅ Architecture and tech stack details
+- ✅ Last session recap (November 25)
+- ✅ Database schema documentation
+- ✅ Plan-based feature gating system
+- ✅ Integration system overview
+- ✅ Calendar system details
+- ✅ AI features documentation
+- ✅ Development workflow and guidelines
+- ✅ Recommended next steps
+
+**Read this briefing if you're**:
+- Starting a new development session
+- Need comprehensive project context
+- Understanding the current state of the project
+- Planning new features or improvements
+- Onboarding as a new developer
+
+---
+
 ## 📚 Related Documentation
 
 ### Core Architecture
@@ -200,4 +226,5 @@ pnpm dev
 **Last Updated**: November 25, 2025  
 **Maintained By**: Development Team  
 **Questions?**: Check briefings first, then inline code comments
+
 
