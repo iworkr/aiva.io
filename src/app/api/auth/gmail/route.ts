@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseUserRouteHandlerClient } from '@/supabase-clients/user/createSupabaseUserRouteHandlerClient';
+import { getOAuthRedirectUri } from '@/utils/helpers';
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,9 +35,9 @@ export async function GET(request: NextRequest) {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
     // Build redirect URI dynamically from the current request origin
-    // This ensures localhost uses localhost callback, and production uses production callback
+    // This ensures localhost uses localhost callback, and production uses HTTPS
     const origin = request.nextUrl.origin; // e.g. http://localhost:3000 or https://www.tryaiva.io
-    const redirectUri = `${origin}/api/auth/gmail/callback`;
+    const redirectUri = getOAuthRedirectUri(origin, '/api/auth/gmail/callback');
 
     if (!clientId || !clientSecret) {
       return NextResponse.json(

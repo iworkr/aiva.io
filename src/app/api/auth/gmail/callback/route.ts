@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseUserRouteHandlerClient } from '@/supabase-clients/user/createSupabaseUserRouteHandlerClient';
 import { createChannelConnectionAction } from '@/data/user/channels';
-import { toSiteURL } from '@/utils/helpers';
+import { toSiteURL, getOAuthRedirectUri } from '@/utils/helpers';
 
 // Ensure this route is dynamic and not cached
 export const dynamic = 'force-dynamic';
@@ -111,8 +111,9 @@ export async function GET(request: NextRequest) {
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
     // Use the exact redirect URI from state if available, otherwise construct it
     // This ensures we use the EXACT same redirect URI that was sent to Google
+    const origin = request.nextUrl.origin;
     const redirectUri = stateData.redirectUri || 
-      `${process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '')}/api/auth/gmail/callback`;
+      getOAuthRedirectUri(origin, '/api/auth/gmail/callback');
 
     console.log('🟡 Token exchange request:', {
       redirectUri,
