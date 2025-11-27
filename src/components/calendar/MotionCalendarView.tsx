@@ -41,7 +41,7 @@ import {
 } from '@/data/user/calendar';
 import { toast } from 'sonner';
 import { useAction } from 'next-safe-action/hooks';
-import { CreateEventDialog } from './CreateEventDialog';
+import { LazyCreateEventDialog } from '@/components/lazy/LazyDialogs';
 import { ManageAccountsDialog } from './ManageAccountsDialog';
 import { ManageFrequentContactsDialog } from './ManageFrequentContactsDialog';
 import {
@@ -441,8 +441,8 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
         </Dialog>
       )}
 
-      {/* Create Event Dialog */}
-      <CreateEventDialog
+      {/* Create Event Dialog - Lazy Loaded */}
+      <LazyCreateEventDialog
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
         workspaceId={workspaceId}

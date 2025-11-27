@@ -40,6 +40,25 @@ export default async function RootLayout(props: {
       suppressHydrationWarning
     >
       <head>
+        {/* Font optimization - preload and font-display */}
+        <link
+          rel="preload"
+          href="/fonts/geist-sans.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              @font-face {
+                font-family: 'Geist Sans';
+                font-display: swap;
+                src: url('/fonts/geist-sans.woff2') format('woff2');
+              }
+            `,
+          }}
+        />
         <AffonsoWrapper />
       </head>
       <body className="flex flex-col h-full overflow-hidden">

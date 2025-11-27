@@ -22,6 +22,7 @@ import {
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface ChannelSidebarProps {
   workspaceId: string;
@@ -100,8 +101,10 @@ export function ChannelSidebar({
 
   if (loading) {
     return (
-      <div className="w-20 flex flex-col items-center py-4 border-r">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      <div className="w-20 flex flex-col items-center py-4 border-r space-y-3">
+        <Skeleton className="h-10 w-10 rounded-full" />
+        <Skeleton className="h-10 w-10 rounded-full" />
+        <Skeleton className="h-10 w-10 rounded-full" />
       </div>
     );
   }

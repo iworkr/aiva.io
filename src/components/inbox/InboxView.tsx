@@ -6,7 +6,7 @@
 
 'use client';
 
-import { ConnectChannelDialog } from '@/components/channels/ConnectChannelDialog';
+import { LazyConnectChannelDialog } from '@/components/lazy/LazyDialogs';
 import { IntegrationAvatars } from '@/components/integrations/IntegrationAvatars';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +26,7 @@ import { memo, useCallback, useEffect, useState, useTransition, useMemo, useRef 
 import { toast } from 'sonner';
 import { ChannelSidebar } from './ChannelSidebar';
 import { MessageList } from './MessageList';
+import { InboxSkeleton } from './InboxSkeleton';
 import type { MessagePriority, MessageCategory } from '@/utils/zod-schemas/aiva-schemas';
 
 interface InboxViewProps {
@@ -334,12 +335,7 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
         {/* Message List */}
         <div className="flex-1 overflow-hidden">
           {loading ? (
-            <div className="flex h-full items-center justify-center">
-              <div className="text-center">
-                <RefreshCw className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
-                <p className="mt-2 text-sm text-muted-foreground">Loading messages...</p>
-              </div>
-            </div>
+            <InboxSkeleton />
           ) : hasChannels === false ? (
             // No channels connected - Show connect prompt
             <div className="flex h-full items-center justify-center">
@@ -426,8 +422,8 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
         </div>
       </div>
 
-      {/* Connect Channel Dialog */}
-      <ConnectChannelDialog
+      {/* Connect Channel Dialog - Lazy Loaded */}
+      <LazyConnectChannelDialog
         workspaceId={workspaceId}
         open={connectDialogOpen}
         onOpenChange={setConnectDialogOpen}

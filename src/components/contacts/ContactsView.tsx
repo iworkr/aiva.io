@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useEffect, useState, useMemo, useCallback, useTransition, memo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useTransition, useDeferredValue, memo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -31,9 +31,9 @@ import {
   deleteContactAction,
   toggleContactFavoriteAction,
 } from '@/data/user/contacts';
-import { CreateEditContactDialog } from './CreateEditContactDialog';
-import { ContactDetailDialog } from './ContactDetailDialog';
+import { LazyCreateEditContactDialog, LazyContactDetailDialog } from '@/components/lazy/LazyDialogs';
 import { ContactTile } from './ContactTile';
+import { ContactsSkeleton } from './ContactsSkeleton';
 import { cn } from '@/lib/utils';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useDebouncedValue } from '@/hooks/usePrefetch';
@@ -205,9 +205,7 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
       {/* Content */}
       <div className="flex-1 overflow-auto p-6">
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
+          <ContactsSkeleton />
         ) : contacts.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-center">
             <UserCircle className="h-16 w-16 text-muted-foreground mb-4" />
@@ -243,8 +241,8 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
         )}
       </div>
 
-      {/* Create/Edit Contact Dialog */}
-      <CreateEditContactDialog
+      {/* Create/Edit Contact Dialog - Lazy Loaded */}
+      <LazyCreateEditContactDialog
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
         workspaceId={workspaceId}
@@ -256,9 +254,9 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
         }}
       />
 
-      {/* Contact Detail Dialog */}
+      {/* Contact Detail Dialog - Lazy Loaded */}
       {selectedContact && (
-        <ContactDetailDialog
+        <LazyContactDetailDialog
           open={showDetailDialog}
           onOpenChange={setShowDetailDialog}
           contact={selectedContact}
