@@ -7,9 +7,10 @@
 'use client';
 
 import React from 'react';
-import { Star, Mail, Instagram, MessageCircle, Phone, Linkedin, Slack, X, Edit } from 'lucide-react';
+import { Star, X, Edit } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { ChannelLogo } from './ChannelLogo';
 
 interface ContactTileProps {
   contact: any;
@@ -34,27 +35,7 @@ const channelColors: Record<string, { bg: string; icon: string }> = {
   default: { bg: 'bg-muted', icon: 'text-muted-foreground' },
 };
 
-const getChannelIcon = (channelType: string) => {
-  const normalized = channelType.toLowerCase();
-  switch (normalized) {
-    case 'gmail':
-    case 'email':
-    case 'outlook':
-      return <Mail className="h-4 w-4" />;
-    case 'instagram':
-      return <Instagram className="h-4 w-4" />;
-    case 'slack':
-      return <Slack className="h-4 w-4" />;
-    case 'whatsapp':
-    case 'phone':
-    case 'sms':
-      return <MessageCircle className="h-4 w-4" />;
-    case 'linkedin':
-      return <Linkedin className="h-4 w-4" />;
-    default:
-      return <MessageCircle className="h-4 w-4" />;
-  }
-};
+// ChannelLogo component is used instead of getChannelIcon
 
 const getChannelColor = (channelType: string) => {
   const normalized = channelType.toLowerCase();
@@ -173,7 +154,7 @@ export function ContactTile({
                 )}
                 title={`${channel.channel_type}: ${channel.channel_display_name || channel.channel_id}`}
               >
-                {getChannelIcon(channel.channel_type)}
+                <ChannelLogo channelType={channel.channel_type} size={16} className="text-white" />
               </div>
             );
           })}

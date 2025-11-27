@@ -26,15 +26,10 @@ import {
   Edit,
   Trash2,
   Plus,
-  Instagram,
-  MessageCircle,
-  Linkedin,
-  Twitter,
-  Facebook,
   X,
   Loader2,
-  Slack,
 } from 'lucide-react';
+import { ChannelLogo } from './ChannelLogo';
 import { toast } from 'sonner';
 import { useAction } from 'next-safe-action/hooks';
 import {
@@ -116,31 +111,7 @@ export function ContactDetailDialog({
     default: { bg: 'bg-muted', icon: 'text-muted-foreground' },
   };
 
-  const getChannelIcon = (channelType: string) => {
-    const normalized = channelType.toLowerCase();
-    switch (normalized) {
-      case 'gmail':
-      case 'email':
-      case 'outlook':
-        return <Mail className="h-4 w-4" />;
-      case 'instagram':
-        return <Instagram className="h-4 w-4" />;
-      case 'slack':
-        return <Slack className="h-4 w-4" />;
-      case 'whatsapp':
-      case 'phone':
-      case 'sms':
-        return <MessageCircle className="h-4 w-4" />;
-      case 'linkedin':
-        return <Linkedin className="h-4 w-4" />;
-      case 'twitter':
-        return <Twitter className="h-4 w-4" />;
-      case 'facebook':
-        return <Facebook className="h-4 w-4" />;
-      default:
-        return <MessageCircle className="h-4 w-4" />;
-    }
-  };
+// ChannelLogo component is used instead of getChannelIcon
 
   const getChannelColor = (channelType: string) => {
     const normalized = channelType.toLowerCase();
@@ -278,7 +249,7 @@ export function ContactDetailDialog({
                     )}
                     title={`${channel.channel_type}: ${channel.channel_display_name || channel.channel_id}`}
                   >
-                    {getChannelIcon(channel.channel_type)}
+                    <ChannelLogo channelType={channel.channel_type} size={20} className="text-white" />
                   </div>
                 );
               })}
@@ -433,7 +404,7 @@ export function ContactDetailDialog({
                     className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-accent"
                   >
                     <div className="flex items-center gap-3 flex-1">
-                      {getChannelIcon(channel.channel_type)}
+                      <ChannelLogo channelType={channel.channel_type} size={20} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="font-medium capitalize">{channel.channel_type}</p>
