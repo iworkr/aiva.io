@@ -131,7 +131,7 @@ export const signInWithMagicLinkAction = actionClient
 
     // Use Supabase's built-in magic link sending
     // Supabase will use our custom email templates configured in the dashboard
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error, data } = await supabase.auth.signInWithOtp({
       email,
       options: {
         emailRedirectTo: redirectUrl.toString(),
@@ -140,17 +140,38 @@ export const signInWithMagicLinkAction = actionClient
     });
 
     if (error) {
-      const errorDetails = handleSupabaseAuthMagicLinkErrors(error);
+      console.error('❌ Supabase magic link error:', {
+        code: error.code,
+        status: error.status,
+        message: error.message,
+        email,
+      });
+
+      // Provide more specific error messages
+      let errorMessage = 'Failed to send magic link. Please try again.';
+      
+      if (error.code === 'unexpected_failure' || error.message?.includes('Error sending')) {
+        errorMessage = 
+          'Unable to send email. Please verify that email templates and SMTP settings are configured in Supabase Dashboard. ' +
+          'If the problem persists, contact support.';
+      } else {
+        const errorDetails = handleSupabaseAuthMagicLinkErrors(error);
+        errorMessage = errorDetails.message;
+      }
+
       returnValidationErrors(signInWithMagicLinkSchema, {
         email: {
-          _errors: [errorDetails.message],
+          _errors: [errorMessage],
         },
       });
       return;
     }
 
-    // Supabase handles email sending automatically with our custom templates
-    // No need to manually send emails here
+    // Success - Supabase handles email sending automatically with our custom templates
+    console.log('✅ Magic link request successful:', {
+      email,
+      shouldCreateUser,
+    });
   });
 
 /**
@@ -200,24 +221,44 @@ export const resetPasswordAction = actionClient
 
     // Use Supabase's built-in password reset
     // Supabase will use our custom email templates configured in the dashboard
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error, data } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: redirectToURL.toString(),
     });
 
     if (error) {
-      const errorDetails = handleSupabaseAuthResetPasswordErrors(error);
-      if (errorDetails.field === "email") {
+      console.error('❌ Supabase password reset error:', {
+        code: error.code,
+        status: error.status,
+        message: error.message,
+        email,
+      });
+
+      // Provide more specific error messages
+      let errorMessage = 'Failed to send password reset email. Please try again.';
+      let errorField: string | undefined = undefined;
+      
+      if (error.code === 'unexpected_failure' || error.message?.includes('Error sending')) {
+        errorMessage = 
+          'Unable to send email. Please verify that email templates and SMTP settings are configured in Supabase Dashboard. ' +
+          'If the problem persists, contact support.';
+      } else {
+        const errorDetails = handleSupabaseAuthResetPasswordErrors(error);
+        errorMessage = errorDetails.message;
+        errorField = errorDetails.field;
+      }
+
+      if (errorField === "email") {
         returnValidationErrors(resetPasswordSchema, {
-          email: { _errors: [errorDetails.message] },
+          email: { _errors: [errorMessage] },
         });
       } else {
         returnValidationErrors(resetPasswordSchema, {
-          _errors: [errorDetails.message],
+          _errors: [errorMessage],
         });
       }
       return;
     }
 
-    // Supabase handles email sending automatically with our custom templates
-    // No need to manually send emails here
+    // Success - Supabase handles email sending automatically with our custom templates
+    console.log('✅ Password reset request successful:', { email });
   });

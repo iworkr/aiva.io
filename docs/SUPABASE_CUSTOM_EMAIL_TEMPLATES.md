@@ -61,8 +61,10 @@ This creates HTML files in `supabase-email-templates/` with Supabase template va
    - **Port**: `465` (SSL) or `587` (TLS)
    - **Username**: `resend`
    - **Password**: `re_5qiqzKmo_6QX7QxtE6Z1cwGALvs71eysu` (your Resend API key)
-   - **Sender email**: `noreply@tryaiva.io` (must use verified domain)
+   - **Sender email**: `noreply@tryaiva.io` (must use verified domain - see troubleshooting if domain not verified)
    - **Sender name**: `Aiva.io`
+   
+   **⚠️ IMPORTANT**: The sender email domain (`tryaiva.io`) must be **verified** in Resend. If you see "domain not verified" errors, see [Resend Domain Verification Fix](./RESEND_DOMAIN_VERIFICATION_FIX.md).
 
 4. **Test Connection**:
    - Click **"Test Connection"** to verify SMTP settings
