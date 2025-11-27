@@ -251,11 +251,7 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
             <TabsContent value="message">
               <Card>
                 <CardContent className="prose prose-sm max-w-none p-6 dark:prose-invert">
-                  {message.body_html ? (
-                    <div dangerouslySetInnerHTML={{ __html: message.body_html }} />
-                  ) : (
-                    <div className="whitespace-pre-wrap">{message.body}</div>
-                  )}
+                  <div className="whitespace-pre-wrap text-foreground">{message.body || ''}</div>
                 </CardContent>
               </Card>
 
