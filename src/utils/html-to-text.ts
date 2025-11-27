@@ -4,15 +4,75 @@
  */
 
 /**
+ * Decode HTML entities in text
+ * Handles both named entities and numeric entities
+ */
+export function decodeHtmlEntities(text: string): string {
+  if (!text) return '';
+
+  // First decode numeric entities (decimal and hex)
+  text = text
+    // Decimal entities like &#39; or &#8217;
+    .replace(/&#(\d+);/g, (_, dec) => {
+      try {
+        return String.fromCharCode(parseInt(dec, 10));
+      } catch {
+        return '';
+      }
+    })
+    // Hex entities like &#x27; or &#x2019;
+    .replace(/&#x([a-f\d]+);/gi, (_, hex) => {
+      try {
+        return String.fromCharCode(parseInt(hex, 16));
+      } catch {
+        return '';
+      }
+    });
+
+  // Then decode named entities
+  const entityMap: Record<string, string> = {
+    '&nbsp;': ' ',
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&apos;': "'",
+    '&copy;': '©',
+    '&reg;': '®',
+    '&trade;': '™',
+    '&mdash;': '—',
+    '&ndash;': '–',
+    '&hellip;': '…',
+    '&bull;': '•',
+    '&rsquo;': "'",
+    '&lsquo;': "'",
+    '&rdquo;': '"',
+    '&ldquo;': '"',
+  };
+
+  // Replace named entities
+  for (const [entity, char] of Object.entries(entityMap)) {
+    text = text.replace(new RegExp(entity, 'gi'), char);
+  }
+
+  return text;
+}
+
+/**
  * Convert HTML to plain text with proper formatting
  * Handles common HTML elements and preserves structure
  */
 export function htmlToPlainText(html: string): string {
   if (!html) return '';
 
-  // Remove script and style elements
+  // Remove script and style elements completely
   let text = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
   text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  text = text.replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, '');
+
+  // Remove HTML comments
+  text = text.replace(/<!--[\s\S]*?-->/g, '');
 
   // Convert common HTML elements to plain text equivalents
   text = text
@@ -44,25 +104,15 @@ export function htmlToPlainText(html: string): string {
     .replace(/<\/blockquote>/gi, '\n')
     // Horizontal rules
     .replace(/<hr[^>]*>/gi, '\n---\n')
-    // Divs and spans (just remove tags, keep content)
-    .replace(/<\/?(div|span)[^>]*>/gi, '')
-    // Remove all remaining HTML tags
+    // Remove all HTML tags (including html, head, body, meta, etc.)
     .replace(/<[^>]+>/g, '')
-    // Decode HTML entities
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'")
-    // Decode numeric entities
-    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(dec))
-    .replace(/&#x([a-f\d]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
     // Clean up whitespace
     .replace(/\n\s*\n\s*\n/g, '\n\n') // Multiple newlines to double
     .replace(/[ \t]+/g, ' ') // Multiple spaces to single
     .trim();
+
+  // Decode HTML entities
+  text = decodeHtmlEntities(text);
 
   return text;
 }

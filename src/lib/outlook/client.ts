@@ -145,7 +145,7 @@ export async function getOutlookMessage(
   return await response.json();
 }
 
-import { htmlToPlainText } from '@/utils/html-to-text';
+import { htmlToPlainText, decodeHtmlEntities } from '@/utils/html-to-text';
 
 /**
  * Parse Outlook message to normalized format
@@ -172,7 +172,10 @@ export function parseOutlookMessage(outlookMessage: any) {
   const bodyPlain = outlookMessage.body?.contentType === 'text' ? body : undefined;
 
   // Convert HTML to plain text if we only have HTML
-  const plainTextBody = bodyPlain || (bodyHtml ? htmlToPlainText(bodyHtml) : body.replace(/<[^>]*>/g, ''));
+  let plainTextBody = bodyPlain || (bodyHtml ? htmlToPlainText(bodyHtml) : body.replace(/<[^>]*>/g, ''));
+
+  // Decode HTML entities in the final text (even plain text might contain entities)
+  plainTextBody = decodeHtmlEntities(plainTextBody);
 
   return {
     providerMessageId: outlookMessage.id,

@@ -4,7 +4,7 @@
  */
 
 import { createSupabaseUserServerActionClient } from '@/supabase-clients/user/createSupabaseUserServerActionClient';
-import { htmlToPlainText } from '@/utils/html-to-text';
+import { htmlToPlainText, decodeHtmlEntities } from '@/utils/html-to-text';
 
 interface GmailMessage {
   id: string;
@@ -200,9 +200,14 @@ export function parseGmailMessage(gmailMessage: GmailMessage) {
     body = htmlToPlainText(bodyHtml);
   }
 
+  // Decode HTML entities in body text (even if it's plain text, it might contain entities)
+  if (body) {
+    body = decodeHtmlEntities(body);
+  }
+
   // If still no body, use snippet
   if (!body) {
-    body = gmailMessage.snippet;
+    body = gmailMessage.snippet || '';
   }
 
   // Parse recipients
