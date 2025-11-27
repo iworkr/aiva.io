@@ -111,9 +111,18 @@ export async function GET(request: NextRequest) {
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
     // Use the exact redirect URI from state if available, otherwise construct it
     // This ensures we use the EXACT same redirect URI that was sent to Google
-    const origin = request.nextUrl.origin;
-    const redirectUri = stateData.redirectUri || 
-      getOAuthRedirectUri(origin, '/api/auth/gmail/callback');
+    let redirectUri: string;
+    if (stateData.redirectUri) {
+      redirectUri = stateData.redirectUri;
+    } else if (process.env.NEXT_PUBLIC_SITE_URL && !request.nextUrl.origin.includes('localhost')) {
+      // Production: use configured site URL
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, '');
+      redirectUri = `${siteUrl}/api/auth/gmail/callback`;
+    } else {
+      // Development: use request origin
+      const origin = request.nextUrl.origin;
+      redirectUri = getOAuthRedirectUri(origin, '/api/auth/gmail/callback');
+    }
 
     console.log('🟡 Token exchange request:', {
       redirectUri,

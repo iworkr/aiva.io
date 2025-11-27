@@ -34,10 +34,19 @@ export async function GET(request: NextRequest) {
     // Check if Google OAuth credentials are configured
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    // Build redirect URI dynamically from the current request origin
-    // This ensures localhost uses localhost callback, and production uses HTTPS
-    const origin = request.nextUrl.origin; // e.g. http://localhost:3000 or https://www.tryaiva.io
-    const redirectUri = getOAuthRedirectUri(origin, '/api/auth/gmail/callback');
+    
+    // Build redirect URI - use NEXT_PUBLIC_SITE_URL for production, origin for localhost
+    // This ensures consistency with Google Cloud Console configuration
+    let redirectUri: string;
+    if (process.env.NEXT_PUBLIC_SITE_URL && !request.nextUrl.origin.includes('localhost')) {
+      // Production: use configured site URL
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, '');
+      redirectUri = `${siteUrl}/api/auth/gmail/callback`;
+    } else {
+      // Development: use request origin
+      const origin = request.nextUrl.origin;
+      redirectUri = getOAuthRedirectUri(origin, '/api/auth/gmail/callback');
+    }
 
     if (!clientId || !clientSecret) {
       return NextResponse.json(
@@ -73,7 +82,9 @@ export async function GET(request: NextRequest) {
       clientId: clientId?.substring(0, 20) + '...',
       workspaceId,
       userId: user.id,
-      origin,
+      origin: request.nextUrl.origin,
+      siteUrl: process.env.NEXT_PUBLIC_SITE_URL,
+      isProduction: !request.nextUrl.origin.includes('localhost'),
     });
 
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
