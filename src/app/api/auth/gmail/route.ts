@@ -120,7 +120,16 @@ export async function GET(request: NextRequest) {
     authUrl.searchParams.append('prompt', 'consent');
     authUrl.searchParams.append('state', state);
 
-    console.log('🔵 Redirecting to Google OAuth:', authUrl.toString().substring(0, 200) + '...');
+    // Log the FULL redirect URI for debugging
+    const fullRedirectUri = authUrl.searchParams.get('redirect_uri');
+    console.log('🔵 FULL Redirect URI being sent to Google:', fullRedirectUri);
+    console.log('🔵 Complete OAuth URL:', authUrl.toString());
+    console.log('🔵 Environment check:', {
+      NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+      redirectUri,
+      matchesGoogleConsole: fullRedirectUri === 'https://www.tryaiva.io/api/auth/gmail/callback',
+    });
+    
     return NextResponse.redirect(authUrl.toString());
   } catch (error) {
     console.error('Gmail OAuth initiation error:', error);
