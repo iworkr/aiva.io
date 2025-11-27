@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
       redirectUri = `${normalizedUrl}/api/auth/teams/callback`;
     } else {
       // Fallback: use request origin (for localhost development)
-      const origin = request.nextUrl.origin;
+    const origin = request.nextUrl.origin;
       redirectUri = getOAuthRedirectUri(origin, '/api/auth/teams/callback');
     }
 

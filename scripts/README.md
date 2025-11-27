@@ -5,6 +5,7 @@ Scripts to programmatically update Vercel environment variables.
 ## Option 1: Using Vercel CLI (Recommended)
 
 ### Prerequisites
+
 ```bash
 npm i -g vercel
 vercel login
@@ -12,6 +13,7 @@ vercel link  # Link to your project
 ```
 
 ### Update Environment Variables
+
 ```bash
 # Run the shell script
 ./scripts/update-env-vars.sh
@@ -20,6 +22,7 @@ vercel link  # Link to your project
 ## Option 2: Using Vercel API (Node.js)
 
 ### Prerequisites
+
 1. Get Vercel token from: https://vercel.com/account/tokens
 2. Set environment variable:
    ```bash
@@ -27,6 +30,7 @@ vercel link  # Link to your project
    ```
 
 ### Update Environment Variables
+
 ```bash
 node scripts/update-env-vars.js
 ```
@@ -41,6 +45,7 @@ node scripts/update-env-vars.js
 ### Required Environment Variables
 
 **Critical for OAuth:**
+
 - `NEXT_PUBLIC_SITE_URL=https://www.tryaiva.io` (MUST match your domain exactly)
 - `GOOGLE_CLIENT_ID` (from Google Cloud Console)
 - `GOOGLE_CLIENT_SECRET` (from Google Cloud Console)
@@ -72,9 +77,9 @@ If you're still getting redirect_uri_mismatch errors:
 ### Debugging
 
 Check your Vercel deployment logs to see the redirect URI being used:
+
 ```bash
 vercel logs --follow
 ```
 
 Look for: `🔵 Gmail OAuth Redirect URI:` in the logs.
-

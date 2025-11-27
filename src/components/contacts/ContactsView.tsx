@@ -33,6 +33,7 @@ import {
 } from '@/data/user/contacts';
 import { CreateEditContactDialog } from './CreateEditContactDialog';
 import { ContactDetailDialog } from './ContactDetailDialog';
+import { ContactTile } from './ContactTile';
 import { cn } from '@/lib/utils';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useDebouncedValue } from '@/hooks/usePrefetch';
@@ -224,115 +225,19 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {contacts.map((contact) => (
-              <div
+              <ContactTile
                 key={contact.id}
+                contact={contact}
                 onClick={() => handleContactClick(contact)}
-                className="group border border-border rounded-lg p-4 hover:bg-accent cursor-pointer transition-colors relative"
-              >
-                {/* Favorite Star */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleToggleFavorite(contact);
-                  }}
-                  className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Star
-                    className={cn(
-                      'h-4 w-4',
-                      contact.is_favorite
-                        ? 'fill-yellow-500 text-yellow-500'
-                        : 'text-muted-foreground hover:text-yellow-500'
-                    )}
-                  />
-                </button>
-
-                {/* Contact Info */}
-                <div className="flex items-start gap-3 mb-4">
-                  {contact.avatar_url ? (
-                    <img
-                      src={contact.avatar_url}
-                      alt={contact.full_name}
-                      className="h-12 w-12 rounded-full object-cover"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  ) : (
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold">
-                      {contact.full_name.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold truncate">{contact.full_name}</h3>
-                    {contact.company && (
-                      <p className="text-sm text-muted-foreground truncate flex items-center gap-1">
-                        <Building className="h-3 w-3" />
-                        {contact.company}
-                      </p>
-                    )}
-                    {contact.job_title && (
-                      <p className="text-xs text-muted-foreground truncate">
-                        {contact.job_title}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Channels */}
-                {contact.contact_channels && contact.contact_channels.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    {contact.contact_channels.slice(0, 3).map((channel: any) => (
-                      <Badge key={channel.id} variant="outline" className="text-xs">
-                        {getChannelIcon(channel.channel_type)}
-                        <span className="ml-1 capitalize">{channel.channel_type}</span>
-                      </Badge>
-                    ))}
-                    {contact.contact_channels.length > 3 && (
-                      <Badge variant="outline" className="text-xs">
-                        +{contact.contact_channels.length - 3} more
-                      </Badge>
-                    )}
-                  </div>
-                )}
-
-                {/* Tags */}
-                {contact.tags && contact.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {contact.tags.slice(0, 2).map((tag: string, idx: number) => (
-                      <Badge key={idx} variant="secondary" className="text-xs">
-                        {tag}
-                      </Badge>
-                    ))}
-                    {contact.tags.length > 2 && (
-                      <Badge variant="secondary" className="text-xs">
-                        +{contact.tags.length - 2}
-                      </Badge>
-                    )}
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={(e) => handleEditContact(contact, e)}
-                  >
-                    <Edit className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-destructive hover:text-destructive"
-                    onClick={(e) => handleDeleteContact(contact, e)}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
+                onToggleFavorite={(e) => {
+                  e.stopPropagation();
+                  handleToggleFavorite(contact);
+                }}
+                onEdit={(e) => handleEditContact(contact, e)}
+                onDelete={(e) => handleDeleteContact(contact, e)}
+              />
             ))}
           </div>
         )}

@@ -33,6 +33,7 @@ import {
   Facebook,
   X,
   Loader2,
+  Slack,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAction } from 'next-safe-action/hooks';
@@ -100,19 +101,36 @@ export function ContactDetailDialog({
     },
   });
 
+  // Channel icon colors matching the reference design
+  const channelColors: Record<string, { bg: string; icon: string }> = {
+    gmail: { bg: 'bg-red-500', icon: 'text-white' },
+    email: { bg: 'bg-red-500', icon: 'text-white' },
+    outlook: { bg: 'bg-blue-500', icon: 'text-white' },
+    instagram: { bg: 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500', icon: 'text-white' },
+    slack: { bg: 'bg-[#4A154B]', icon: 'text-white' },
+    whatsapp: { bg: 'bg-green-500', icon: 'text-white' },
+    phone: { bg: 'bg-green-500', icon: 'text-white' },
+    sms: { bg: 'bg-green-500', icon: 'text-white' },
+    linkedin: { bg: 'bg-[#0077B5]', icon: 'text-white' },
+    teams: { bg: 'bg-[#6264A7]', icon: 'text-white' },
+    default: { bg: 'bg-muted', icon: 'text-muted-foreground' },
+  };
+
   const getChannelIcon = (channelType: string) => {
-    switch (channelType.toLowerCase()) {
-      case 'instagram':
-        return <Instagram className="h-4 w-4" />;
-      case 'whatsapp':
-      case 'sms':
-        return <MessageCircle className="h-4 w-4" />;
-      case 'email':
+    const normalized = channelType.toLowerCase();
+    switch (normalized) {
       case 'gmail':
+      case 'email':
       case 'outlook':
         return <Mail className="h-4 w-4" />;
+      case 'instagram':
+        return <Instagram className="h-4 w-4" />;
+      case 'slack':
+        return <Slack className="h-4 w-4" />;
+      case 'whatsapp':
       case 'phone':
-        return <Phone className="h-4 w-4" />;
+      case 'sms':
+        return <MessageCircle className="h-4 w-4" />;
       case 'linkedin':
         return <Linkedin className="h-4 w-4" />;
       case 'twitter':
@@ -122,6 +140,25 @@ export function ContactDetailDialog({
       default:
         return <MessageCircle className="h-4 w-4" />;
     }
+  };
+
+  const getChannelColor = (channelType: string) => {
+    const normalized = channelType.toLowerCase();
+    return channelColors[normalized] || channelColors.default;
+  };
+
+  // Generate a color based on contact name for profile picture glow
+  const getContactColor = (name: string) => {
+    const colors = [
+      'from-green-400 to-green-600',
+      'from-blue-400 to-blue-600',
+      'from-purple-400 to-purple-600',
+      'from-pink-400 to-pink-600',
+      'from-orange-400 to-orange-600',
+      'from-cyan-400 to-cyan-600',
+    ];
+    const index = name.charCodeAt(0) % colors.length;
+    return colors[index];
   };
 
   const handleAddChannel = () => {
@@ -138,34 +175,69 @@ export function ContactDetailDialog({
     });
   };
 
+  const contactColor = getContactColor(contact.full_name || 'A');
+  const displayTitle = contact.job_title || '';
+  const displayLocation = contact.company || contact.location || '';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
+        {/* Modern Header with Profile Picture Glow */}
+        <div className="relative bg-gradient-to-b from-background to-background/95 border-b border-border px-8 py-8">
           <div className="flex items-start justify-between">
-            <div className="flex items-start gap-4">
+            <div className="flex items-start gap-6">
+              {/* Profile Picture with Glow */}
               {contact.avatar_url ? (
-                <img
-                  src={contact.avatar_url}
-                  alt={contact.full_name}
-                  className="h-16 w-16 rounded-full object-cover"
-                  loading="lazy"
-                  decoding="async"
-                />
+                <div className="relative">
+                  <div
+                    className={cn(
+                      'absolute inset-0 rounded-full blur-2xl opacity-50 bg-gradient-to-br',
+                      contactColor
+                    )}
+                  />
+                  <img
+                    src={contact.avatar_url}
+                    alt={contact.full_name}
+                    className="relative h-24 w-24 rounded-full object-cover ring-4 ring-background"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
               ) : (
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary text-2xl font-semibold">
-                  {contact.full_name.charAt(0).toUpperCase()}
+                <div className="relative">
+                  <div
+                    className={cn(
+                      'absolute inset-0 rounded-full blur-2xl opacity-50 bg-gradient-to-br',
+                      contactColor
+                    )}
+                  />
+                  <div
+                    className={cn(
+                      'relative h-24 w-24 rounded-full bg-gradient-to-br flex items-center justify-center text-3xl font-bold text-white ring-4 ring-background',
+                      contactColor
+                    )}
+                  >
+                    {contact.full_name.charAt(0).toUpperCase()}
+                  </div>
                 </div>
               )}
-              <div>
-                <DialogTitle className="text-2xl">{contact.full_name}</DialogTitle>
-                {contact.job_title && contact.company && (
-                  <p className="text-sm text-muted-foreground">
-                    {contact.job_title} at {contact.company}
+
+              {/* Name and Title */}
+              <div className="flex-1 pt-2">
+                <DialogTitle className="text-3xl font-bold mb-2">
+                  {contact.full_name}
+                </DialogTitle>
+                {(displayTitle || displayLocation) && (
+                  <p className="text-base text-muted-foreground">
+                    {displayTitle && displayLocation
+                      ? `${displayTitle} - ${displayLocation}`
+                      : displayTitle || displayLocation}
                   </p>
                 )}
               </div>
             </div>
+
+            {/* Action Buttons */}
             <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
@@ -185,14 +257,55 @@ export function ContactDetailDialog({
                 <Edit className="h-4 w-4 mr-2" />
                 Edit
               </Button>
+              <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
+                <X className="h-5 w-5" />
+              </Button>
             </div>
           </div>
-        </DialogHeader>
 
-        <div className="space-y-6 mt-6">
+          {/* Channel Icons Row */}
+          {contact.contact_channels && contact.contact_channels.length > 0 && (
+            <div className="flex flex-wrap gap-3 mt-6">
+              {contact.contact_channels.map((channel: any) => {
+                const colors = getChannelColor(channel.channel_type);
+                return (
+                  <div
+                    key={channel.id}
+                    className={cn(
+                      'h-10 w-10 rounded-lg flex items-center justify-center transition-transform hover:scale-110 cursor-pointer',
+                      colors.bg,
+                      colors.icon
+                    )}
+                    title={`${channel.channel_type}: ${channel.channel_display_name || channel.channel_id}`}
+                  >
+                    {getChannelIcon(channel.channel_type)}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Content Area */}
+        <div className="px-8 py-6 space-y-6">
+
+          {/* Bio - Full Text */}
+          {contact.bio && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                Biography
+              </h3>
+              <p className="text-base text-foreground leading-relaxed whitespace-pre-wrap">
+                {contact.bio}
+              </p>
+            </div>
+          )}
+
           {/* Contact Information */}
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold">Contact Information</h3>
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Contact Information
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {contact.email && (
                 <div className="flex items-center gap-3">
@@ -233,18 +346,12 @@ export function ContactDetailDialog({
             </div>
           </div>
 
-          {/* Bio */}
-          {contact.bio && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold">Bio</h3>
-              <p className="text-sm text-muted-foreground">{contact.bio}</p>
-            </div>
-          )}
-
           {/* Communication Channels */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold">Communication Channels</h3>
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                Communication Channels
+              </h3>
               <Button
                 variant="outline"
                 size="sm"
