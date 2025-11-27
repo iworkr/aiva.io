@@ -668,3 +668,142 @@ export const syncWorkspaceConnectionsAction = authActionClient
     return result;
   });
 
+// ============================================================================
+// GENERATE AI REPLY DRAFT
+// ============================================================================
+
+export const generateReplyDraftAction = authActionClient
+  .schema(
+    z.object({
+      messageId: z.string().uuid(),
+      workspaceId: z.string().uuid(),
+      tone: z.enum(['formal', 'casual', 'friendly', 'professional']).optional(),
+      maxLength: z.number().int().positive().max(1000).optional(),
+    })
+  )
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    const { messageId, workspaceId, tone, maxLength } = parsedInput;
+
+    // Verify workspace membership
+    const isMember = await isWorkspaceMember(userId, workspaceId);
+    if (!isMember) {
+      throw new Error('You are not a member of this workspace');
+    }
+
+    const { generateReplyDraft } = await import('@/lib/ai/reply-generator');
+    
+    try {
+      const draft = await generateReplyDraft(messageId, workspaceId, {
+        tone: tone || 'professional',
+        maxLength: maxLength || 300,
+      });
+
+      return {
+        success: true,
+        data: draft,
+      };
+    } catch (error) {
+      throw new Error(
+        error instanceof Error ? error.message : 'Failed to generate reply draft'
+      );
+    }
+  });
+
+// ============================================================================
+// SEND REPLY
+// ============================================================================
+
+export const sendReplyAction = authActionClient
+  .schema(
+    z.object({
+      messageId: z.string().uuid(),
+      workspaceId: z.string().uuid(),
+      body: z.string().min(1),
+      subject: z.string(),
+      to: z.array(z.string().email()),
+      provider: z.enum(['gmail', 'outlook', 'slack', 'teams']),
+      providerMessageId: z.string().optional(),
+    })
+  )
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    const { messageId, workspaceId, body, subject, to, provider, providerMessageId } =
+      parsedInput;
+
+    // Verify workspace membership
+    const isMember = await isWorkspaceMember(userId, workspaceId);
+    if (!isMember) {
+      throw new Error('You are not a member of this workspace');
+    }
+
+    const supabase = await createSupabaseUserServerActionClient();
+
+    // Get the original message and connection
+    const { data: message, error: messageError } = await supabase
+      .from('messages')
+      .select(
+        `
+        *,
+        channel_connection:channel_connections(
+          id,
+          provider,
+          access_token,
+          refresh_token,
+          token_expires_at
+        )
+      `
+      )
+      .eq('id', messageId)
+      .eq('workspace_id', workspaceId)
+      .single();
+
+    if (messageError || !message) {
+      throw new Error('Message not found');
+    }
+
+    const connection = message.channel_connection;
+    if (!connection || connection.provider !== provider) {
+      throw new Error('Channel connection not found or provider mismatch');
+    }
+
+    // Send reply based on provider
+    try {
+      if (provider === 'gmail') {
+        const { sendGmailMessage, getGmailAccessToken } = await import('@/lib/gmail/client');
+        const accessToken = await getGmailAccessToken(connection.id);
+        await sendGmailMessage(accessToken, {
+          to,
+          subject,
+          body,
+          inReplyTo: providerMessageId || message.provider_message_id,
+          references: message.provider_thread_id
+            ? [message.provider_thread_id]
+            : undefined,
+        });
+      } else if (provider === 'outlook') {
+        const { sendOutlookMessage, getOutlookAccessToken } = await import('@/lib/outlook/client');
+        const accessToken = await getOutlookAccessToken(connection.id);
+        await sendOutlookMessage(accessToken, {
+          to,
+          subject,
+          body,
+          inReplyTo: providerMessageId || message.provider_message_id,
+        });
+      } else {
+        throw new Error(`Reply not supported for ${provider}`);
+      }
+
+      revalidatePath(`/inbox`);
+      revalidatePath(`/inbox/${messageId}`);
+
+      return {
+        success: true,
+        message: 'Reply sent successfully',
+      };
+    } catch (error) {
+      console.error('Send reply error:', error);
+      throw new Error(
+        error instanceof Error ? error.message : 'Failed to send reply'
+      );
+    }
+  });
+

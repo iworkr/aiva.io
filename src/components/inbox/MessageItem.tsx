@@ -40,6 +40,7 @@ import { useAction } from 'next-safe-action/hooks';
 import { format, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { PriorityBadge, CategoryBadge, SentimentBadge } from './ClassificationBadges';
+import { QuickReply } from './QuickReply';
 
 interface MessageItemProps {
   message: any;
@@ -275,6 +276,21 @@ export function MessageItem({ message, workspaceId, onUpdate }: MessageItemProps
                 </Badge>
               )}
             </div>
+          )}
+
+          {/* Quick Reply */}
+          {message.channel_connection?.provider && 
+           (message.channel_connection.provider === 'gmail' || 
+            message.channel_connection.provider === 'outlook') && (
+            <QuickReply
+              messageId={message.id}
+              workspaceId={workspaceId}
+              messageSubject={message.subject || '(no subject)'}
+              senderEmail={message.sender_email}
+              provider={message.channel_connection.provider}
+              providerMessageId={message.provider_message_id}
+              onSent={onUpdate}
+            />
           )}
         </div>
       </div>
