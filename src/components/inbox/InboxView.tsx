@@ -26,8 +26,7 @@ import { memo, useCallback, useEffect, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { ChannelSidebar } from './ChannelSidebar';
 import { MessageList } from './MessageList';
-
-// Types are now imported from zod schemas - MessagePriority and MessageCategory
+import type { MessagePriority, MessageCategory } from '@/utils/zod-schemas/aiva-schemas';
 
 interface InboxViewProps {
   workspaceId: string;
