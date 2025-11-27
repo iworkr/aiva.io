@@ -1,6 +1,7 @@
 "use client";
 
 import { EmailConfirmationPendingCard } from "@/components/Auth/EmailConfirmationPendingCard";
+import { OAuthWithChannelButtons } from "@/components/Auth/OAuthWithChannelButtons";
 import { Link } from "@/components/intl-link";
 import {
   Card,
@@ -66,7 +67,17 @@ export function SignUp({ next, nextActionType }: SignUpProps) {
               </TabsContent>
             </Tabs>
             <Separator className="my-4" />
-            <ProviderSignupForm next={next} />
+            <div className="space-y-3">
+              <div className="text-sm text-center text-muted-foreground">
+                Sign up with your email provider to automatically connect your inbox
+              </div>
+              <OAuthWithChannelButtons />
+              <Separator className="my-4" />
+              <div className="text-sm text-center text-muted-foreground">
+                Or sign up with other providers
+              </div>
+              <ProviderSignupForm next={next} />
+            </div>
           </CardContent>
           <CardFooter>
             <div className="w-full text-center">

@@ -3,6 +3,7 @@
 import { EmailConfirmationPendingCard } from "@/components/Auth/EmailConfirmationPendingCard";
 import { RedirectingPleaseWaitCard } from "@/components/Auth/RedirectingPleaseWaitCard";
 import { RenderProviders } from "@/components/Auth/RenderProviders";
+import { OAuthWithChannelButtons } from "@/components/Auth/OAuthWithChannelButtons";
 import { Link } from "@/components/intl-link";
 import {
   Card,
@@ -116,13 +117,23 @@ export function Login({
           </TabsContent>
         </Tabs>
         <Separator className="my-4" />
-        <RenderProviders
-          providers={["google", "github", "twitter"]}
-          isLoading={providerStatus === "executing"}
-          onProviderLoginRequested={(provider) =>
-            executeProvider({ provider, next })
-          }
-        />
+        <div className="space-y-3">
+          <div className="text-sm text-center text-muted-foreground">
+            Sign in with your email provider to automatically connect your inbox
+          </div>
+          <OAuthWithChannelButtons />
+          <Separator className="my-4" />
+          <div className="text-sm text-center text-muted-foreground">
+            Or sign in with other providers
+          </div>
+          <RenderProviders
+            providers={["github", "twitter"]}
+            isLoading={providerStatus === "executing"}
+            onProviderLoginRequested={(provider) =>
+              executeProvider({ provider, next })
+            }
+          />
+        </div>
       </CardContent>
       <CardFooter className="flex justify-between">
         <Link

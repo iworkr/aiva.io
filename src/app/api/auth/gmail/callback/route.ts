@@ -210,10 +210,15 @@ export async function GET(request: NextRequest) {
 
     console.log('Gmail connection stored successfully:', result.data.data.id);
 
+    // Check if this was an auto-connect from sign-in flow
+    const autoConnect = request.nextUrl.searchParams.get('auto_connect') === 'true';
+    
     // Redirect to inbox page with success message
-    return NextResponse.redirect(
-      toSiteURL(`${locale}/inbox?success=gmail_connected`)
-    );
+    const redirectUrl = autoConnect
+      ? toSiteURL(`${locale}/inbox?success=gmail_connected&auto_connect=true`)
+      : toSiteURL(`${locale}/inbox?success=gmail_connected`);
+    
+    return NextResponse.redirect(redirectUrl);
   } catch (error) {
     console.error('Gmail OAuth callback error:', error);
     const locale = 'en';

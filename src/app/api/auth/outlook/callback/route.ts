@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseUserServerComponentClient } from '@/supabase-clients/user/createSupabaseUserServerComponentClient';
 import { createChannelConnectionAction } from '@/data/user/channels';
+import { toSiteURL } from '@/utils/helpers';
 
 export async function GET(request: NextRequest) {
   try {
@@ -126,9 +127,16 @@ export async function GET(request: NextRequest) {
       throw new Error('Failed to store connection');
     }
 
-    return NextResponse.redirect(
-      new URL('/channels?success=outlook_connected', request.url)
-    );
+    // Check if this was an auto-connect from sign-in flow
+    const autoConnect = request.nextUrl.searchParams.get('auto_connect') === 'true';
+    const locale = 'en';
+    
+    // Redirect to inbox if auto-connect, otherwise channels
+    const redirectUrl = autoConnect
+      ? toSiteURL(`${locale}/inbox?success=outlook_connected&auto_connect=true`)
+      : toSiteURL(`${locale}/channels?success=outlook_connected`);
+    
+    return NextResponse.redirect(redirectUrl);
   } catch (error) {
     console.error('Outlook OAuth callback error:', error);
     return NextResponse.redirect(
