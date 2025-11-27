@@ -16,6 +16,29 @@ export default async function Page(props: {
   const code = searchParams.code;
   const state = searchParams.state;
   const error = searchParams.error;
+  
+  // Check if this is a Supabase auth verification (token parameter)
+  const token = searchParams.token;
+  const type = searchParams.type;
+
+  // Handle Supabase auth verification redirects
+  if (token && type) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (supabaseUrl) {
+      const verifyUrl = new URL('/auth/v1/verify', supabaseUrl);
+      verifyUrl.searchParams.set('token', Array.isArray(token) ? token[0] : token);
+      verifyUrl.searchParams.set('type', Array.isArray(type) ? type[0] : type);
+      
+      // Copy redirect_to if present
+      const redirectTo = searchParams.redirect_to;
+      if (redirectTo) {
+        verifyUrl.searchParams.set('redirect_to', Array.isArray(redirectTo) ? redirectTo[0] : redirectTo);
+      }
+      
+      console.log('🔄 Redirecting Supabase auth verification to:', verifyUrl.toString());
+      redirect(verifyUrl.toString());
+    }
+  }
 
   if (code || state || error) {
     console.log('🟡 OAuth callback detected at root locale page, redirecting to callback route', {

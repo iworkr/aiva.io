@@ -124,17 +124,20 @@ export const signInWithMagicLinkAction = actionClient
   .schema(signInWithMagicLinkSchema)
   .action(async ({ parsedInput: { email, next, shouldCreateUser } }) => {
     const supabase = await createSupabaseUserServerActionClient();
-    const redirectUrl = new URL(toSiteURL("/auth/callback"));
+    
+    // Construct callback URL - must be absolute and match Supabase redirect URL settings
+    const callbackUrl = new URL(toSiteURL("/en/auth/callback"));
     if (next) {
-      redirectUrl.searchParams.set("next", next);
+      callbackUrl.searchParams.set("next", next);
     }
 
     // Use Supabase's built-in magic link sending
     // Supabase will use our custom email templates configured in the dashboard
+    // The emailRedirectTo must match what's configured in Supabase Dashboard → Authentication → URL Configuration
     const { error, data } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: redirectUrl.toString(),
+        emailRedirectTo: callbackUrl.toString(),
         shouldCreateUser,
       },
     });
@@ -150,10 +153,18 @@ export const signInWithMagicLinkAction = actionClient
       // Provide more specific error messages
       let errorMessage = 'Failed to send magic link. Please try again.';
       
-      if (error.code === 'unexpected_failure' || error.message?.includes('Error sending')) {
+      // Check for email sending errors (domain not verified, SMTP issues, etc.)
+      if (
+        error.code === 'unexpected_failure' && 
+        (error.message?.includes('Error sending') || 
+         error.message?.includes('email') ||
+         error.message?.includes('SMTP') ||
+         error.message?.includes('domain'))
+      ) {
         errorMessage = 
-          'Unable to send email. Please verify that email templates and SMTP settings are configured in Supabase Dashboard. ' +
-          'If the problem persists, contact support.';
+          'Unable to send email. The email service is currently being configured. ' +
+          'This usually means the email domain verification is still in progress. ' +
+          'Please try again in 15-60 minutes, or contact support if the issue persists.';
       } else {
         const errorDetails = handleSupabaseAuthMagicLinkErrors(error);
         errorMessage = errorDetails.message;

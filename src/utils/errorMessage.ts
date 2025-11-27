@@ -161,6 +161,21 @@ export function handleSupabaseAuthPasswordResetErrors(
 export function handleSupabaseAuthGeneralErrors(
   error: AuthError,
 ): AuthFormErrorReturnType {
+  // Check for email sending errors specifically
+  if (
+    error.code === "unexpected_failure" &&
+    (error.message?.includes("Error sending") ||
+      error.message?.includes("email") ||
+      error.message?.includes("SMTP") ||
+      error.message?.includes("domain is not verified"))
+  ) {
+    return {
+      message:
+        "Unable to send email. The email service is currently being configured. " +
+        "Please try again in a few minutes, or contact support if the issue persists.",
+    };
+  }
+
   switch (error.code) {
     case "auth_session_missing":
       return {

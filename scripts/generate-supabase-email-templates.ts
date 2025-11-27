@@ -86,8 +86,8 @@ async function main() {
   );
 
   // Generate magic link template
-  // Supabase provides {{ .Token }} and {{ .SiteURL }}, we construct the full URL
-  // Format: {{ .SiteURL }}/auth/v1/verify?token={{ .Token }}&type=magiclink
+  // Supabase provides {{ .Token }} and {{ .ConfirmationURL }}
+  // Use {{ .ConfirmationURL }} which Supabase generates automatically with correct redirect
   await generateTemplate(
     'magic_link',
     MagicLink,
@@ -95,7 +95,8 @@ async function main() {
       appName: APP_NAME,
       userName: SUPABASE_PLACEHOLDERS.magic_link.user_name,
       supportEmail: SUPPORT_EMAIL,
-      magicLink: `{{ .SiteURL }}/auth/v1/verify?token={{ .Token }}&type=magiclink&redirect_to=https://www.tryaiva.io/en/auth/callback`,
+      // Use ConfirmationURL which Supabase generates - it includes the redirect_to parameter
+      magicLink: `{{ .ConfirmationURL }}`,
     },
   );
 
