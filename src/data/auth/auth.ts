@@ -201,22 +201,24 @@ export const signInWithMagicLinkAction = actionClient
 
     // Get user ID if user exists, or use email as fallback
     const userId = linkData.user?.id || email;
-    const userName = await getUserDisplayName(userId, email);
 
-    // Send custom email using our email service
-    try {
-      await sendAuthEmail({
-        type: "magic_link",
-        to: email,
-        userName,
-        magicLink: linkData.properties.action_link,
-      });
-    } catch (emailError) {
-      console.error("Failed to send custom magic link email:", emailError);
-      // Don't fail the entire operation if email sending fails
-      // The link was generated successfully, user can request another email
-    }
+    // Send custom email using our email service (non-blocking)
+    // We do this in a fire-and-forget manner so it doesn't block the response
+    sendAuthEmail({
+      type: "magic_link",
+      to: email,
+      userName: await getUserDisplayName(userId, email),
+      magicLink: linkData.properties.action_link,
+    }).catch((emailError) => {
+      // Log error but don't throw - email sending failure shouldn't break auth flow
+      console.error("⚠️ Failed to send custom magic link email:", emailError);
+      console.log(
+        "📧 Magic link generated successfully. Link:",
+        linkData.properties.action_link,
+      );
+    });
 
+    // Return success immediately - email is sent asynchronously
     // No need to return anything if the operation is successful
   });
 

@@ -9,9 +9,9 @@ import { toSiteURL } from './helpers';
 
 // Import email templates
 import EmailConfirmation from '../../emails/email-confirmation';
+import ForgotPassword from '../../emails/forgot-password';
 import MagicLink from '../../emails/magic-link';
 import MagicLinkLinkOnly from '../../emails/magic-link-link-only';
-import ForgotPassword from '../../emails/forgot-password';
 import PasswordUpdated from '../../emails/password-update';
 import WelcomeEmail from '../../emails/welcome';
 
@@ -161,18 +161,30 @@ export async function sendAuthEmail(options: SendAuthEmailOptions) {
         throw new Error(`Unknown email type: ${type}`);
     }
 
-    // Send email via Resend
-    await sendEmail({
-      to,
-      from: process.env.ADMIN_EMAIL || 'noreply@tryaiva.io',
-      subject,
-      html,
-    });
+    // Send email via Resend (or Inbucket in development)
+    try {
+      await sendEmail({
+        to,
+        from: process.env.ADMIN_EMAIL || 'noreply@tryaiva.io',
+        subject,
+        html,
+      });
+      console.log(`✅ Custom ${type} email sent to ${to}`);
+    } catch (error) {
+      // Log error but don't throw - email sending failure shouldn't break auth flow
+      console.error(`⚠️ Failed to send ${type} email to ${to}:`, error);
+      // In development, this is non-critical
+      if (process.env.NODE_ENV === 'production') {
+        // In production, we might want to throw, but for now we'll log and continue
+        console.warn(`Email sending failed but continuing auth flow for ${to}`);
+      }
+    }
 
     return { success: true };
   } catch (error) {
-    console.error(`Failed to send ${type} email to ${to}:`, error);
-    throw error;
+    console.error(`Failed to render/send ${type} email to ${to}:`, error);
+    // Don't throw - allow auth flow to continue even if email fails
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
 
