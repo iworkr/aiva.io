@@ -10,9 +10,9 @@ import {
   Settings,
 } from "lucide-react";
 import { Suspense } from "react";
-import { Link } from "./intl-link";
 import { NotificationsDropdownMenuTrigger } from "./notifications-dropdown-menu-trigger";
 import { ThemeToggle } from "./theme-toggle";
+import { SidebarFooterUserNavClient } from "./sidebar-footer-user-nav-client";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import {
   DropdownMenu,
@@ -90,35 +90,18 @@ async function SidebarFooterUserMenu() {
               <NotificationsDropdownMenuTrigger />
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem asChild>
-                <Link href="/user/settings">
-                  <Settings />
-                  Account Settings
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/channels">
-                  <Zap />
-                  Connected Channels
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/feedback">
-                  <HelpCircle />
-                  Help & Support
-                </Link>
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
+            <SidebarFooterUserNavClient 
+              userEmail={user.email || ''}
+              fullName={data?.full_name}
+            />
             <DropdownMenuSeparator />
             <ThemeToggle />
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/logout">
-                <LogOut />
-                Log out
-              </Link>
-            </DropdownMenuItem>
+            <SidebarFooterUserNavClient 
+              userEmail={user.email || ''}
+              fullName={data?.full_name}
+              showLogout={true}
+            />
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

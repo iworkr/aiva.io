@@ -49,12 +49,13 @@ export function IntegrationLogo({
       {!imageError ? (
         <Image
           src={integration.logoUrl}
+          loading="lazy"
+          unoptimized={integration.logoUrl?.startsWith('http')}
           alt={`${integration.name} logo`}
           width={image}
           height={image}
           className="object-contain"
           onError={() => setImageError(true)}
-          unoptimized // For external CDN URLs
         />
       ) : (
         <FallbackIcon className={cn(integration.textColor, `h-${image / 4} w-${image / 4}`)} />

@@ -49,6 +49,7 @@ export function QuickReply({
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to send reply');
       setIsSending(false);
+      // Keep reply text so user can retry
     },
   });
 
@@ -90,11 +91,15 @@ export function QuickReply({
       return;
     }
 
+    // Optimistic update - close immediately, show success
+    const replyBody = replyText.trim();
     setIsSending(true);
+    setIsExpanded(false);
+    
     sendReply({
       messageId,
       workspaceId,
-      body: replyText.trim(),
+      body: replyBody,
       subject: messageSubject.startsWith('Re:') ? messageSubject : `Re: ${messageSubject}`,
       to: [senderEmail],
       provider,

@@ -20,16 +20,20 @@ const paramsSchema = z.object({
 });
 
 // Return a list of `params` to populate the [slug] dynamic segment
+// Generate static params for all blog posts (SSG)
 export async function generateStaticParams() {
   const posts = await anonGetPublishedBlogPosts();
 
-  return routing.locales.map((locale) =>
+  return routing.locales.flatMap((locale) =>
     posts.map((post) => ({
       slug: post.slug,
       locale,
-    })),
+    }))
   );
 }
+
+// Revalidate blog posts every hour (ISR)
+export const revalidate = 3600;
 
 export async function generateMetadata(props: {
   params: Promise<unknown>;

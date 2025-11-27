@@ -1,4 +1,5 @@
 import { Link } from "@/components/intl-link";
+import { usePrefetch } from "@/hooks/usePrefetch";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -28,6 +29,8 @@ const resourceLinks = [
 ];
 
 export function SidebarPlatformNav() {
+  const { onMouseEnter } = usePrefetch();
+  
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
       <SidebarGroupLabel>Resources</SidebarGroupLabel>
@@ -35,7 +38,11 @@ export function SidebarPlatformNav() {
         {resourceLinks.map((link) => (
           <SidebarMenuItem key={link.href}>
             <SidebarMenuButton asChild>
-              <Link href={link.href} target="_blank">
+              <Link 
+                href={link.href} 
+                target="_blank"
+                onMouseEnter={onMouseEnter(link.href)}
+              >
                 {link.icon}
                 {link.label}
               </Link>

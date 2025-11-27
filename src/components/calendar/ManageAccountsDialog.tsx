@@ -124,6 +124,8 @@ export function ManageAccountsDialog({
           width={24}
           height={24}
           className="object-contain"
+          loading="lazy"
+          unoptimized
         />
       );
     }
@@ -132,6 +134,8 @@ export function ManageAccountsDialog({
       return (
         <Image
           src="https://static.cdnlogo.com/logos/a/19/apple.svg"
+          loading="lazy"
+          unoptimized
           alt="Apple Calendar logo"
           width={24}
           height={24}

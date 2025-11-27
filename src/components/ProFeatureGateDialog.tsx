@@ -69,6 +69,7 @@ export function ProFeatureGateDialog({
           >
             <Image
               src="/assets/feature-pro-text.png"
+              priority
               alt="Feature Pro"
               fill
               className="z-10"

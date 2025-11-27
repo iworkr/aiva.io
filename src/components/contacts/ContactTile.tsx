@@ -7,6 +7,7 @@
 'use client';
 
 import React, { memo } from 'react';
+import Image from 'next/image';
 import { Star, X, Edit } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -97,12 +98,13 @@ export const ContactTile = memo(function ContactTile({
                 contactColor
               )}
             />
-            <img
+            <Image
               src={contact.avatar_url}
               alt={contact.full_name}
+              width={64}
+              height={64}
               className="relative h-16 w-16 rounded-full object-cover ring-2 ring-background"
               loading="lazy"
-              decoding="async"
             />
           </div>
         ) : (

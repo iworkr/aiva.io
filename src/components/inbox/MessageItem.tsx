@@ -50,12 +50,16 @@ interface MessageItemProps {
 
 export const MessageItem = memo(function MessageItem({ message, workspaceId, onUpdate }: MessageItemProps) {
   const router = useRouter();
-  const [isStarred, setIsStarred] = useState(message.starred);
+  const [isStarred, setIsStarred] = useState(message.is_starred || false);
 
-  // Mark as read action
+  // Mark as read action with optimistic update
   const { execute: markAsRead } = useAction(markMessageAsReadAction, {
     onSuccess: () => {
-      toast.success('Marked as read');
+      // Already optimistically updated
+      onUpdate();
+    },
+    onError: () => {
+      // Revert on error - would need to track previous state
       onUpdate();
     },
   });
@@ -68,12 +72,17 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
     },
   });
 
-  // Star action
+  // Star action with optimistic update
   const { execute: toggleStar } = useAction(starMessageAction, {
     onSuccess: () => {
-      setIsStarred(!isStarred);
+      // Already optimistically updated
       toast.success(isStarred ? 'Unstarred' : 'Starred');
       onUpdate();
+    },
+    onError: () => {
+      // Revert optimistic update on error
+      setIsStarred(message.is_starred || false);
+      toast.error('Failed to update star status');
     },
   });
 
@@ -96,6 +105,8 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
 
   const handleStarClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    // Optimistic update
+    setIsStarred(!isStarred);
     toggleStar({ id: message.id, workspaceId });
   };
 

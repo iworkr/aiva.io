@@ -4,11 +4,13 @@ import { Link } from "@/components/intl-link";
 import { cn } from "@/utils/cn";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { usePrefetch } from "@/hooks/usePrefetch";
 import { DocsMobileNavigation } from "./DocsMobileNavigation";
 import { navbarLinks } from "./constants";
 
 export function LeftNav() {
   const pathname = usePathname();
+  const { onMouseEnter } = usePrefetch();
 
   const isBlogPage = pathname?.startsWith("/blog");
   const isDocsPage = pathname?.startsWith("/docs");
@@ -46,7 +48,7 @@ export function LeftNav() {
             key={name}
             className="text-muted-foreground font-regular text-sm hover:text-foreground"
           >
-            <Link href={href}>{name}</Link>
+            <Link href={href} onMouseEnter={onMouseEnter(href)}>{name}</Link>
           </li>
         ))}
       </ul>

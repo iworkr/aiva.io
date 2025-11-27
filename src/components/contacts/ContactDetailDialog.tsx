@@ -6,6 +6,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import {
   Dialog,
   DialogContent,
@@ -166,12 +167,13 @@ export function ContactDetailDialog({
                       contactColor
                     )}
                   />
-                  <img
+                  <Image
                     src={contact.avatar_url}
                     alt={contact.full_name}
+                    width={96}
+                    height={96}
                     className="relative h-24 w-24 rounded-full object-cover ring-4 ring-background"
                     loading="lazy"
-                    decoding="async"
                   />
                 </div>
               ) : (

@@ -95,14 +95,18 @@ export default async function Page(props0: {
   );
 }
 
+// Generate static params for all docs pages (SSG)
 export async function generateStaticParams() {
-  return routing.locales.map((locale) =>
+  return routing.locales.flatMap((locale) =>
     getPages().map((page) => ({
       slug: page.slugs,
       locale,
-    })),
+    }))
   );
 }
+
+// Revalidate docs every 24 hours (ISR)
+export const revalidate = 86400;
 
 export async function generateMetadata(props: {
   params: Promise<{ slug?: string[] }>;

@@ -17,12 +17,16 @@ const BlogListByTagPageParamsSchema = z.object({
   locale: z.string(),
 });
 
+// Generate static params for all blog tag pages (SSG)
 export async function generateStaticParams() {
   const tags = await anonGetAllBlogTags();
-  return routing.locales.map((locale) =>
-    tags.map((tag) => ({ tagSlug: tag.slug, locale })),
+  return routing.locales.flatMap((locale) =>
+    tags.map((tag) => ({ tagSlug: tag.slug, locale }))
   );
 }
+
+// Revalidate blog tag pages every hour (ISR)
+export const revalidate = 3600;
 
 export async function generateMetadata(props: {
   params: Promise<unknown>;

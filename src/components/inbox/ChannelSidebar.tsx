@@ -172,6 +172,8 @@ export function ChannelSidebar({
                       width={20}
                       height={20}
                       className="object-contain"
+                      loading="lazy"
+                      unoptimized={integration.logoUrl?.startsWith('http')}
                     />
                   </div>
                 ) : (
