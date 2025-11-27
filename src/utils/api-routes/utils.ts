@@ -77,8 +77,27 @@ export async function sendEmail(options: EmailOptions) {
 
   try {
     const resend = new Resend(resendApiKey);
-    // return sendgrid.send(options);
-    return await resend.emails.send(options);
+    const result = await resend.emails.send(options);
+    
+    // Check if Resend returned an error in the response
+    if (result.error) {
+      console.error("❌ Resend API returned an error:", result.error);
+      throw new Error(`Resend API error: ${JSON.stringify(result.error)}`);
+    }
+    
+    // Verify we got a successful response with an ID
+    if (!result.data?.id) {
+      console.error("❌ Resend API response missing email ID:", result);
+      throw new Error("Resend API did not return a valid email ID");
+    }
+    
+    console.log("📧 Resend email sent successfully:", {
+      emailId: result.data.id,
+      to: options.to,
+      subject: options.subject,
+    });
+    
+    return result;
   } catch (error: any) {
     // If it's the "Missing API key" error, provide helpful message
     if (
@@ -95,7 +114,12 @@ export async function sendEmail(options: EmailOptions) {
           "Please add it in Vercel/Render dashboard → Environment Variables → RESEND_API_KEY = re_U3wbepDx_8jGmrWhM5JZhvy2UmebYBMDa",
       );
     }
-    console.error("Failed to send email via Resend:", error);
+    console.error("❌ Failed to send email via Resend:", {
+      error: error.message,
+      errorDetails: error,
+      to: options.to,
+      subject: options.subject,
+    });
     errors.add(error);
     throw error; // Re-throw so caller knows email failed
   }

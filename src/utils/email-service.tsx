@@ -163,21 +163,40 @@ export async function sendAuthEmail(options: SendAuthEmailOptions) {
 
     // Send email via Resend (or Inbucket in development)
     try {
-      await sendEmail({
+      const result = await sendEmail({
         to,
         from: process.env.ADMIN_EMAIL || 'noreply@tryaiva.io',
         subject,
         html,
       });
-      console.log(`✅ Custom ${type} email sent to ${to}`);
-    } catch (error) {
+      
+      // Verify the email was actually sent
+      // Resend returns { data: { id: string } } on success
+      // Or { id: string, message: string } if skipped
+      if (result && 'data' in result && result.data?.id) {
+        console.log(`✅ Custom ${type} email sent successfully to ${to}`, {
+          emailId: result.data.id,
+          type,
+        });
+      } else if (result && 'id' in result && result.id === 'skipped') {
+        console.warn(`⚠️ Email sending was skipped:`, result);
+      } else {
+        console.warn(`⚠️ Email send returned unexpected response:`, result);
+      }
+    } catch (error: any) {
       // Log error but don't throw - email sending failure shouldn't break auth flow
-      console.error(`⚠️ Failed to send ${type} email to ${to}:`, error);
+      console.error(`❌ Failed to send ${type} email to ${to}:`, {
+        error: error?.message || error,
+        errorDetails: error,
+        type,
+        to,
+      });
       // In development, this is non-critical
       if (process.env.NODE_ENV === 'production') {
-        // In production, we might want to throw, but for now we'll log and continue
-        console.warn(`Email sending failed but continuing auth flow for ${to}`);
+        // In production, log the error but continue auth flow
+        console.warn(`⚠️ Email sending failed but continuing auth flow for ${to}`);
       }
+      // Don't re-throw - allow auth flow to continue
     }
 
     return { success: true };
