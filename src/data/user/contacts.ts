@@ -405,3 +405,182 @@ export async function findOrCreateContactFromChannel(
   return newContact;
 }
 
+/**
+ * Find or create contact from message sender information
+ * This is the main function used during message sync to automatically create/link contacts
+ * 
+ * Matching logic:
+ * 1. First tries to find existing contact by email (primary matching)
+ * 2. If email matches, links the channel to that contact
+ * 3. If no email match, tries to find by channel (channel_type + channel_id)
+ * 4. If no match found, creates new contact and links channel
+ * 
+ * This ensures that:
+ * - Same person across channels (Gmail, Instagram, etc.) is linked to one contact
+ * - All communication history is unified under one contact
+ */
+export async function findOrCreateContactFromMessage(
+  workspaceId: string,
+  userId: string,
+  channelType: string,
+  senderEmail: string | null,
+  senderName: string | null,
+  channelId?: string // For non-email channels (Instagram username, phone number, etc.)
+): Promise<{ contactId: string; isNew: boolean }> {
+  const isMember = await isWorkspaceMember(userId, workspaceId);
+  if (!isMember) throw new Error('Not a workspace member');
+
+  const supabase = await createSupabaseUserServerActionClient();
+
+  // Normalize email for matching (lowercase, trim)
+  const normalizedEmail = senderEmail?.toLowerCase().trim() || null;
+  
+  // Use email as channel_id for email channels if not provided
+  const normalizedChannelId = channelId || normalizedEmail || senderName || 'unknown';
+
+  // Step 1: Try to find existing contact by email (primary matching method)
+  if (normalizedEmail) {
+    const { data: existingContactByEmail } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .eq('email', normalizedEmail)
+      .single();
+
+    if (existingContactByEmail) {
+      // Found contact by email - link this channel to it
+      const contactId = existingContactByEmail.id;
+
+      // Check if channel already linked
+      const { data: existingChannel } = await supabase
+        .from('contact_channels')
+        .select('id, message_count')
+        .eq('contact_id', contactId)
+        .eq('workspace_id', workspaceId)
+        .eq('channel_type', channelType)
+        .eq('channel_id', normalizedChannelId)
+        .single();
+
+      if (!existingChannel) {
+        // Link the channel to the existing contact
+        await supabase
+          .from('contact_channels')
+          .insert({
+            contact_id: contactId,
+            workspace_id: workspaceId,
+            channel_type: channelType,
+            channel_id: normalizedChannelId,
+            channel_display_name: senderName || normalizedEmail,
+            // Mark as primary if this is the first channel of this type
+            is_primary: channelType === 'gmail' || channelType === 'outlook',
+            last_message_at: new Date().toISOString(),
+            message_count: 1,
+          });
+      } else {
+        // Update message count and last message time
+        await supabase
+          .from('contact_channels')
+          .update({
+            last_message_at: new Date().toISOString(),
+            message_count: (existingChannel.message_count || 0) + 1,
+          })
+          .eq('id', existingChannel.id);
+      }
+
+      // Update contact interaction stats (will be triggered by trigger)
+      await supabase
+        .from('contacts')
+        .update({
+          last_interaction_at: new Date().toISOString(),
+          // Update name if we have a better one
+          ...(senderName && { full_name: senderName }),
+        })
+        .eq('id', contactId);
+
+      return { contactId, isNew: false };
+    }
+  }
+
+  // Step 2: Try to find existing contact by channel (for non-email channels)
+  const { data: existingChannel } = await supabase
+    .from('contact_channels')
+    .select('contact_id, contacts(*)')
+    .eq('workspace_id', workspaceId)
+    .eq('channel_type', channelType)
+    .eq('channel_id', normalizedChannelId)
+    .single();
+
+  if (existingChannel && existingChannel.contacts) {
+    const contactId = (existingChannel.contacts as any).id;
+    
+    // Update contact with email if we have one and it's not set
+    if (normalizedEmail) {
+      await supabase
+        .from('contacts')
+        .update({
+          email: normalizedEmail,
+          last_interaction_at: new Date().toISOString(),
+          ...(senderName && { full_name: senderName }),
+        })
+        .eq('id', contactId)
+        .is('email', null); // Only update if email is null
+    }
+
+    // Update channel message count and last message time
+    await supabase
+      .from('contact_channels')
+      .update({
+        last_message_at: new Date().toISOString(),
+        message_count: ((existingChannel as any).message_count || 0) + 1,
+      })
+      .eq('contact_id', contactId)
+      .eq('channel_type', channelType)
+      .eq('channel_id', normalizedChannelId);
+
+    return { contactId, isNew: false };
+  }
+
+  // Step 3: No existing contact found - create new one
+  const displayName = senderName || normalizedEmail || normalizedChannelId;
+  const firstName = senderName?.split(' ')[0] || null;
+  const lastName = senderName?.split(' ').slice(1).join(' ') || null;
+
+  const { data: newContact, error: contactError } = await supabase
+    .from('contacts')
+    .insert({
+      workspace_id: workspaceId,
+      full_name: displayName,
+      first_name: firstName,
+      last_name: lastName || null,
+      email: normalizedEmail,
+      created_by: userId,
+      last_interaction_at: new Date().toISOString(),
+      interaction_count: 1,
+    })
+    .select('id')
+    .single();
+
+  if (contactError) throw new Error(contactError.message);
+
+  // Link the channel to the new contact
+  const { error: channelError } = await supabase
+    .from('contact_channels')
+    .insert({
+      contact_id: newContact.id,
+      workspace_id: workspaceId,
+      channel_type: channelType,
+      channel_id: normalizedChannelId,
+      channel_display_name: senderName || normalizedEmail || normalizedChannelId,
+      is_primary: true,
+      last_message_at: new Date().toISOString(),
+      message_count: 1,
+    });
+
+  if (channelError) {
+    console.error('Failed to link channel to contact:', channelError);
+    // Don't throw - contact was created successfully
+  }
+
+  return { contactId: newContact.id, isNew: true };
+}
+

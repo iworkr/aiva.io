@@ -13,6 +13,7 @@ import {
   listGmailMessages,
   parseGmailMessage,
 } from "./client";
+import { findOrCreateContactFromMessage } from "@/data/user/contacts";
 
 /**
  * Sync Gmail messages for a channel connection
@@ -28,7 +29,7 @@ export async function syncGmailMessages(
   try {
     const supabase = await createSupabaseUserServerActionClient();
 
-    // Get connection details
+    // Get connection details (including user_id for contact creation)
     const { data: connection, error: connectionError } = await supabase
       .from("channel_connections")
       .select("*")
@@ -43,6 +44,8 @@ export async function syncGmailMessages(
     if (connection.provider !== "gmail") {
       throw new Error("Connection is not a Gmail account");
     }
+
+    const userId = connection.user_id;
 
     console.log("📥 Gmail sync starting", {
       connectionId,
@@ -138,6 +141,21 @@ export async function syncGmailMessages(
 
         if (inserted?.id) {
           newCount++;
+          
+          // Create or link contact for this message sender
+          try {
+            await findOrCreateContactFromMessage(
+              workspaceId,
+              userId,
+              'gmail', // channel type
+              parsed.senderEmail, // email
+              parsed.senderName, // name
+              parsed.senderEmail // channel ID (email for Gmail)
+            );
+          } catch (contactError) {
+            // Log but don't fail the sync if contact creation fails
+            console.error(`Failed to create/link contact for ${parsed.senderEmail}:`, contactError);
+          }
         }
         syncedCount++;
       } catch (error) {
