@@ -25,6 +25,12 @@
   ],
   "rewrites": [
     { "source": "/api/health", "destination": "/api/health" }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/sync",
+      "schedule": "*/5 * * * *"
+    }
   ]
 }
 

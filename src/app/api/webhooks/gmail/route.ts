@@ -72,15 +72,20 @@ export async function POST(request: NextRequest) {
     // Trigger sync for this connection
     // Note: We're returning 200 immediately and processing async
     // Gmail expects a quick response
+    // Sync ALL recent messages (not just unread) to ensure contacts are created
     syncGmailMessages(connection.id, connection.workspace_id, {
-      maxMessages: 10, // Only fetch recent messages
-      query: 'is:unread',
+      maxMessages: 20, // Fetch recent messages (webhook indicates new activity)
+      query: '', // No filter = sync all recent messages
     })
       .then((result) => {
-        console.log('Gmail webhook sync completed:', result);
+        console.log('✅ Gmail webhook sync completed:', {
+          connectionId: connection.id,
+          syncedCount: result.syncedCount,
+          newCount: result.newCount,
+        });
       })
       .catch((error) => {
-        console.error('Gmail webhook sync failed:', error);
+        console.error('❌ Gmail webhook sync failed:', error);
       });
 
     return NextResponse.json({
