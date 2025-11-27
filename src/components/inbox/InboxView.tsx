@@ -6,26 +6,26 @@
 
 'use client';
 
-import { useState, useEffect, useCallback, useTransition, memo } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { MessageList } from './MessageList';
-import { ChannelSidebar } from './ChannelSidebar';
+import { ConnectChannelDialog } from '@/components/channels/ConnectChannelDialog';
+import { IntegrationAvatars } from '@/components/integrations/IntegrationAvatars';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { RefreshCw, Search, Inbox as InboxIcon, Plus } from 'lucide-react';
+import { getUserChannelConnections } from '@/data/user/channels';
 import {
   getMessagesAction,
   syncWorkspaceConnectionsAction,
 } from '@/data/user/messages';
-import { getUserChannelConnections } from '@/data/user/channels';
-import { ConnectChannelDialog } from '@/components/channels/ConnectChannelDialog';
-import { toast } from 'sonner';
-import { useAction } from 'next-safe-action/hooks';
-import { cn } from '@/lib/utils';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useDebouncedValue } from '@/hooks/usePrefetch';
 import { allIntegrations } from '@/lib/integrations/config';
-import { IntegrationAvatars } from '@/components/integrations/IntegrationAvatars';
+import { cn } from '@/lib/utils';
+import { Inbox as InboxIcon, Plus, RefreshCw, Search } from 'lucide-react';
+import { useAction } from 'next-safe-action/hooks';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { memo, useCallback, useEffect, useState, useTransition } from 'react';
+import { toast } from 'sonner';
+import { ChannelSidebar } from './ChannelSidebar';
+import { MessageList } from './MessageList';
 
 type MessagePriority = 'high' | 'medium' | 'low' | 'noise';
 type MessageCategory = 'sales_lead' | 'client_support' | 'internal' | 'social' | 'marketing' | 'personal' | 'other';
@@ -66,7 +66,7 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
       if (data && data.messages) {
         const messagesArray = Array.isArray(data.messages) ? data.messages : [];
         setMessages(messagesArray);
-        
+
         // Calculate message counts per channel
         const counts: Record<string, number> = {};
         messagesArray.forEach((msg: any) => {
@@ -97,8 +97,7 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
       onSuccess: ({ data }) => {
         if (data) {
           toast.success(
-            `Synced ${data.totalNewMessages ?? 0} new message(s) from ${
-              data.totalConnections ?? 0
+            `Synced ${data.totalNewMessages ?? 0} new message(s) from ${data.totalConnections ?? 0
             } channel(s)`
           );
         }
@@ -212,7 +211,7 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
   const filteredMessages = useCallback(() => {
     if (!debouncedSearchQuery) return messages;
     const query = debouncedSearchQuery.toLowerCase();
-    return messages.filter((msg) => 
+    return messages.filter((msg) =>
       msg.subject?.toLowerCase().includes(query) ||
       msg.sender_name?.toLowerCase().includes(query) ||
       msg.sender_email?.toLowerCase().includes(query) ||
@@ -259,94 +258,94 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
                 )}
               />
             </Button>
+          </div>
         </div>
-      </div>
 
         {/* Message List */}
-      <div className="flex-1 overflow-hidden">
-        {loading ? (
-          <div className="flex h-full items-center justify-center">
-            <div className="text-center">
-              <RefreshCw className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
-              <p className="mt-2 text-sm text-muted-foreground">Loading messages...</p>
+        <div className="flex-1 overflow-hidden">
+          {loading ? (
+            <div className="flex h-full items-center justify-center">
+              <div className="text-center">
+                <RefreshCw className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
+                <p className="mt-2 text-sm text-muted-foreground">Loading messages...</p>
+              </div>
             </div>
-          </div>
           ) : hasChannels === false ? (
-          // No channels connected - Show connect prompt
-          <div className="flex h-full items-center justify-center">
-            <div className="text-center max-w-md px-6">
+            // No channels connected - Show connect prompt
+            <div className="flex h-full items-center justify-center">
+              <div className="text-center max-w-md px-6">
                 <div className="mx-auto w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6">
                   <Plus className="h-10 w-10 text-primary" />
                 </div>
-              <h3 className="text-2xl font-semibold mb-3">Connect Your First Channel</h3>
-              <p className="text-muted-foreground mb-6">
-                  Get started by connecting your email or messaging accounts. 
+                <h3 className="text-2xl font-semibold mb-3">Connect Your First Channel</h3>
+                <p className="text-muted-foreground mb-6">
+                  Get started by connecting your email or messaging accounts.
                   We'll sync your messages and help you manage them with AI.
-              </p>
-              <Button
+                </p>
+                <Button
                   size="lg"
                   onClick={() => setConnectDialogOpen(true)}
                   className="gap-2"
-              >
+                >
                   <Plus className="h-5 w-5" />
                   Connect Channel
-              </Button>
+                </Button>
                 <div className="mt-6 flex flex-col items-center gap-3">
                   <IntegrationAvatars integrations={allIntegrations} max={7} />
                   <p className="text-sm text-muted-foreground">
                     Available integrations
                   </p>
                 </div>
+              </div>
             </div>
-          </div>
           ) : filteredMessages.length === 0 ? (
-          <div className="flex h-full items-center justify-center">
-            <div className="text-center">
-              <InboxIcon className="mx-auto h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-4 text-lg font-semibold">No messages</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
+            <div className="flex h-full items-center justify-center">
+              <div className="text-center">
+                <InboxIcon className="mx-auto h-12 w-12 text-muted-foreground" />
+                <h3 className="mt-4 text-lg font-semibold">No messages</h3>
+                <p className="mt-2 text-sm text-muted-foreground">
                   {searchQuery
                     ? 'No messages match your search'
                     : selectedChannel
-                    ? 'No messages in this channel'
-                    : 'Your inbox is empty. Click sync to fetch new messages.'}
-              </p>
+                      ? 'No messages in this channel'
+                      : 'Your inbox is empty. Click sync to fetch new messages.'}
+                </p>
                 {!searchQuery && (
-              <Button
-                  className="mt-4"
-                  variant="outline"
-                  onClick={handleSync}
-                  disabled={syncing || syncStatus === 'executing'}
-                >
-                  <RefreshCw
-                    className={cn(
-                      'mr-2 h-4 w-4',
-                      (syncing || syncStatus === 'executing') && 'animate-spin'
-                    )}
-                  />
-                  Sync Messages
-                </Button>
+                  <Button
+                    className="mt-4"
+                    variant="outline"
+                    onClick={handleSync}
+                    disabled={syncing || syncStatus === 'executing'}
+                  >
+                    <RefreshCw
+                      className={cn(
+                        'mr-2 h-4 w-4',
+                        (syncing || syncStatus === 'executing') && 'animate-spin'
+                      )}
+                    />
+                    Sync Messages
+                  </Button>
                 )}
+              </div>
             </div>
-          </div>
-        ) : (
-          <MessageList
+          ) : (
+            <MessageList
               messages={filteredMessages}
-            workspaceId={workspaceId}
-            onMessageUpdate={() => {
-              // Refresh messages after update
-              fetchMessages({
-                workspaceId,
+              workspaceId={workspaceId}
+              onMessageUpdate={() => {
+                // Refresh messages after update
+                fetchMessages({
+                  workspaceId,
                   channelConnectionId: selectedChannel || undefined,
                   priority: filters?.priority,
                   category: filters?.category,
                   isRead: filters?.status === 'unread' ? false : undefined,
                   limit: 100,
                   offset: 0,
-              });
-            }}
-          />
-        )}
+                });
+              }}
+            />
+          )}
         </div>
       </div>
 

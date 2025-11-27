@@ -3,16 +3,16 @@
  * Syncs messages from Gmail to Aiva.io database
  */
 
-'use server';
+"use server";
 
-import { createSupabaseUserServerActionClient } from '@/supabase-clients/user/createSupabaseUserServerActionClient';
+import { createMessageAction } from "@/data/user/messages";
+import { createSupabaseUserServerActionClient } from "@/supabase-clients/user/createSupabaseUserServerActionClient";
 import {
   getGmailAccessToken,
-  listGmailMessages,
   getGmailMessage,
+  listGmailMessages,
   parseGmailMessage,
-} from './client';
-import { createMessageAction } from '@/data/user/messages';
+} from "./client";
 
 /**
  * Sync Gmail messages for a channel connection
@@ -23,28 +23,28 @@ export async function syncGmailMessages(
   options: {
     maxMessages?: number;
     query?: string;
-  } = {}
+  } = {},
 ) {
   try {
     const supabase = await createSupabaseUserServerActionClient();
 
     // Get connection details
     const { data: connection, error: connectionError } = await supabase
-      .from('channel_connections')
-      .select('*')
-      .eq('id', connectionId)
-      .eq('workspace_id', workspaceId)
+      .from("channel_connections")
+      .select("*")
+      .eq("id", connectionId)
+      .eq("workspace_id", workspaceId)
       .single();
 
     if (connectionError || !connection) {
-      throw new Error('Channel connection not found');
+      throw new Error("Channel connection not found");
     }
 
-    if (connection.provider !== 'gmail') {
-      throw new Error('Connection is not a Gmail account');
+    if (connection.provider !== "gmail") {
+      throw new Error("Connection is not a Gmail account");
     }
 
-    console.log('📥 Gmail sync starting', {
+    console.log("📥 Gmail sync starting", {
       connectionId,
       workspaceId,
       maxMessages: options.maxMessages,
@@ -59,10 +59,10 @@ export async function syncGmailMessages(
       maxResults: options.maxMessages || 50,
       // If a specific query is provided, use it; otherwise fetch recent messages
       // Leaving q empty lets Gmail return recent mail instead of only unread
-      q: options.query ?? '',
+      q: options.query ?? "",
     });
 
-    console.log('📥 Gmail messages listed', {
+    console.log("📥 Gmail messages listed", {
       connectionId,
       workspaceId,
       totalRefs: messagesList.messages?.length ?? 0,
@@ -74,7 +74,7 @@ export async function syncGmailMessages(
         success: true,
         syncedCount: 0,
         newCount: 0,
-        message: 'No new messages to sync',
+        message: "No new messages to sync",
       };
     }
 
@@ -93,10 +93,10 @@ export async function syncGmailMessages(
 
         // Check if message already exists
         const { data: existing } = await supabase
-          .from('messages')
-          .select('id')
-          .eq('channel_connection_id', connectionId)
-          .eq('provider_message_id', parsed.providerMessageId)
+          .from("messages")
+          .select("id")
+          .eq("channel_connection_id", connectionId)
+          .eq("provider_message_id", parsed.providerMessageId)
           .single();
 
         if (existing) {
@@ -106,7 +106,7 @@ export async function syncGmailMessages(
 
         // Store message in database directly (system sync, not user-initiated action)
         const { data: inserted, error: insertError } = await supabase
-          .from('messages')
+          .from("messages")
           .insert({
             workspace_id: workspaceId,
             channel_connection_id: connectionId,
@@ -124,13 +124,13 @@ export async function syncGmailMessages(
             // Cast to any to satisfy Supabase Json type
             raw_data: parsed.rawData as any,
           })
-          .select('id')
+          .select("id")
           .single();
 
         if (insertError) {
           console.error(
             `Failed to insert Gmail message ${messageRef.id} into messages:`,
-            insertError
+            insertError,
           );
           errorCount++;
           continue;
@@ -141,23 +141,20 @@ export async function syncGmailMessages(
         }
         syncedCount++;
       } catch (error) {
-        console.error(
-          `Failed to sync message ${messageRef.id}:`,
-          error
-        );
+        console.error(`Failed to sync message ${messageRef.id}:`, error);
         errorCount++;
       }
     }
 
     // Update last sync time and cursor
     await supabase
-      .from('channel_connections')
+      .from("channel_connections")
       .update({
         last_sync_at: new Date().toISOString(),
         sync_cursor: messagesList.nextPageToken || null,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', connectionId);
+      .eq("id", connectionId);
 
     return {
       success: true,
@@ -169,7 +166,7 @@ export async function syncGmailMessages(
       message: `Synced ${syncedCount} messages (${newCount} new, ${errorCount} errors)`,
     };
   } catch (error) {
-    console.error('Gmail sync error:', error);
+    console.error("Gmail sync error:", error);
     throw error;
   }
 }
@@ -182,16 +179,16 @@ export async function syncAllGmailConnectionsForWorkspace(workspaceId: string) {
 
   // Get all active Gmail connections for workspace
   const { data: connections, error } = await supabase
-    .from('channel_connections')
-    .select('id, provider_account_name')
-    .eq('workspace_id', workspaceId)
-    .eq('provider', 'gmail')
-    .eq('status', 'active');
+    .from("channel_connections")
+    .select("id, provider_account_name")
+    .eq("workspace_id", workspaceId)
+    .eq("provider", "gmail")
+    .eq("status", "active");
 
   if (error || !connections || connections.length === 0) {
     return {
       success: true,
-      message: 'No active Gmail connections found',
+      message: "No active Gmail connections found",
       results: [],
     };
   }
@@ -211,12 +208,15 @@ export async function syncAllGmailConnectionsForWorkspace(workspaceId: string) {
         connectionId: connection.id,
         accountName: connection.provider_account_name,
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : "Unknown error",
       });
     }
   }
 
-  const totalNew = results.reduce((sum, r) => sum + ((r as any).newCount || 0), 0);
+  const totalNew = results.reduce(
+    (sum, r) => sum + ((r as any).newCount || 0),
+    0,
+  );
 
   return {
     success: true,
@@ -232,21 +232,21 @@ export async function syncAllGmailConnectionsForWorkspace(workspaceId: string) {
 export async function syncGmailThread(
   connectionId: string,
   workspaceId: string,
-  threadId: string
+  threadId: string,
 ) {
   try {
     const supabase = await createSupabaseUserServerActionClient();
 
     // Get connection details
     const { data: connection, error: connectionError } = await supabase
-      .from('channel_connections')
-      .select('*')
-      .eq('id', connectionId)
-      .eq('workspace_id', workspaceId)
+      .from("channel_connections")
+      .select("*")
+      .eq("id", connectionId)
+      .eq("workspace_id", workspaceId)
       .single();
 
     if (connectionError || !connection) {
-      throw new Error('Channel connection not found');
+      throw new Error("Channel connection not found");
     }
 
     // Get access token
@@ -259,11 +259,11 @@ export async function syncGmailThread(
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
-      }
+      },
     );
 
     if (!response.ok) {
-      throw new Error('Failed to fetch Gmail thread');
+      throw new Error("Failed to fetch Gmail thread");
     }
 
     const thread = await response.json();
@@ -277,10 +277,10 @@ export async function syncGmailThread(
 
       // Check if message already exists
       const { data: existing } = await supabase
-        .from('messages')
-        .select('id')
-        .eq('channel_connection_id', connectionId)
-        .eq('provider_message_id', parsed.providerMessageId)
+        .from("messages")
+        .select("id")
+        .eq("channel_connection_id", connectionId)
+        .eq("provider_message_id", parsed.providerMessageId)
         .single();
 
       if (existing) {
@@ -320,8 +320,7 @@ export async function syncGmailThread(
       message: `Synced thread with ${syncedCount} messages (${newCount} new)`,
     };
   } catch (error) {
-    console.error('Gmail thread sync error:', error);
+    console.error("Gmail thread sync error:", error);
     throw error;
   }
 }
-

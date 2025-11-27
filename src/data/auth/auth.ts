@@ -1,6 +1,8 @@
 "use server";
 import { actionClient } from "@/lib/safe-action";
+import { supabaseAdminClient } from "@/supabase-clients/admin/supabaseAdminClient";
 import { createSupabaseUserServerActionClient } from "@/supabase-clients/user/createSupabaseUserServerActionClient";
+import { getUserDisplayName, sendAuthEmail } from "@/utils/email-service";
 import {
   handleSupabaseAuthMagicLinkErrors,
   handleSupabaseAuthPasswordSignUpErrors,
@@ -19,6 +21,7 @@ import { returnValidationErrors } from "next-safe-action";
 
 /**
  * Signs up a new user with email and password.
+ * Uses custom email templates via Resend for email confirmation.
  * @param {Object} params - The parameters for sign up.
  * @param {string} params.email - The user's email address.
  * @param {string} params.password - The user's password (minimum 8 characters).
@@ -33,6 +36,9 @@ export const signUpWithPasswordAction = actionClient
     if (next) {
       emailRedirectTo.searchParams.set("next", next);
     }
+
+    // Sign up user (Supabase will still send confirmation email by default)
+    // We'll also send our custom email after signup
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -53,6 +59,54 @@ export const signUpWithPasswordAction = actionClient
         returnValidationErrors(signUpWithPasswordSchema, {
           _errors: [errorDetails.message],
         });
+      }
+      return;
+    }
+
+    // If user was created and needs email confirmation, send custom confirmation email
+    if (data?.user && !data.user.email_confirmed_at) {
+      // Generate confirmation link (password required for signup type)
+      const { data: linkData } =
+        await supabaseAdminClient.auth.admin.generateLink({
+          type: "signup",
+          email,
+          password,
+          options: {
+            redirectTo: emailRedirectTo.toString(),
+          },
+        });
+
+      if (linkData?.properties?.action_link) {
+        const userName = await getUserDisplayName(data.user.id, email);
+
+        try {
+          // Send custom confirmation email
+          await sendAuthEmail({
+            type: "email_confirmation",
+            to: email,
+            userName,
+            confirmationLink: linkData.properties.action_link,
+          });
+
+          // Optionally send welcome email
+          try {
+            await sendAuthEmail({
+              type: "welcome",
+              to: email,
+              userName,
+              linkToApp: toSiteURL("/dashboard"),
+            });
+          } catch (welcomeError) {
+            console.error("Failed to send welcome email:", welcomeError);
+            // Non-critical, don't throw
+          }
+        } catch (emailError) {
+          console.error(
+            "Failed to send custom confirmation email:",
+            emailError,
+          );
+          // Non-critical, Supabase will still send its default email
+        }
       }
     }
 
@@ -102,6 +156,7 @@ export const signInWithPasswordAction = actionClient
 
 /**
  * Sends a magic link to the user's email for passwordless sign in.
+ * Uses custom email templates via Resend instead of Supabase default emails.
  * @param {Object} params - The parameters for magic link sign in.
  * @param {string} params.email - The user's email address.
  * @param {string} [params.next] - The URL to redirect to after successful sign in.
@@ -110,26 +165,56 @@ export const signInWithPasswordAction = actionClient
 export const signInWithMagicLinkAction = actionClient
   .schema(signInWithMagicLinkSchema)
   .action(async ({ parsedInput: { email, next, shouldCreateUser } }) => {
-    const supabase = await createSupabaseUserServerActionClient();
     const redirectUrl = new URL(toSiteURL("/auth/callback"));
     if (next) {
       redirectUrl.searchParams.set("next", next);
     }
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        shouldCreateUser,
-        emailRedirectTo: redirectUrl.toString(),
-      },
-    });
 
-    if (error) {
-      const errorDetails = handleSupabaseAuthMagicLinkErrors(error);
+    // Generate magic link using admin API (this doesn't send email automatically)
+    const { data: linkData, error: linkError } =
+      await supabaseAdminClient.auth.admin.generateLink({
+        type: "magiclink",
+        email,
+        options: {
+          redirectTo: redirectUrl.toString(),
+        },
+      });
+
+    if (linkError) {
+      const errorDetails = handleSupabaseAuthMagicLinkErrors(linkError);
       returnValidationErrors(signInWithMagicLinkSchema, {
         email: {
           _errors: [errorDetails.message],
         },
       });
+      return;
+    }
+
+    if (!linkData?.properties?.action_link) {
+      returnValidationErrors(signInWithMagicLinkSchema, {
+        email: {
+          _errors: ["Failed to generate magic link"],
+        },
+      });
+      return;
+    }
+
+    // Get user ID if user exists, or use email as fallback
+    const userId = linkData.user?.id || email;
+    const userName = await getUserDisplayName(userId, email);
+
+    // Send custom email using our email service
+    try {
+      await sendAuthEmail({
+        type: "magic_link",
+        to: email,
+        userName,
+        magicLink: linkData.properties.action_link,
+      });
+    } catch (emailError) {
+      console.error("Failed to send custom magic link email:", emailError);
+      // Don't fail the entire operation if email sending fails
+      // The link was generated successfully, user can request another email
     }
 
     // No need to return anything if the operation is successful
@@ -167,6 +252,7 @@ export const signInWithProviderAction = actionClient
 
 /**
  * Initiates the password reset process for a user.
+ * Uses custom email templates via Resend instead of Supabase default emails.
  * @param {Object} params - The parameters for password reset.
  * @param {string} params.email - The email address of the user requesting password reset.
  * @throws {Error} If there's an error initiating the password reset.
@@ -174,16 +260,21 @@ export const signInWithProviderAction = actionClient
 export const resetPasswordAction = actionClient
   .schema(resetPasswordSchema)
   .action(async ({ parsedInput: { email } }) => {
-    const supabase = await createSupabaseUserServerActionClient();
     const redirectToURL = new URL(toSiteURL("/auth/callback"));
     redirectToURL.searchParams.set("next", "/update-password");
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: redirectToURL.toString(),
-    });
+    // Generate password reset link using admin API (this doesn't send email automatically)
+    const { data: linkData, error: linkError } =
+      await supabaseAdminClient.auth.admin.generateLink({
+        type: "recovery",
+        email,
+        options: {
+          redirectTo: redirectToURL.toString(),
+        },
+      });
 
-    if (error) {
-      const errorDetails = handleSupabaseAuthResetPasswordErrors(error);
+    if (linkError) {
+      const errorDetails = handleSupabaseAuthResetPasswordErrors(linkError);
       if (errorDetails.field === "email") {
         returnValidationErrors(resetPasswordSchema, {
           email: { _errors: [errorDetails.message] },
@@ -193,6 +284,32 @@ export const resetPasswordAction = actionClient
           _errors: [errorDetails.message],
         });
       }
+      return;
+    }
+
+    if (!linkData?.properties?.action_link) {
+      returnValidationErrors(resetPasswordSchema, {
+        email: { _errors: ["Failed to generate password reset link"] },
+      });
+      return;
+    }
+
+    // Get user ID if user exists, or use email as fallback
+    const userId = linkData.user?.id || email;
+    const userName = await getUserDisplayName(userId, email);
+
+    // Send custom email using our email service
+    try {
+      await sendAuthEmail({
+        type: "password_reset",
+        to: email,
+        userName,
+        resetLink: linkData.properties.action_link,
+      });
+    } catch (emailError) {
+      console.error("Failed to send custom password reset email:", emailError);
+      // Don't fail the entire operation if email sending fails
+      // The link was generated successfully, user can request another email
     }
 
     // No need to return anything if the operation is successful
