@@ -115,23 +115,32 @@ export async function GET(request: NextRequest) {
     if (stateData.redirectUri) {
       redirectUri = stateData.redirectUri;
       console.log('🟡 Using redirect URI from state:', redirectUri);
-    } else if (process.env.NEXT_PUBLIC_SITE_URL) {
-      // Use configured site URL - normalize it (same logic as initiation)
-      let siteUrl = process.env.NEXT_PUBLIC_SITE_URL.trim();
-      siteUrl = siteUrl.replace(/\/$/, '');
-      if (!siteUrl.startsWith('http://') && !siteUrl.startsWith('https://')) {
-        siteUrl = `https://${siteUrl}`;
-      }
-      if (siteUrl.startsWith('http://') && !siteUrl.includes('localhost')) {
-        siteUrl = siteUrl.replace('http://', 'https://');
-      }
-      redirectUri = `${siteUrl}/api/auth/gmail/callback`;
-      console.log('🟡 Constructed redirect URI from NEXT_PUBLIC_SITE_URL:', redirectUri);
     } else {
-      // Fallback: use request origin (for localhost development only)
+      // Reconstruct using same logic as initiation
       const origin = request.nextUrl.origin;
-      redirectUri = getOAuthRedirectUri(origin, '/api/auth/gmail/callback');
-      console.log('🟡 Using fallback redirect URI from origin:', redirectUri);
+      const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1');
+      
+      if (isLocalhost) {
+        // Always use request origin for localhost (development)
+        redirectUri = getOAuthRedirectUri(origin, '/api/auth/gmail/callback');
+        console.log('🟡 Using localhost redirect URI:', redirectUri);
+      } else if (process.env.NEXT_PUBLIC_SITE_URL) {
+        // Production: use configured site URL - normalize it (same logic as initiation)
+        let siteUrl = process.env.NEXT_PUBLIC_SITE_URL.trim();
+        siteUrl = siteUrl.replace(/\/$/, '');
+        if (!siteUrl.startsWith('http://') && !siteUrl.startsWith('https://')) {
+          siteUrl = `https://${siteUrl}`;
+        }
+        if (siteUrl.startsWith('http://')) {
+          siteUrl = siteUrl.replace('http://', 'https://');
+        }
+        redirectUri = `${siteUrl}/api/auth/gmail/callback`;
+        console.log('🟡 Constructed redirect URI from NEXT_PUBLIC_SITE_URL:', redirectUri);
+      } else {
+        // Fallback: use request origin
+        redirectUri = getOAuthRedirectUri(origin, '/api/auth/gmail/callback');
+        console.log('🟡 Using fallback redirect URI from origin:', redirectUri);
+      }
     }
 
     console.log('🟡 Token exchange request:', {

@@ -35,11 +35,18 @@ export async function GET(request: NextRequest) {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
     
-    // Build redirect URI - ALWAYS use NEXT_PUBLIC_SITE_URL if set (for consistency with Google Cloud Console)
-    // This ensures the redirect URI matches exactly what's configured in Google Cloud Console
+    // Build redirect URI
+    // For localhost: always use request origin (for development)
+    // For production: use NEXT_PUBLIC_SITE_URL if set (for consistency with Google Cloud Console)
     let redirectUri: string;
-    if (process.env.NEXT_PUBLIC_SITE_URL) {
-      // Use configured site URL - normalize it
+    const origin = request.nextUrl.origin;
+    const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1');
+    
+    if (isLocalhost) {
+      // Always use request origin for localhost (development)
+      redirectUri = getOAuthRedirectUri(origin, '/api/auth/gmail/callback');
+    } else if (process.env.NEXT_PUBLIC_SITE_URL) {
+      // Production: use configured site URL - normalize it
       let siteUrl = process.env.NEXT_PUBLIC_SITE_URL.trim();
       // Remove trailing slash
       siteUrl = siteUrl.replace(/\/$/, '');
@@ -48,13 +55,12 @@ export async function GET(request: NextRequest) {
         siteUrl = `https://${siteUrl}`;
       }
       // For production, always use HTTPS (convert http:// to https://)
-      if (siteUrl.startsWith('http://') && !siteUrl.includes('localhost')) {
+      if (siteUrl.startsWith('http://')) {
         siteUrl = siteUrl.replace('http://', 'https://');
       }
       redirectUri = `${siteUrl}/api/auth/gmail/callback`;
     } else {
-      // Fallback: use request origin (for localhost development only)
-      const origin = request.nextUrl.origin;
+      // Fallback: use request origin
       redirectUri = getOAuthRedirectUri(origin, '/api/auth/gmail/callback');
     }
     
