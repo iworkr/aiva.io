@@ -1,5 +1,6 @@
 import { createSupabaseUnkeyClient } from "@/supabase-clients/unkey/createSupabaseUnkeyClient";
 import { NextRequest, NextResponse } from "next/server";
+import { withCacheHeaders, CachePresets } from '@/utils/api-cache-headers';
 
 export async function GET(req: NextRequest) {
   try {
@@ -22,9 +23,12 @@ export async function GET(req: NextRequest) {
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
     };
 
-    return NextResponse.json(user, {
+    const response = NextResponse.json(user, {
       headers: responseHeaders,
     });
+
+    // Cache user data privately for 1 minute
+    return withCacheHeaders(response, CachePresets.userData());
   } catch (error) {
     return new NextResponse(String(error), { status: 500 });
   }

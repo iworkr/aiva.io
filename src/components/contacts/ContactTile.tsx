@@ -6,7 +6,7 @@
 
 'use client';
 
-import React from 'react';
+import React, { memo } from 'react';
 import { Star, X, Edit } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -56,7 +56,7 @@ const getContactColor = (name: string) => {
   return colors[index];
 };
 
-export function ContactTile({
+export const ContactTile = memo(function ContactTile({
   contact,
   onClick,
   onToggleFavorite,
@@ -198,5 +198,5 @@ export function ContactTile({
       </div>
     </div>
   );
-}
+});
 

@@ -1,5 +1,6 @@
 import { getPages } from "@/app/[locale]/source";
 import { createSearchAPI } from "fumadocs-core/search/server";
+import { withCacheHeaders, CachePresets } from '@/utils/api-cache-headers';
 
 /**
  * Creates and exports a search API endpoint using the 'advanced' search mode.

@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -48,7 +48,7 @@ interface MessageItemProps {
   onUpdate: () => void;
 }
 
-export function MessageItem({ message, workspaceId, onUpdate }: MessageItemProps) {
+export const MessageItem = memo(function MessageItem({ message, workspaceId, onUpdate }: MessageItemProps) {
   const router = useRouter();
   const [isStarred, setIsStarred] = useState(message.starred);
 
@@ -301,6 +301,6 @@ export function MessageItem({ message, workspaceId, onUpdate }: MessageItemProps
       </div>
     </div>
   );
-}
+});
 
 

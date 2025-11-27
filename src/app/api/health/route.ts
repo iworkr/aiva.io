@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseUserServerComponentClient } from '@/supabase-clients/user/createSupabaseUserServerComponentClient';
+import { withCacheHeaders, CachePresets } from '@/utils/api-cache-headers';
 
 /**
  * Health Check Endpoint for Render.com and other hosting platforms
