@@ -77,7 +77,8 @@ export async function syncChannelConnection(
       case 'outlook':
         syncResult = await syncOutlookMessages(connectionId, workspaceId, {
           maxMessages: options.maxMessages || 50,
-          filter: 'isRead eq false',
+          // No filter = sync recent messages (like Gmail) to ensure contacts are created
+          // Previously was 'isRead eq false' which only synced unread messages
         });
         break;
 

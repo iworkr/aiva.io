@@ -50,10 +50,26 @@ export async function syncOutlookMessages(
     // Get access token (will refresh if needed)
     const accessToken = await getOutlookAccessToken(connectionId);
 
+    console.log('📥 Outlook sync starting', {
+      connectionId,
+      workspaceId,
+      userId,
+      maxMessages: options.maxMessages,
+      filter: options.filter,
+    });
+
     // List messages
+    // Default to no filter (sync recent messages) like Gmail, unless explicitly provided
+    // This ensures we sync messages regardless of read status to create contacts
     const messagesList = await listOutlookMessages(accessToken, {
       maxResults: options.maxMessages || 50,
-      filter: options.filter || 'isRead eq false',
+      filter: options.filter || undefined, // No filter = sync recent messages
+    });
+
+    console.log('📥 Outlook messages listed', {
+      connectionId,
+      workspaceId,
+      totalMessages: messagesList.value?.length ?? 0,
     });
 
     if (!messagesList.value || messagesList.value.length === 0) {
@@ -111,7 +127,7 @@ export async function syncOutlookMessages(
           
           // Create or link contact for this message sender
           try {
-            await findOrCreateContactFromMessage(
+            const contactResult = await findOrCreateContactFromMessage(
               workspaceId,
               userId,
               'outlook', // channel type
@@ -119,9 +135,15 @@ export async function syncOutlookMessages(
               parsed.senderName, // name
               parsed.senderEmail // channel ID (email for Outlook)
             );
+            console.log('✅ Contact created/linked for Outlook message', {
+              senderEmail: parsed.senderEmail,
+              senderName: parsed.senderName,
+              contactId: contactResult.contactId,
+              isNew: contactResult.isNew,
+            });
           } catch (contactError) {
             // Log but don't fail the sync if contact creation fails
-            console.error(`Failed to create/link contact for ${parsed.senderEmail}:`, contactError);
+            console.error(`❌ Failed to create/link contact for ${parsed.senderEmail}:`, contactError);
           }
         }
         syncedCount++;
