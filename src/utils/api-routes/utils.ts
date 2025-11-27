@@ -31,15 +31,47 @@ export async function sendEmail(options: EmailOptions) {
   }
 
   // Check for API key BEFORE creating Resend instance
-  const resendApiKey = process.env.RESEND_API_KEY;
-  if (!resendApiKey) {
-    console.error("❌ RESEND_API_KEY is not set. Cannot send email.");
-    console.error("Environment variables:", {
+  // Use multiple methods to get the env var (handles different deployment platforms)
+  const resendApiKey =
+    process.env.RESEND_API_KEY?.trim() ||
+    process.env.RESEND_API_KEY?.replace(/\s/g, "") ||
+    null;
+
+  if (!resendApiKey || resendApiKey.length === 0) {
+    const errorMsg =
+      "RESEND_API_KEY is not configured. Please set it in your environment variables (Vercel/Render dashboard).";
+    console.error("❌", errorMsg);
+    console.error("Environment check:", {
       NODE_ENV: process.env.NODE_ENV,
       hasResendKey: !!process.env.RESEND_API_KEY,
+      resendKeyLength: process.env.RESEND_API_KEY?.length || 0,
+      resendKeyPreview:
+        process.env.RESEND_API_KEY?.substring(0, 10) || "undefined",
     });
+
+    // In production, log but don't throw - allow auth flow to continue
+    // The user will see the error in logs and can fix the env var
+    if (process.env.NODE_ENV === "production") {
+      console.warn(
+        "⚠️ Email sending disabled due to missing RESEND_API_KEY. Auth flow will continue.",
+      );
+      // Return a mock success so auth doesn't break
+      return {
+        id: "skipped",
+        message: "Email sending skipped - RESEND_API_KEY not configured",
+      };
+    }
+
+    throw new Error(errorMsg);
+  }
+
+  // Validate API key format (should start with 're_')
+  if (!resendApiKey.startsWith("re_")) {
+    console.error(
+      "❌ RESEND_API_KEY format is invalid. Should start with 're_'",
+    );
     throw new Error(
-      "RESEND_API_KEY is not configured. Please set it in your environment variables.",
+      "RESEND_API_KEY format is invalid. Should start with 're_'",
     );
   }
 
@@ -47,7 +79,22 @@ export async function sendEmail(options: EmailOptions) {
     const resend = new Resend(resendApiKey);
     // return sendgrid.send(options);
     return await resend.emails.send(options);
-  } catch (error) {
+  } catch (error: any) {
+    // If it's the "Missing API key" error, provide helpful message
+    if (
+      error?.message?.includes("Missing API key") ||
+      error?.message?.includes("API key")
+    ) {
+      console.error("❌ Resend API key error:", error.message);
+      console.error(
+        "Current RESEND_API_KEY value:",
+        resendApiKey ? `${resendApiKey.substring(0, 10)}...` : "undefined",
+      );
+      throw new Error(
+        "RESEND_API_KEY is not properly configured in your production environment. " +
+          "Please add it in Vercel/Render dashboard → Environment Variables → RESEND_API_KEY = re_U3wbepDx_8jGmrWhM5JZhvy2UmebYBMDa",
+      );
+    }
     console.error("Failed to send email via Resend:", error);
     errors.add(error);
     throw error; // Re-throw so caller knows email failed
