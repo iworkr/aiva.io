@@ -123,6 +123,98 @@ export const getMessagesAction = authActionClient
   });
 
 // ============================================================================
+// GET NEW MESSAGES (for seamless background sync)
+// ============================================================================
+
+export const getNewMessagesAction = authActionClient
+  .schema(
+    z.object({
+      workspaceId: getMessagesSchema.shape.workspaceId,
+      channelConnectionId: getMessagesSchema.shape.channelConnectionId.optional(),
+      priority: getMessagesSchema.shape.priority.optional(),
+      category: getMessagesSchema.shape.category.optional(),
+      isRead: z.boolean().optional(),
+      afterTimestamp: z.string().datetime(), // ISO timestamp - only get messages after this
+      limit: z.number().int().positive().max(200).default(50),
+    })
+  )
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    const {
+      workspaceId,
+      channelConnectionId,
+      priority,
+      category,
+      isRead,
+      afterTimestamp,
+      limit,
+    } = parsedInput;
+
+    // Verify workspace membership
+    const isMember = await isWorkspaceMember(userId, workspaceId);
+    if (!isMember) {
+      throw new Error('You are not a member of this workspace');
+    }
+
+    const supabase = await createSupabaseUserServerActionClient();
+
+    let query = supabase
+      .from('messages')
+      .select(
+        `
+        *,
+        channel_connection:channel_connections(
+          id,
+          provider,
+          provider_account_name,
+          provider_account_id
+        ),
+        thread:threads(
+          id,
+          primary_subject,
+          message_count
+        )
+      `
+      )
+      .eq('workspace_id', workspaceId)
+      .gt('created_at', afterTimestamp); // Only messages created after timestamp
+
+    // Apply filters
+    if (channelConnectionId) {
+      query = query.eq('channel_connection_id', channelConnectionId);
+    }
+    if (priority) {
+      query = query.eq('priority', priority);
+    }
+    if (category) {
+      query = query.eq('category', category);
+    }
+    if (isRead !== undefined) {
+      query = query.eq('is_read', isRead);
+    }
+
+    // Order by timestamp descending (newest first) and limit
+    query = query
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('📨 getNewMessagesAction error:', {
+        workspaceId,
+        channelConnectionId,
+        afterTimestamp,
+        error,
+      });
+      throw new Error(`Failed to fetch new messages: ${error.message}`);
+    }
+
+    return {
+      messages: data || [],
+    };
+  });
+
+// ============================================================================
 // GET SINGLE MESSAGE
 // ============================================================================
 

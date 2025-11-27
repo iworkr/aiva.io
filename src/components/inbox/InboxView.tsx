@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { getUserChannelConnections } from '@/data/user/channels';
 import {
   getMessagesAction,
+  getNewMessagesAction,
   syncWorkspaceConnectionsAction,
 } from '@/data/user/messages';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -58,6 +59,7 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
   const cacheKeyRef = useRef<string>('');
   const lastFetchRef = useRef<number>(0);
   const fetchingRef = useRef<boolean>(false);
+  const lastSyncTimestampRef = useRef<string>(new Date().toISOString());
 
   // Debounce search for better performance
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
@@ -120,6 +122,15 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
           } catch (error) {
             console.error('Failed to cache messages:', error);
           }
+          
+          // Update last sync timestamp based on newest message
+          if (messagesArray.length > 0) {
+            const newestMessage = messagesArray[0];
+            const newestTimestamp = newestMessage.created_at || newestMessage.timestamp;
+            if (newestTimestamp) {
+              lastSyncTimestampRef.current = new Date(newestTimestamp).toISOString();
+            }
+          }
         });
       } else {
         setMessages([]);
@@ -138,37 +149,97 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
     },
   });
 
-  // Sync all workspace connections (server action)
+  // Fetch only new messages (for seamless background sync)
+  const { execute: fetchNewMessages } = useAction(getNewMessagesAction, {
+    onSuccess: ({ data }) => {
+      if (data?.messages && data.messages.length > 0) {
+        // Seamlessly merge new messages at the top
+        startTransition(() => {
+          setMessages((prevMessages) => {
+            // Create a map of existing message IDs for quick lookup
+            const existingIds = new Set(prevMessages.map((msg) => msg.id));
+            
+            // Filter out duplicates and merge new messages at the top
+            const newMessages = data.messages.filter((msg) => !existingIds.has(msg.id));
+            
+            if (newMessages.length > 0) {
+              // Merge: new messages first, then existing messages
+              // Sort by timestamp descending to maintain order
+              const merged = [...newMessages, ...prevMessages].sort((a, b) => {
+                const timeA = new Date(a.created_at || a.timestamp || 0).getTime();
+                const timeB = new Date(b.created_at || b.timestamp || 0).getTime();
+                return timeB - timeA;
+              });
+              
+              // Update message counts for unread messages
+              const newCounts = { ...messageCounts };
+              newMessages.forEach((msg) => {
+                if (!msg.is_read && msg.channel_connection_id) {
+                  const channelId = msg.channel_connection_id;
+                  newCounts[channelId] = (newCounts[channelId] || 0) + 1;
+                }
+              });
+              setMessageCounts(newCounts);
+              
+              // Update cache silently
+              try {
+                const cacheData = {
+                  messages: merged,
+                  messageCounts: newCounts,
+                  timestamp: Date.now(),
+                };
+                localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+              } catch (error) {
+                console.error('Failed to update cache:', error);
+              }
+              
+              // Show subtle notification only if there are new messages
+              if (newMessages.length > 0) {
+                toast.success(`${newMessages.length} new message${newMessages.length > 1 ? 's' : ''}`, {
+                  duration: 2000,
+                });
+              }
+              
+              return merged;
+            }
+            
+            return prevMessages;
+          });
+        });
+      }
+    },
+    onError: ({ error }) => {
+      // Silently fail - don't disrupt user experience
+      console.error('Failed to fetch new messages:', error);
+    },
+  });
+
+  // Sync all workspace connections (server action) - seamless background sync
   const { execute: syncWorkspaceConnections, status: syncStatus } = useAction(
     syncWorkspaceConnectionsAction,
     {
       onSuccess: ({ data }) => {
-        if (data) {
-          toast.success(
-            `Synced ${data.totalNewMessages ?? 0} new message(s) from ${data.totalConnections ?? 0
-            } channel(s)`
-          );
+        if (data && data.totalNewMessages && data.totalNewMessages > 0) {
+          // Store timestamp before sync to fetch only new messages
+          const syncStartTime = lastSyncTimestampRef.current;
+          
+          // Fetch only new messages created after the sync started
+          // Use a small delay to ensure all messages are committed to DB
+          setTimeout(() => {
+            fetchNewMessages({
+              workspaceId,
+              channelConnectionId: selectedChannel || undefined,
+              priority: filters?.priority,
+              category: filters?.category,
+              isRead: filters?.status === 'unread' ? false : undefined,
+              afterTimestamp: syncStartTime,
+              limit: 100,
+            });
+          }, 500);
+          
+          // Update sync timestamp for next sync
+          lastSyncTimestampRef.current = new Date().toISOString();
         }
-        // Clear cache and refresh messages after sync
-        try {
-          // Clear all inbox caches for this workspace
-          Object.keys(localStorage).forEach((key) => {
-            if (key.startsWith(`inbox-cache-${workspaceId}-`)) {
-              localStorage.removeItem(key);
-            }
-          });
-        } catch (error) {
-          console.error('Failed to clear cache:', error);
-        }
-        fetchMessages({
-          workspaceId,
-          channelConnectionId: selectedChannel || undefined,
-          priority: filters?.priority,
-          category: filters?.category,
-          isRead: filters?.status === 'unread' ? false : undefined,
-          limit: 100,
-          offset: 0,
-        });
       },
       onError: ({ error }) => {
         toast.error(error.serverError || 'Failed to sync channels');
@@ -268,8 +339,10 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
     fetchMessages,
   ]);
 
-  // Sync all channels
+  // Sync all channels - seamless background sync
   const handleSync = () => {
+    // Store timestamp before sync to fetch only new messages
+    lastSyncTimestampRef.current = new Date().toISOString();
     setSyncing(true);
     syncWorkspaceConnections({
       workspaceId,
