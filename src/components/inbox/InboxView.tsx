@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils';
 import { Inbox as InboxIcon, Plus, RefreshCw, Search } from 'lucide-react';
 import { useAction } from 'next-safe-action/hooks';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { memo, useCallback, useEffect, useState, useTransition } from 'react';
+import { memo, useCallback, useEffect, useState, useTransition, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { ChannelSidebar } from './ChannelSidebar';
 import { MessageList } from './MessageList';
@@ -54,37 +54,86 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
   const [hasChannels, setHasChannels] = useState<boolean | null>(null);
   const [connectDialogOpen, setConnectDialogOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const cacheKeyRef = useRef<string>('');
+  const lastFetchRef = useRef<number>(0);
+  const fetchingRef = useRef<boolean>(false);
 
   // Debounce search for better performance
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
 
-  // Fetch messages
+  // Create cache key
+  const cacheKey = useMemo(
+    () => `inbox-cache-${workspaceId}-${selectedChannel || 'all'}-${filters?.priority || 'all'}-${filters?.category || 'all'}-${filters?.status || 'all'}`,
+    [workspaceId, selectedChannel, filters?.priority, filters?.category, filters?.status]
+  );
+
+  // Load from cache on mount
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        // Only use cache if it's less than 30 seconds old
+        if (parsed.timestamp && Date.now() - parsed.timestamp < 30 * 1000) {
+          setMessages(parsed.messages || []);
+          setMessageCounts(parsed.messageCounts || {});
+          setLoading(false);
+          // Still fetch in background to update
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load from cache:', error);
+    }
+  }, [cacheKey]);
+
+  // Fetch messages with better caching
   const { execute: fetchMessages, status: fetchStatus } = useAction(getMessagesAction, {
     onSuccess: ({ data }) => {
       if (data && data.messages) {
         const messagesArray = Array.isArray(data.messages) ? data.messages : [];
-        setMessages(messagesArray);
+        
+        // Batch update to prevent individual UI refreshes
+        startTransition(() => {
+          setMessages(messagesArray);
 
-        // Calculate message counts per channel
-        const counts: Record<string, number> = {};
-        messagesArray.forEach((msg: any) => {
-          const channelId = msg.channel_connection_id || msg.channel_connection?.id;
-          if (!msg.is_read && channelId) {
-            counts[channelId] = (counts[channelId] || 0) + 1;
+          // Calculate message counts per channel
+          const counts: Record<string, number> = {};
+          messagesArray.forEach((msg: any) => {
+            const channelId = msg.channel_connection_id || msg.channel_connection?.id;
+            if (!msg.is_read && channelId) {
+              counts[channelId] = (counts[channelId] || 0) + 1;
+            }
+          });
+          setMessageCounts(counts);
+
+          // Cache the result
+          try {
+            localStorage.setItem(
+              cacheKey,
+              JSON.stringify({
+                messages: messagesArray,
+                messageCounts: counts,
+                timestamp: Date.now(),
+              })
+            );
+          } catch (error) {
+            console.error('Failed to cache messages:', error);
           }
         });
-        setMessageCounts(counts);
       } else {
         setMessages([]);
         setMessageCounts({});
       }
       setLoading(false);
+      lastFetchRef.current = Date.now();
+      fetchingRef.current = false;
     },
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to load messages');
       setLoading(false);
       setMessages([]);
       setMessageCounts({});
+      fetchingRef.current = false;
     },
   });
 
@@ -99,7 +148,17 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
             } channel(s)`
           );
         }
-        // Refresh messages after sync
+        // Clear cache and refresh messages after sync
+        try {
+          // Clear all inbox caches for this workspace
+          Object.keys(localStorage).forEach((key) => {
+            if (key.startsWith(`inbox-cache-${workspaceId}-`)) {
+              localStorage.removeItem(key);
+            }
+          });
+        } catch (error) {
+          console.error('Failed to clear cache:', error);
+        }
         fetchMessages({
           workspaceId,
           channelConnectionId: selectedChannel || undefined,
@@ -149,8 +208,6 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
       return;
     }
 
-    setLoading(true);
-
     // Update URL query params only when they actually change,
     // to avoid an infinite loop of rerenders + POST /en/inbox calls.
     const params = new URLSearchParams();
@@ -175,15 +232,28 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
       router.replace(`?${newQuery}`);
     }
 
-    fetchMessages({
-      workspaceId,
-      channelConnectionId: selectedChannel || undefined,
-      priority: filters?.priority,
-      category: filters?.category,
-      isRead: filters?.status === 'unread' ? false : undefined,
-      limit: 100,
-      offset: 0,
-    });
+    // Check if we need to fetch (avoid duplicate fetches)
+    const now = Date.now();
+    const timeSinceLastFetch = now - lastFetchRef.current;
+    const cacheKeyChanged = cacheKeyRef.current !== cacheKey;
+    
+    // Only fetch if:
+    // 1. Not already fetching
+    // 2. Cache key changed (different filters/channel) OR it's been more than 30 seconds
+    if (!fetchingRef.current && (cacheKeyChanged || timeSinceLastFetch > 30 * 1000)) {
+      cacheKeyRef.current = cacheKey;
+      fetchingRef.current = true;
+      setLoading(true);
+      fetchMessages({
+        workspaceId,
+        channelConnectionId: selectedChannel || undefined,
+        priority: filters?.priority,
+        category: filters?.category,
+        isRead: filters?.status === 'unread' ? false : undefined,
+        limit: 100,
+        offset: 0,
+      });
+    }
   }, [
     workspaceId,
     selectedChannel,
@@ -193,6 +263,8 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
     hasChannels,
     searchParams,
     router,
+    cacheKey,
+    fetchMessages,
   ]);
 
   // Sync all channels
@@ -331,7 +403,14 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
               messages={filteredMessages}
               workspaceId={workspaceId}
               onMessageUpdate={() => {
-                // Refresh messages after update
+                // Invalidate cache and refresh messages after update
+                try {
+                  localStorage.removeItem(cacheKey);
+                } catch (error) {
+                  console.error('Failed to clear cache:', error);
+                }
+                fetchingRef.current = false;
+                lastFetchRef.current = 0; // Force refresh
                 fetchMessages({
                   workspaceId,
                   channelConnectionId: selectedChannel || undefined,

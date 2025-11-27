@@ -32,7 +32,13 @@ export function PriorityBadge({ priority }: { priority: string | null | undefine
   );
 }
 
-export function CategoryBadge({ category }: { category: string | null | undefined }) {
+export function CategoryBadge({ 
+  category, 
+  confidenceScore 
+}: { 
+  category: string | null | undefined;
+  confidenceScore?: number | null;
+}) {
   if (!category) return null;
 
   const display = getCategoryDisplay(category as MessageCategory);
@@ -61,10 +67,20 @@ export function CategoryBadge({ category }: { category: string | null | undefine
   };
 
   const colors = colorMap[category] || colorMap.other;
+  const confidence = confidenceScore !== null && confidenceScore !== undefined 
+    ? Math.round(confidenceScore * 100) 
+    : null;
 
   return (
-    <Badge variant="outline" className={cn('text-xs', colors.color, colors.bgColor)} title={display.description}>
+    <Badge 
+      variant="outline" 
+      className={cn('text-xs', colors.color, colors.bgColor)} 
+      title={confidence !== null ? `${display.description} (${confidence}% confidence)` : display.description}
+    >
       {display.label}
+      {confidence !== null && (
+        <span className="ml-1.5 text-[10px] opacity-70">{confidence}%</span>
+      )}
     </Badge>
   );
 }

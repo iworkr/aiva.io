@@ -37,6 +37,7 @@ export function QuickReply({
   const [replyText, setReplyText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [confidenceScore, setConfidenceScore] = useState<number | null>(null);
 
   const { execute: sendReply } = useAction(sendReplyAction, {
     onSuccess: () => {
@@ -55,6 +56,7 @@ export function QuickReply({
     onSuccess: ({ data }) => {
       if (data?.data?.body) {
         setReplyText(data.data.body);
+        setConfidenceScore(data.data.confidenceScore || null);
       }
       setIsGenerating(false);
     },
@@ -63,6 +65,7 @@ export function QuickReply({
         error.serverError || 'Failed to generate reply. You can still type your own reply.'
       );
       setIsGenerating(false);
+      setConfidenceScore(null);
     },
   });
 
@@ -134,6 +137,12 @@ export function QuickReply({
                 className="min-h-[80px] resize-none text-sm"
                 onClick={(e) => e.stopPropagation()}
               />
+              {confidenceScore !== null && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Sparkles className="h-3 w-3" />
+                  <span>AI Confidence: {Math.round(confidenceScore * 100)}%</span>
+                </div>
+              )}
               <div className="flex items-center justify-end gap-2">
                 <Button
                   variant="ghost"

@@ -261,7 +261,12 @@ export function MessageItem({ message, workspaceId, onUpdate }: MessageItemProps
                   <span>AI analyzed</span>
                 </div>
               )}
-              {message.category && <CategoryBadge category={message.category} />}
+              {message.category && (
+                <CategoryBadge 
+                  category={message.category} 
+                  confidenceScore={message.confidence_score}
+                />
+              )}
               {message.sentiment && <SentimentBadge sentiment={message.sentiment} />}
               {message.actionability === 'requires_urgent_action' && (
                 <Badge variant="destructive" className="text-xs">
