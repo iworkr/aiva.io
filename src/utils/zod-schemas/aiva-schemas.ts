@@ -28,16 +28,41 @@ export const ChannelConnectionStatusSchema = z.enum([
   'revoked',
 ]);
 
-export const MessagePrioritySchema = z.enum(['high', 'medium', 'low', 'noise']);
+export const MessagePrioritySchema = z.enum(['urgent', 'high', 'medium', 'low', 'noise']);
 
 export const MessageCategorySchema = z.enum([
-  'sales_lead',
-  'client_support',
-  'internal',
-  'social',
-  'marketing',
-  'personal',
-  'other',
+  // Customer & Business
+  'customer_inquiry',        // Customer questions, order status, support requests
+  'customer_complaint',      // Customer complaints, issues
+  'sales_lead',              // New business opportunities, prospects
+  'client_support',          // Technical support, help requests
+  
+  // Financial & Administrative
+  'bill',                    // Bills, invoices, payment requests
+  'invoice',                 // Invoices, receipts
+  'payment_confirmation',    // Payment confirmations, receipts
+  
+  // Security & Authentication
+  'authorization_code',      // 2FA codes, login codes, verification codes
+  'sign_in_code',            // Sign-in codes, authentication codes
+  'security_alert',          // Security notifications, login alerts
+  
+  // Marketing & Promotional
+  'marketing',               // Promotional emails, newsletters
+  'junk_email',              // Spam, junk mail, unwanted promotional
+  'newsletter',              // Newsletters, updates from companies
+  
+  // Internal & Team
+  'internal',                // Team communications, company updates
+  'meeting_request',         // Meeting invitations, scheduling
+  
+  // Personal & Social
+  'personal',                // Personal correspondence
+  'social',                   // Social invites, personal messages
+  
+  // Other
+  'notification',            // Automated notifications, system messages
+  'other',                   // Doesn't fit above categories
 ]);
 
 export const MessageSentimentSchema = z.enum([

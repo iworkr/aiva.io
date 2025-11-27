@@ -14,12 +14,21 @@ import {
   AlertTriangle,
   Minus,
   TrendingDown,
+  Ban,
   Briefcase,
   User,
   ShoppingCart,
   Users,
   DollarSign,
   Plane,
+  MessageCircle,
+  AlertCircle,
+  Receipt,
+  Key,
+  Shield,
+  Mailbox,
+  Calendar,
+  Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -124,6 +133,12 @@ export function InboxFilters({ currentFilters, onFilterChange }: InboxFiltersPro
             filterKey="priority"
             filterValue="low"
           />
+          <FilterButton
+            icon={Ban}
+            label="Noise"
+            filterKey="priority"
+            filterValue="noise"
+          />
         </div>
       </div>
 
@@ -136,16 +151,46 @@ export function InboxFilters({ currentFilters, onFilterChange }: InboxFiltersPro
         </h3>
         <div className="space-y-1">
           <FilterButton
-            icon={Briefcase}
-            label="Work"
+            icon={MessageCircle}
+            label="Customer Inquiry"
             filterKey="category"
-            filterValue="work"
+            filterValue="customer_inquiry"
           />
           <FilterButton
-            icon={User}
-            label="Personal"
+            icon={AlertCircle}
+            label="Customer Complaint"
             filterKey="category"
-            filterValue="personal"
+            filterValue="customer_complaint"
+          />
+          <FilterButton
+            icon={Briefcase}
+            label="Sales Lead"
+            filterKey="category"
+            filterValue="sales_lead"
+          />
+          <FilterButton
+            icon={Users}
+            label="Client Support"
+            filterKey="category"
+            filterValue="client_support"
+          />
+          <FilterButton
+            icon={Receipt}
+            label="Bill / Invoice"
+            filterKey="category"
+            filterValue="bill"
+          />
+          <FilterButton
+            icon={Key}
+            label="Auth Code"
+            filterKey="category"
+            filterValue="authorization_code"
+          />
+          <FilterButton
+            icon={Shield}
+            label="Security Alert"
+            filterKey="category"
+            filterValue="security_alert"
           />
           <FilterButton
             icon={ShoppingCart}
@@ -154,22 +199,28 @@ export function InboxFilters({ currentFilters, onFilterChange }: InboxFiltersPro
             filterValue="marketing"
           />
           <FilterButton
-            icon={Users}
-            label="Social"
+            icon={Mailbox}
+            label="Junk Email"
             filterKey="category"
-            filterValue="social"
+            filterValue="junk_email"
           />
           <FilterButton
-            icon={DollarSign}
-            label="Finance"
+            icon={Calendar}
+            label="Meeting"
             filterKey="category"
-            filterValue="finance"
+            filterValue="meeting_request"
           />
           <FilterButton
-            icon={Plane}
-            label="Travel"
+            icon={User}
+            label="Personal"
             filterKey="category"
-            filterValue="travel"
+            filterValue="personal"
+          />
+          <FilterButton
+            icon={Bell}
+            label="Notification"
+            filterKey="category"
+            filterValue="notification"
           />
         </div>
       </div>

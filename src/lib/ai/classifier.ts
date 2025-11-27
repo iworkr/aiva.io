@@ -13,6 +13,7 @@ import {
   MessageSentiment,
   MessageActionability,
 } from '@/utils/zod-schemas/aiva-schemas';
+import { getPriorityFromCategory } from './priority-mapper';
 
 // Lazy-load OpenAI client to avoid crashes on missing API key
 let openaiClient: OpenAI | null = null;
@@ -67,47 +68,67 @@ export async function classifyMessage(
 
 Subject: ${message.subject || '(no subject)'}
 From: ${message.sender_name || message.sender_email}
-Body: ${message.body.substring(0, 1000)} ${message.body.length > 1000 ? '...' : ''}
+Body: ${message.body.substring(0, 1500)} ${message.body.length > 1500 ? '...' : ''}
 
 Classify this message into the following categories:
 
-1. Priority (high, medium, low, noise):
-   - high: Urgent, time-sensitive, from important contacts
-   - medium: Regular correspondence, moderately important
-   - low: Can wait, routine updates
-   - noise: Marketing, spam, automated notifications
-
-2. Category (sales_lead, client_support, internal, social, marketing, personal, other):
-   - sales_lead: New business opportunities, prospects
-   - client_support: Customer inquiries, support requests
-   - internal: Team communications, company updates
-   - social: Personal messages, social invites
-   - marketing: Promotional content, newsletters
-   - personal: Personal correspondence
+1. Category (choose the MOST SPECIFIC category):
+   - customer_inquiry: Customer questions, order status ("where is my order", "when will it arrive", "tracking number")
+   - customer_complaint: Customer complaints, issues, problems, refund requests
+   - sales_lead: New business opportunities, prospects, potential clients
+   - client_support: Technical support, help requests, troubleshooting
+   - bill: Bills, payment requests, statements
+   - invoice: Invoices, receipts, billing documents
+   - payment_confirmation: Payment confirmations, transaction receipts
+   - authorization_code: 2FA codes, verification codes, OTP codes (usually 4-6 digits)
+   - sign_in_code: Sign-in codes, login codes, authentication codes
+   - security_alert: Security notifications, login alerts, account changes
+   - marketing: Promotional emails, sales offers, discounts
+   - junk_email: Spam, junk mail, unwanted promotional, obvious spam
+   - newsletter: Newsletters, company updates, regular updates
+   - internal: Team communications, company updates, internal messages
+   - meeting_request: Meeting invitations, scheduling requests
+   - personal: Personal correspondence, friends, family
+   - social: Social invites, personal messages, social media notifications
+   - notification: Automated notifications, system messages, alerts
    - other: Doesn't fit above categories
+
+2. Priority (urgent, high, medium, low, noise):
+   - urgent: Time-sensitive codes (authorization/sign-in codes), urgent customer issues requiring immediate response
+   - high: Customer inquiries, complaints, sales leads, security alerts, client support
+   - medium: Bills, invoices, payment confirmations, meeting requests, internal communications
+   - low: Personal, social, notifications, newsletters
+   - noise: Marketing, junk_email (spam)
 
 3. Sentiment (neutral, positive, negative, urgent):
    - neutral: Normal tone
-   - positive: Appreciative, friendly
-   - negative: Complaints, concerns
-   - urgent: Requires immediate attention
+   - positive: Appreciative, friendly, thank you messages
+   - negative: Complaints, concerns, frustration, anger
+   - urgent: Requires immediate attention, time-sensitive
 
 4. Actionability (question, request, fyi, scheduling_intent, task, none):
    - question: Asking for information
-   - request: Requesting action
-   - fyi: Informational only
+   - request: Requesting action or response
+   - fyi: Informational only, no action needed
    - scheduling_intent: Mentions meeting/scheduling
    - task: Contains actionable task
-   - none: No action needed
+   - none: No action needed (codes, confirmations, notifications)
 
 5. Provide a brief summary (1-2 sentences)
 
 6. Extract 2-3 key points if applicable
 
+IMPORTANT PRIORITY RULES:
+- authorization_code or sign_in_code → ALWAYS "urgent" priority
+- customer_inquiry or customer_complaint → "urgent" if sentiment is urgent/negative, otherwise "high"
+- marketing or junk_email → ALWAYS "noise" priority
+- bills, invoices → "medium" priority
+- sales_lead, client_support → "high" priority
+
 Respond ONLY with valid JSON in this exact format:
 {
-  "priority": "high|medium|low|noise",
-  "category": "sales_lead|client_support|internal|social|marketing|personal|other",
+  "category": "customer_inquiry|customer_complaint|sales_lead|client_support|bill|invoice|payment_confirmation|authorization_code|sign_in_code|security_alert|marketing|junk_email|newsletter|internal|meeting_request|personal|social|notification|other",
+  "priority": "urgent|high|medium|low|noise",
   "sentiment": "neutral|positive|negative|urgent",
   "actionability": "question|request|fyi|scheduling_intent|task|none",
   "summary": "Brief summary here",
@@ -143,11 +164,19 @@ Respond ONLY with valid JSON in this exact format:
       completion.choices[0].message.content || '{}'
     ) as ClassificationResult;
 
+    // Ensure priority is correctly assigned based on category
+    // Override AI priority with our priority mapping logic for consistency
+    const finalPriority = getPriorityFromCategory(
+      result.category,
+      result.sentiment,
+      result.actionability
+    );
+
     // Update message with classification
     await supabase
       .from('messages')
       .update({
-        priority: result.priority,
+        priority: finalPriority, // Use mapped priority for consistency
         category: result.category,
         sentiment: result.sentiment,
         actionability: result.actionability,

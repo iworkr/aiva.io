@@ -2567,14 +2567,26 @@ export type Database = {
         | "task"
         | "none"
       message_category:
+        | "customer_inquiry"
+        | "customer_complaint"
         | "sales_lead"
         | "client_support"
-        | "internal"
-        | "social"
+        | "bill"
+        | "invoice"
+        | "payment_confirmation"
+        | "authorization_code"
+        | "sign_in_code"
+        | "security_alert"
         | "marketing"
+        | "junk_email"
+        | "newsletter"
+        | "internal"
+        | "meeting_request"
         | "personal"
+        | "social"
+        | "notification"
         | "other"
-      message_priority: "high" | "medium" | "low" | "noise"
+      message_priority: "urgent" | "high" | "medium" | "low" | "noise"
       message_sentiment: "neutral" | "positive" | "negative" | "urgent"
       message_status:
         | "unread"
@@ -2804,15 +2816,27 @@ export const Constants = {
         "none",
       ],
       message_category: [
+        "customer_inquiry",
+        "customer_complaint",
         "sales_lead",
         "client_support",
-        "internal",
-        "social",
+        "bill",
+        "invoice",
+        "payment_confirmation",
+        "authorization_code",
+        "sign_in_code",
+        "security_alert",
         "marketing",
+        "junk_email",
+        "newsletter",
+        "internal",
+        "meeting_request",
         "personal",
+        "social",
+        "notification",
         "other",
       ],
-      message_priority: ["high", "medium", "low", "noise"],
+      message_priority: ["urgent", "high", "medium", "low", "noise"],
       message_sentiment: ["neutral", "positive", "negative", "urgent"],
       message_status: [
         "unread",

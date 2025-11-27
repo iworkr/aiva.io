@@ -27,8 +27,7 @@ import { toast } from 'sonner';
 import { ChannelSidebar } from './ChannelSidebar';
 import { MessageList } from './MessageList';
 
-type MessagePriority = 'high' | 'medium' | 'low' | 'noise';
-type MessageCategory = 'sales_lead' | 'client_support' | 'internal' | 'social' | 'marketing' | 'personal' | 'other';
+// Types are now imported from zod schemas - MessagePriority and MessageCategory
 
 interface InboxViewProps {
   workspaceId: string;
