@@ -40,11 +40,34 @@ export async function GET(request: NextRequest) {
     // For production: use NEXT_PUBLIC_SITE_URL if set (for consistency with Google Cloud Console)
     let redirectUri: string;
     const origin = request.nextUrl.origin;
-    const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1');
+    const host = request.headers.get('host') || '';
+    const forwardedHost = request.headers.get('x-forwarded-host') || '';
+    
+    // More robust localhost detection - check origin, host header, and forwarded host
+    const isLocalhost = 
+      origin.includes('localhost') || 
+      origin.includes('127.0.0.1') ||
+      host.includes('localhost') ||
+      host.includes('127.0.0.1') ||
+      forwardedHost.includes('localhost') ||
+      forwardedHost.includes('127.0.0.1') ||
+      request.url.includes('localhost') ||
+      request.url.includes('127.0.0.1');
+    
+    // CRITICAL: Log all detection info for debugging
+    console.log('🔵 Gmail OAuth Origin Detection:', {
+      origin,
+      host,
+      forwardedHost,
+      requestUrl: request.url,
+      isLocalhost,
+      nextPublicSiteUrl: process.env.NEXT_PUBLIC_SITE_URL,
+    });
     
     if (isLocalhost) {
       // Always use request origin for localhost (development)
       redirectUri = getOAuthRedirectUri(origin, '/api/auth/gmail/callback');
+      console.log('🔵 Using LOCALHOST redirect URI:', redirectUri);
     } else if (process.env.NEXT_PUBLIC_SITE_URL) {
       // Production: use configured site URL - normalize it
       let siteUrl = process.env.NEXT_PUBLIC_SITE_URL.trim();
@@ -59,18 +82,15 @@ export async function GET(request: NextRequest) {
         siteUrl = siteUrl.replace('http://', 'https://');
       }
       redirectUri = `${siteUrl}/api/auth/gmail/callback`;
+      console.log('🔵 Using PRODUCTION redirect URI:', redirectUri);
     } else {
       // Fallback: use request origin
       redirectUri = getOAuthRedirectUri(origin, '/api/auth/gmail/callback');
+      console.log('🔵 Using FALLBACK redirect URI:', redirectUri);
     }
     
     // CRITICAL: Log the exact redirect URI being used for debugging
-    console.log('🔵 Gmail OAuth Redirect URI:', {
-      redirectUri,
-      nextPublicSiteUrl: process.env.NEXT_PUBLIC_SITE_URL,
-      requestOrigin: request.nextUrl.origin,
-      requestUrl: request.url,
-    });
+    console.log('🔵 Gmail OAuth Redirect URI (FINAL):', redirectUri);
 
     if (!clientId || !clientSecret) {
       return NextResponse.json(
