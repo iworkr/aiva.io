@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseUserRouteHandlerClient } from '@/supabase-clients/user/createSupabaseUserRouteHandlerClient';
 import { createChannelConnectionAction } from '@/data/user/channels';
-import { toSiteURL } from '@/utils/helpers';
+import { toSiteURL, getOAuthRedirectUri } from '@/utils/helpers';
 
 export async function GET(request: NextRequest) {
   try {
@@ -59,16 +59,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(toSiteURL(`${locale}/login`));
     }
 
-    const clientId = process.env.MICROSOFT_CLIENT_ID!;
-    const clientSecret = process.env.MICROSOFT_CLIENT_SECRET!;
-    const tenant = process.env.AZURE_TENANT_ID || 'common';
+    // Use Teams-specific credentials (fallback to Microsoft credentials if Teams not configured)
+    const clientId = process.env.TEAMS_CLIENT_ID || process.env.MICROSOFT_CLIENT_ID!;
+    const clientSecret = process.env.TEAMS_CLIENT_SECRET || process.env.MICROSOFT_CLIENT_SECRET!;
+    const tenant = process.env.TEAMS_TENANT_ID || process.env.AZURE_TENANT_ID || 'common';
 
-    const redirectUri =
-      stateData.redirectUri ||
-      `${process.env.NEXT_PUBLIC_SITE_URL?.replace(
-        /\/$/,
-        ''
-      )}/api/auth/teams/callback`;
+    // Use the exact redirect URI from state if available, otherwise construct it
+    // This ensures we use the EXACT same redirect URI that was sent to Microsoft
+    const origin = request.nextUrl.origin;
+    const redirectUri = stateData.redirectUri || 
+      getOAuthRedirectUri(origin, '/api/auth/teams/callback');
+
+    console.log('🟡 Teams token exchange request:', {
+      redirectUri,
+      clientId: clientId?.substring(0, 20) + '...',
+      hasCode: !!code,
+      hasState: !!state,
+      tenant,
+    });
 
     const tokenResponse = await fetch(
       `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`,
