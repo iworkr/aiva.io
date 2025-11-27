@@ -2522,6 +2522,7 @@ export type Database = {
         | "google_calendar"
         | "outlook_calendar"
         | "apple_calendar"
+        | "aiva"
       channel_connection_status:
         | "active"
         | "inactive"
@@ -2567,26 +2568,26 @@ export type Database = {
         | "task"
         | "none"
       message_category:
-        | "customer_inquiry"
-        | "customer_complaint"
         | "sales_lead"
         | "client_support"
+        | "internal"
+        | "social"
+        | "marketing"
+        | "personal"
+        | "other"
+        | "customer_inquiry"
+        | "customer_complaint"
         | "bill"
         | "invoice"
         | "payment_confirmation"
         | "authorization_code"
         | "sign_in_code"
         | "security_alert"
-        | "marketing"
         | "junk_email"
         | "newsletter"
-        | "internal"
         | "meeting_request"
-        | "personal"
-        | "social"
         | "notification"
-        | "other"
-      message_priority: "urgent" | "high" | "medium" | "low" | "noise"
+      message_priority: "high" | "medium" | "low" | "noise" | "urgent"
       message_sentiment: "neutral" | "positive" | "negative" | "urgent"
       message_status:
         | "unread"
@@ -2764,6 +2765,7 @@ export const Constants = {
         "google_calendar",
         "outlook_calendar",
         "apple_calendar",
+        "aiva",
       ],
       channel_connection_status: [
         "active",
@@ -2816,27 +2818,27 @@ export const Constants = {
         "none",
       ],
       message_category: [
-        "customer_inquiry",
-        "customer_complaint",
         "sales_lead",
         "client_support",
+        "internal",
+        "social",
+        "marketing",
+        "personal",
+        "other",
+        "customer_inquiry",
+        "customer_complaint",
         "bill",
         "invoice",
         "payment_confirmation",
         "authorization_code",
         "sign_in_code",
         "security_alert",
-        "marketing",
         "junk_email",
         "newsletter",
-        "internal",
         "meeting_request",
-        "personal",
-        "social",
         "notification",
-        "other",
       ],
-      message_priority: ["urgent", "high", "medium", "low", "noise"],
+      message_priority: ["high", "medium", "low", "noise", "urgent"],
       message_sentiment: ["neutral", "positive", "negative", "urgent"],
       message_status: [
         "unread",
