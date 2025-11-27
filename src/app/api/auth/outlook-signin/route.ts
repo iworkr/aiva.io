@@ -55,10 +55,16 @@ export async function GET(request: NextRequest) {
     const callbackUrl = new URL(toSiteURL('/api/auth/outlook-signin/callback'), request.url);
     
     // Initiate Supabase OAuth with Microsoft
+    // Use queryParams to ensure email scope and force consent
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'azure',
       options: {
         redirectTo: callbackUrl.toString(),
+        queryParams: {
+          prompt: 'select_account', // Force account selection
+          // Ensure email scope is included
+          scope: 'openid profile email',
+        },
       },
     });
 

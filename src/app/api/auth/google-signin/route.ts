@@ -55,10 +55,15 @@ export async function GET(request: NextRequest) {
     const callbackUrl = new URL(toSiteURL('/api/auth/google-signin/callback'), request.url);
     
     // Initiate Supabase OAuth with Google
+    // Use queryParams to force account selection screen
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: callbackUrl.toString(),
+        queryParams: {
+          prompt: 'select_account', // Force account selection screen
+          access_type: 'offline', // Request refresh token
+        },
       },
     });
 

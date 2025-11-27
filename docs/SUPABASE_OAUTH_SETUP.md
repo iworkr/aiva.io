@@ -273,6 +273,7 @@ AZURE_TENANT_ID=YOUR_AZURE_TENANT_ID
 ```
 
 **Important**: Replace the placeholder values with your actual credentials from:
+
 - Google Cloud Console (for Google OAuth)
 - Azure Portal (for Microsoft OAuth)
 

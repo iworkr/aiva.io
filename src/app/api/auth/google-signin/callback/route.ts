@@ -27,14 +27,35 @@ export async function GET(request: NextRequest) {
     // Exchange code for session (Supabase handles this)
     const { data: authData, error: authError } = await supabase.auth.exchangeCodeForSession(code);
 
-    if (authError || !authData?.user) {
-      console.error('Failed to exchange code for session:', authError);
+    if (authError) {
+      console.error('❌ Failed to exchange code for session:', {
+        code: authError.code,
+        message: authError.message,
+        status: authError.status,
+      });
+      
       return NextResponse.redirect(
-        toSiteURL('/en/login?error=auth_failed')
+        toSiteURL('/en/login?error=' + encodeURIComponent(authError.message || 'Authentication failed. Please try again.'))
+      );
+    }
+
+    if (!authData?.user) {
+      console.error('❌ No user data returned from OAuth');
+      return NextResponse.redirect(
+        toSiteURL('/en/login?error=' + encodeURIComponent('No user data received. Please try again.'))
       );
     }
 
     const user = authData.user;
+    
+    // Verify user has an email (required for our app)
+    if (!user.email) {
+      console.error('❌ User authenticated but no email address:', user.id);
+      return NextResponse.redirect(
+        toSiteURL('/en/login?error=' + encodeURIComponent('Your Google account must have an email address to sign in. Please use a different account or contact support.'))
+      );
+    }
+    
     console.log('✅ User authenticated via Google:', user.id, user.email);
 
     // Get user's default workspace or create one

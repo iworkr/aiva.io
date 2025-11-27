@@ -40,6 +40,26 @@ export default async function Page(props: {
     }
   }
 
+  // Handle OAuth errors from Supabase (e.g., email extraction errors)
+  const errorCode = searchParams.error_code;
+  const errorDescription = searchParams.error_description;
+  
+  if (errorCode || errorDescription) {
+    const errorCodeStr = Array.isArray(errorCode) ? errorCode[0] : errorCode;
+    const errorDescStr = Array.isArray(errorDescription) ? errorDescription[0] : errorDescription;
+    
+    console.log('🔴 OAuth error detected:', { errorCode: errorCodeStr, errorDescription: errorDescStr });
+    
+    // Handle specific Supabase OAuth errors
+    if (errorCodeStr === 'unexpected_failure' && errorDescStr?.includes('email')) {
+      // Redirect to login with a user-friendly error message
+      redirect(`/en/login?error=${encodeURIComponent('Unable to sign in. Please ensure your Microsoft account has an email address and try again.')}`);
+    }
+    
+    // Generic OAuth error
+    redirect(`/en/login?error=${encodeURIComponent(errorDescStr || 'OAuth authentication failed. Please try again.')}`);
+  }
+
   if (code || state || error) {
     console.log('🟡 OAuth callback detected at root locale page, redirecting to callback route', {
       hasCode: !!code,
@@ -47,7 +67,8 @@ export default async function Page(props: {
       hasError: !!error,
     });
 
-    // Build callback URL with all query parameters
+    // Determine which callback route to use based on the error or referer
+    // For now, default to Gmail callback, but we could make this smarter
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') || 'https://www.tryaiva.io';
     const callbackUrl = new URL('/api/auth/gmail/callback', baseUrl);
     
