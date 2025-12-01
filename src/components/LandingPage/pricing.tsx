@@ -87,7 +87,7 @@ const PricingCard = ({
           <h3 className="text-4xl font-bold tracking-tighter">${price}</h3>
           <span className="text-muted-foreground">/month</span>
         </div>
-        <Button className="w-full" size="lg">Start Free Trial</Button>
+        <Button className="w-full" size="lg" variant="default">Start Free Trial</Button>
       </CardHeader>
 
       <CardContent className="p-4">

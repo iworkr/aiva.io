@@ -27,7 +27,7 @@ export default function HeroSection() {
             {t("description")}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:justify-center pt-6">
-            <Button className="w-full sm:w-auto sm:min-w-40 text-lg h-12" size="lg" asChild>
+            <Button className="w-full sm:w-auto sm:min-w-40 text-lg h-12" size="lg" variant="default" asChild>
               <Link href={"/sign-up"}>
                 Start Free Trial
                 <ArrowRight size={18} className="ml-2" />

@@ -14,7 +14,7 @@ export default function CTA() {
         subtitle="Start your free 14-day trial today. No credit card required. Cancel anytime."
       />
       <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-        <Button className="w-full sm:w-auto px-8 text-lg h-12" size="lg" asChild>
+        <Button className="w-full sm:w-auto px-8 text-lg h-12" size="lg" variant="default" asChild>
           <Link href="/sign-up">Start Free Trial</Link>
         </Button>
         <Button className="w-full sm:w-auto px-8 text-lg h-12" size="lg" variant="outline" asChild>

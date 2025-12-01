@@ -19,6 +19,7 @@ import {
 import { Link } from "./intl-link";
 import { usePrefetch } from "@/hooks/usePrefetch";
 import { memo } from "react";
+import { usePathname } from "next/navigation";
 
 export const SidebarWorkspaceNav = memo(function SidebarWorkspaceNav({
   workspace,
@@ -28,6 +29,7 @@ export const SidebarWorkspaceNav = memo(function SidebarWorkspaceNav({
   withLinkLabelPrefix?: boolean;
 }) {
   const { onMouseEnter } = usePrefetch();
+  const pathname = usePathname();
   
   let sidebarLinks = [
     { label: "Home", href: "/home", icon: <Home className="h-5 w-5" /> },
@@ -78,9 +80,10 @@ export const SidebarWorkspaceNav = memo(function SidebarWorkspaceNav({
       <SidebarMenu>
         {sidebarLinks.map((link) => {
           const href = getWorkspaceSubPath(workspace, link.href);
+          const isActive = pathname === href || pathname?.startsWith(href + '/');
           return (
             <SidebarMenuItem key={link.label}>
-              <SidebarMenuButton asChild>
+              <SidebarMenuButton asChild isActive={isActive}>
                 <Link 
                   href={href}
                   onMouseEnter={onMouseEnter(href)}

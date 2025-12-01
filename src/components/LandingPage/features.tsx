@@ -107,7 +107,7 @@ export default function Features() {
       </div>
 
       <div className="flex justify-center pt-8">
-        <Button size="lg" asChild>
+        <Button size="lg" variant="default" asChild>
           <Link href="/sign-up">
             Start Free Trial
           </Link>
