@@ -365,6 +365,7 @@ export const createMessageAction = authActionClient
     // Create message - convert camelCase to snake_case for database
     const { data, error } = await supabase
       .from('messages')
+      // Cast insert payload to any so channels without email/subject (e.g. Telegram) fit DB types
       .insert({
         workspace_id: workspaceId,
         channel_connection_id: messageData.channelConnectionId,
@@ -382,7 +383,7 @@ export const createMessageAction = authActionClient
         labels: messageData.labels,
         attachments: messageData.attachments,
         raw_data: messageData.rawData,
-      })
+      } as any)
       .select()
       .single();
 

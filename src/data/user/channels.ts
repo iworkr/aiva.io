@@ -48,7 +48,8 @@ export const createChannelConnectionAction = authActionClient
       .from('channel_connections')
       .select('id, status')
       .eq('workspace_id', workspaceId)
-      .eq('provider', provider)
+      // DB enum for provider may lag behind newly added providers (twitter, telegram), so relax type here.
+      .eq('provider' as any, provider as any)
       .eq('provider_account_id', providerAccountId)
       .single();
 
@@ -87,6 +88,7 @@ export const createChannelConnectionAction = authActionClient
     // Create new connection
     const { data, error } = await supabase
       .from('channel_connections')
+      // Cast insert payload to any so newly added providers (twitter, telegram) don't conflict
       .insert({
         workspace_id: workspaceId,
         user_id: userId,
@@ -99,7 +101,7 @@ export const createChannelConnectionAction = authActionClient
         scopes: scopes,
         status: 'active',
         metadata: metadata,
-      })
+      } as any)
       .select()
       .single();
 
@@ -300,7 +302,7 @@ export async function getActiveConnectionByProvider(
     .select('*')
     .eq('workspace_id', workspaceId)
     .eq('user_id', userId)
-    .eq('provider', provider)
+    .eq('provider' as any, provider as any)
     .eq('status', 'active')
     .single();
 

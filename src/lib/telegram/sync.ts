@@ -61,7 +61,7 @@ export async function syncTelegramMessages(
       throw new Error('Channel connection not found');
     }
 
-    if (connection.provider !== 'telegram') {
+    if ((connection.provider as any) !== 'telegram') {
       throw new Error('Connection is not a Telegram account');
     }
 
@@ -148,11 +148,11 @@ export async function syncTelegramMessages(
           channelConnectionId: connectionId,
           providerMessageId: parsed.providerMessageId,
           providerThreadId: parsed.providerThreadId,
-          subject: parsed.subject,
+          subject: parsed.subject ?? undefined,
           body: parsed.body,
-          bodyHtml: parsed.bodyHtml,
+          bodyHtml: parsed.bodyHtml ?? undefined,
           snippet: parsed.snippet,
-          senderEmail: parsed.senderEmail,
+          senderEmail: parsed.senderEmail ?? undefined,
           senderName: parsed.senderName,
           recipients: parsed.recipients,
           timestamp: parsed.timestamp,

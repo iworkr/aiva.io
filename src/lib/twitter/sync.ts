@@ -27,7 +27,7 @@ function parseTwitterDM(dm: any, accessToken: string) {
     bodyHtml: null,
     snippet: text.substring(0, 200),
     senderEmail: null, // Twitter doesn't provide email
-    senderName: null, // Will be fetched from user API
+    senderName: null as string | null, // Will be fetched from user API
     senderId, // Twitter user ID
     recipients: [],
     timestamp: new Date(parseInt(createdAt)).toISOString(),
@@ -62,7 +62,7 @@ export async function syncTwitterMessages(
       throw new Error('Channel connection not found');
     }
 
-    if (connection.provider !== 'twitter') {
+    if ((connection.provider as any) !== 'twitter') {
       throw new Error('Connection is not a Twitter account');
     }
 
@@ -105,7 +105,7 @@ export async function syncTwitterMessages(
     // Process each DM
     for (const dm of dmsList.data) {
       try {
-        const parsed = parseTwitterDM(dm, accessToken);
+          const parsed = parseTwitterDM(dm, accessToken);
 
         // Get sender info from Twitter API
         if (parsed.senderId) {
@@ -137,12 +137,12 @@ export async function syncTwitterMessages(
           channelConnectionId: connectionId,
           providerMessageId: parsed.providerMessageId,
           providerThreadId: parsed.providerThreadId,
-          subject: parsed.subject,
+          subject: parsed.subject ?? undefined,
           body: parsed.body,
-          bodyHtml: parsed.bodyHtml,
+          bodyHtml: parsed.bodyHtml ?? undefined,
           snippet: parsed.snippet,
-          senderEmail: parsed.senderEmail,
-          senderName: parsed.senderName,
+          senderEmail: parsed.senderEmail ?? undefined,
+          senderName: parsed.senderName || 'Twitter User',
           recipients: parsed.recipients,
           timestamp: parsed.timestamp,
           labels: parsed.labels,

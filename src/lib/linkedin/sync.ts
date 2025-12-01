@@ -123,22 +123,22 @@ export async function syncLinkedInMessages(
           }
 
           // Store message
-          const result = await createMessageAction({
-            workspaceId,
-            channelConnectionId: connectionId,
-            providerMessageId: parsed.providerMessageId,
-            providerThreadId: parsed.providerThreadId,
-            subject: parsed.subject,
-            body: parsed.body,
-            bodyHtml: parsed.bodyHtml,
-            snippet: parsed.snippet,
-            senderEmail: parsed.senderEmail,
-            senderName: parsed.senderName || 'LinkedIn User',
-            recipients: parsed.recipients,
-            timestamp: parsed.timestamp,
-            labels: parsed.labels,
-            rawData: parsed.rawData,
-          });
+            const result = await createMessageAction({
+              workspaceId,
+              channelConnectionId: connectionId,
+              providerMessageId: parsed.providerMessageId,
+              providerThreadId: parsed.providerThreadId,
+              subject: parsed.subject ?? undefined,
+              body: parsed.body,
+              bodyHtml: parsed.bodyHtml ?? undefined,
+              snippet: parsed.snippet,
+              senderEmail: parsed.senderEmail ?? undefined,
+              senderName: parsed.senderName || 'LinkedIn User',
+              recipients: parsed.recipients,
+              timestamp: parsed.timestamp,
+              labels: parsed.labels,
+              rawData: parsed.rawData,
+            });
 
           if (result?.data && !(result.data as any).isDuplicate) {
             newCount++;

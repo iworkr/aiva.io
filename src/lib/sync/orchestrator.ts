@@ -67,10 +67,11 @@ export async function syncChannelConnection(
   }
 
   try {
-    let syncResult;
+    let syncResult: any;
 
     // Route to appropriate sync function
-    switch (connection.provider) {
+    // Note: cast to any so newly added providers (twitter, telegram) are accepted
+    switch (connection.provider as any) {
       case 'gmail':
         syncResult = await syncGmailMessages(connectionId, workspaceId, {
           maxMessages: options.maxMessages || 50,

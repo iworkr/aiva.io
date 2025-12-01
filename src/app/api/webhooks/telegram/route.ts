@@ -111,7 +111,8 @@ export async function POST(request: NextRequest) {
     const { data: connections } = await supabase
       .from('channel_connections')
       .select('id, workspace_id, user_id, provider_account_id')
-      .eq('provider', 'telegram')
+      // DB enum for provider may not yet include "telegram" in generated types, so assert for now.
+      .eq('provider' as any, 'telegram' as any)
       .eq('status', 'active')
       .limit(1);
 
@@ -142,17 +143,14 @@ export async function POST(request: NextRequest) {
                       message.from.username || 
                       `Telegram User ${message.from.id}`;
 
-    // Store message
+    // Store message - note: subject/bodyHtml/senderEmail omitted for non-email channel
     const result = await createMessageAction({
       workspaceId,
       channelConnectionId: connection.id,
       providerMessageId: String(message.message_id),
       providerThreadId: String(message.chat.id),
-      subject: null,
       body: text,
-      bodyHtml: null,
       snippet: text.substring(0, 200),
-      senderEmail: null, // Telegram doesn't provide email
       senderName,
       recipients: [],
       timestamp: new Date(message.date * 1000).toISOString(),

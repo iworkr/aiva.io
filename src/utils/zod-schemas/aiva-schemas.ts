@@ -177,7 +177,8 @@ export const createMessageSchema = z.object({
   body: z.string().min(1),
   bodyHtml: z.string().optional(),
   snippet: z.string().optional(),
-  senderEmail: z.string().email(),
+  // Some channels (e.g. Telegram, Slack) may not have an email address
+  senderEmail: z.string().email().nullable().optional(),
   senderName: z.string().optional(),
   recipients: z.array(messageRecipientSchema).default([]),
   timestamp: z.string().datetime(),
