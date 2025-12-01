@@ -24,3 +24,4 @@ analyze
 .DS_Store
 # content-collections
 .content-collections
+.env*.local

@@ -20,7 +20,7 @@ export function LeftNav() {
       <DocsMobileNavigation />
       <div className="flex space-x-8">
         <Link href="/" className={cn("font-bold text-xl ")}>
-          <div className="relative flex space-x-2 h-10 md:w-fit items-center justify-center dark:-ml-4 -ml-2">
+          <div className="relative flex h-10 md:w-fit items-center justify-center dark:-ml-4 -ml-2">
             {/* Dark theme: light logo on dark background */}
             <Image
               src={`/logos/aiva-logo-light.svg`}
@@ -37,16 +37,6 @@ export function LeftNav() {
               alt="Aiva logo"
               className="block dark:hidden"
             />
-
-            {isBlogPage && (
-              <span className="font-bold text-foreground">Aiva Blog</span>
-            )}
-            {isDocsPage && (
-              <span className="font-bold text-foreground">Aiva Docs</span>
-            )}
-            {!isBlogPage && !isDocsPage && (
-              <span className="font-bold">Aiva.io</span>
-            )}
           </div>
         </Link>
       </div>
