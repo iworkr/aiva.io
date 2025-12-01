@@ -82,7 +82,7 @@ pnpm dev
 - ✅ Tasks module removed → integrated into Calendar/Events
 - ✅ Plan-based feature gating system implemented
 - ✅ 14 integrations configured with centralized management
-- ✅ Green theme applied throughout
+- ✅ Blue primary (#258FFB) & accent (#33EFFA) theme applied throughout
 - ✅ Calendar multi-day event rendering fixed
 - ✅ Default "Aiva Calendar" for users without external calendars
 - ✅ Security hardened (server-side feature gates)

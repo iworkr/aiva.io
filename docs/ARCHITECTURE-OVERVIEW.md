@@ -355,7 +355,7 @@ Example: Mon 2pm → Wed 10am
 ```
 ┌─────────────────────────────────────────────┐
 │         CSS Variables (globals.css)          │
-│         OKLCH Color Space                    │
+│         HSL / OKLCH Brand Palette            │
 └─────────────────────────────────────────────┘
                     │
      ┌──────────────┴──────────────┐
@@ -365,10 +365,14 @@ Example: Mon 2pm → Wed 10am
 │   Mode   │                  │   Mode   │
 └──────────┘                  └──────────┘
      │                             │
-     │  Primary: #5CE65C           │
-     │  oklch(0.60 0.20 138)       │
-     │                             │  Primary: #5CE65C
-     │                             │  oklch(0.75 0.22 138)
+     │  Primary: #258FFB           │
+     │  Accent:  #33EFFA           │
+     │  --primary: 217 100% 56%    │
+     │  --accent:  190 95% 60%     │
+     │                             │  Primary: #258FFB
+     │                             │  Accent:  #33EFFA
+     │                             │  --primary: 217 100% 65%
+     │                             │  --accent:  190 95% 70%
      └─────────────┬───────────────┘
                    ▼
      ┌─────────────────────────────┐

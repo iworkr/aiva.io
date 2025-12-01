@@ -19,9 +19,13 @@
 ## 🎨 Theme & Colors
 
 ```css
-/* Primary Color: Green #5CE65C */
-Light Mode: oklch(0.60 0.20 138)
-Dark Mode:  oklch(0.75 0.22 138)
+/* Primary Color: Blue #258FFB, Accent #33EFFA */
+Light Mode:
+  --primary: 217 100% 56%;  /* #258FFB */
+  --accent:  190 95% 60%;   /* #33EFFA */
+Dark Mode:
+  --primary: 217 100% 65%;
+  --accent:  190 95% 70%;
 
 /* Hover Pattern */
 hover:bg-primary/5 hover:border-primary/30 transition-colors

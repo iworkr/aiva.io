@@ -14,33 +14,35 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.62 0.12 220);
+  /* Brand: primary #258FFB, accent #33EFFA (light theme) */
+  --primary: 217 100% 56%;
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.145 0 0);
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.62 0.12 220);
-  --accent-foreground: oklch(0.985 0 0);
+  --accent: 190 95% 60%;
+  --accent-foreground: oklch(0.145 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.62 0.12 220);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  --ring: 217 100% 56%;
+  /* Charts biased toward primary/accent palette */
+  --chart-1: 217 100% 56%;
+  --chart-2: 190 95% 60%;
+  --chart-3: 217 80% 46%;
+  --chart-4: 190 85% 50%;
+  --chart-5: 217 70% 40%;
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.62 0.12 220);
+  --sidebar-primary: 217 100% 56%;
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.145 0 0);
   --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.62 0.12 220);
+  --sidebar-ring: 217 100% 56%;
 }
 
 .dark {
@@ -50,32 +52,33 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.145 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.72 0.12 220);
+  /* Brand: slightly brighter primary/accent in dark mode */
+  --primary: 217 100% 65%;
   --primary-foreground: oklch(0.145 0 0);
   --secondary: oklch(0.27 0.006 286);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.27 0.006 286);
   --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.72 0.12 220);
+  --accent: 190 95% 70%;
   --accent-foreground: oklch(0.145 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.27 0.006 286);
   --input: oklch(0.27 0.006 286);
-  --ring: oklch(0.72 0.12 220);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
+  --ring: 217 100% 65%;
+  --chart-1: 217 100% 65%;
+  --chart-2: 190 95% 70%;
+  --chart-3: 217 80% 55%;
+  --chart-4: 190 85% 60%;
+  --chart-5: 217 70% 50%;
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.72 0.12 220);
+  --sidebar-primary: 217 100% 65%;
   --sidebar-primary-foreground: oklch(0.145 0 0);
   --sidebar-accent: oklch(0.27 0.006 286);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.27 0.006 286);
-  --sidebar-ring: oklch(0.72 0.12 220);
+  --sidebar-ring: 217 100% 65%;
 }
 
 @theme inline {
@@ -262,9 +265,9 @@
   background: conic-gradient(
     from var(--angle),
     hsl(var(--primary)) 0deg,
-    hsl(var(--primary)) 90deg,
-    hsl(var(--primary) / 0.3) 180deg,
-    hsl(var(--primary)) 270deg,
+    hsl(var(--accent)) 90deg,
+    hsl(var(--primary) / 0.5) 180deg,
+    hsl(var(--accent)) 270deg,
     hsl(var(--primary)) 360deg
   );
   -webkit-mask:
@@ -317,9 +320,9 @@
   background: conic-gradient(
     from var(--angle),
     hsl(var(--primary)),
-    hsl(var(--primary) / 0.85),
-    hsl(var(--primary) / 0.7),
-    hsl(var(--primary) / 0.85),
+    hsl(var(--accent)),
+    hsl(var(--primary) / 0.8),
+    hsl(var(--accent)),
     hsl(var(--primary))
   );
   opacity: 0.6;
@@ -355,9 +358,9 @@
   background: conic-gradient(
     from var(--angle),
     hsl(var(--primary)),
-    hsl(var(--primary) / 0.95),
-    hsl(var(--primary) / 0.8),
-    hsl(var(--primary) / 0.95),
+    hsl(var(--accent)),
+    hsl(var(--primary) / 0.9),
+    hsl(var(--accent)),
     hsl(var(--primary))
   );
 }
