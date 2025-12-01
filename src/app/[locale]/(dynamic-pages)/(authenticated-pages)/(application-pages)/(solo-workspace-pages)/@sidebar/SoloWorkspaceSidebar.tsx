@@ -3,6 +3,7 @@
 import { SidebarAdminPanelNav } from "@/components/sidebar-admin-panel-nav";
 import { SidebarFooterUserNav } from "@/components/sidebar-footer-user-nav";
 import { SidebarWorkspaceNav } from "@/components/sidebar-workspace-nav";
+import Image from "next/image";
 import {
   Sidebar,
   SidebarContent,
@@ -60,7 +61,22 @@ export async function SoloWorkspaceSidebar() {
     return (
       <Sidebar variant="inset" collapsible="icon">
         <SidebarHeader>
-          {/* Logo will go here */}
+          <div className="flex items-center gap-2 px-1 py-1">
+            <Image
+              src="/logos/aiva-logo-dark.svg"
+              width={120}
+              height={32}
+              alt="Aiva logo"
+              className="hidden dark:block"
+            />
+            <Image
+              src="/logos/aiva-logo-light.svg"
+              width={120}
+              height={32}
+              alt="Aiva logo"
+              className="block dark:hidden"
+            />
+          </div>
         </SidebarHeader>
         <SidebarContent>
           <SidebarWorkspaceNav workspace={workspace} />
