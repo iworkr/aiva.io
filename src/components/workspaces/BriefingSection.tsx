@@ -88,7 +88,7 @@ export function BriefingSection({ items }: BriefingSectionProps) {
 
     return (
       <Link key={item.id} href={item.href}>
-        <Card className={`group relative transition-all duration-300 hover:shadow-md cursor-pointer border-l-4 overflow-hidden animated-border ${getPriorityColor(item.priority)} ${getHoverBorderColor()}`}>
+        <Card className={`group relative transition-all duration-300 hover:shadow-md cursor-pointer border-l-4 overflow-hidden ${getPriorityColor(item.priority)} ${getHoverBorderColor()}`}>
           {/* Shimmer effect */}
           <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-transparent via-white/50 to-transparent opacity-0 group-hover:opacity-100 group-hover:animate-shimmer transition-opacity duration-300 pointer-events-none z-10" />
           <CardContent className="py-1.5 px-3 relative z-10">

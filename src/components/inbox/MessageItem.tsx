@@ -174,7 +174,7 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
     <div
       onClick={handleClick}
       className={cn(
-        'group relative cursor-pointer px-6 py-4 transition-colors hover:bg-muted/50 border-b animated-border',
+        'group relative cursor-pointer px-6 py-4 transition-colors hover:bg-muted/50 border-b',
         !message.is_read && 'bg-muted/20'
       )}
     >
