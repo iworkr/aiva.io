@@ -41,6 +41,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { PriorityBadge, CategoryBadge, SentimentBadge } from './ClassificationBadges';
 import { QuickReply } from './QuickReply';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface MessageItemProps {
   message: any;
@@ -170,6 +171,19 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
     ? format(timestamp, 'h:mm a')
     : formatDistanceToNow(timestamp, { addSuffix: true });
 
+  const senderDisplay =
+    message.sender_name || message.sender_email || 'Sender';
+
+  const senderInitial =
+    typeof senderDisplay === 'string' && senderDisplay.length > 0
+      ? senderDisplay.charAt(0).toUpperCase()
+      : 'S';
+
+  const senderAvatarUrl =
+    typeof message.sender_email === 'string' && message.sender_email.length > 0
+      ? `https://unavatar.io/${encodeURIComponent(message.sender_email)}`
+      : undefined;
+
   return (
     <div
       onClick={handleClick}
@@ -179,17 +193,19 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
       )}
     >
       <div className="flex items-start gap-4">
-        {/* Channel Icon */}
+        {/* Sender Avatar */}
         <div className="mt-1 flex-shrink-0">
-          {getProviderIcon() ? (
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
-              {getProviderIcon()}
-            </div>
-          ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
-              <Mail className="h-4 w-4 text-muted-foreground" />
-            </div>
-          )}
+          <Avatar className="h-8 w-8">
+            {senderAvatarUrl && (
+              <AvatarImage
+                src={senderAvatarUrl}
+                alt={senderDisplay}
+              />
+            )}
+            <AvatarFallback className="text-xs font-medium">
+              {senderInitial}
+            </AvatarFallback>
+          </Avatar>
         </div>
 
         {/* Message content */}

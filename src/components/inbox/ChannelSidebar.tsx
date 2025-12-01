@@ -118,7 +118,7 @@ export function ChannelSidebar({
           className={cn(
             'relative mb-4 flex items-center justify-center w-14 h-14 rounded-2xl transition-all',
             selectedChannel === null
-              ? 'bg-primary text-primary-foreground shadow-lg ring-2 ring-primary/60'
+              ? 'bg-primary text-primary-foreground shadow-lg ring-2 ring-primary/60 border-2 border-primary'
               : 'bg-background hover:bg-muted text-muted-foreground border border-border/60'
           )}
           title="All inboxes"
@@ -154,7 +154,7 @@ export function ChannelSidebar({
                 className={cn(
                   'relative flex items-center justify-center w-14 h-14 rounded-2xl transition-all',
                   isSelected
-                    ? 'bg-background text-foreground shadow-lg ring-2 ring-primary'
+                    ? 'bg-background text-foreground shadow-lg ring-2 ring-primary border-2 border-primary'
                     : 'bg-background/80 hover:bg-muted text-muted-foreground border border-border/60'
                 )}
                 title={tooltip}
