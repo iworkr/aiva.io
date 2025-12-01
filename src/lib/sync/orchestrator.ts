@@ -8,6 +8,9 @@
 import { createSupabaseUserServerActionClient } from '@/supabase-clients/user/createSupabaseUserServerActionClient';
 import { syncGmailMessages } from '@/lib/gmail/sync';
 import { syncOutlookMessages } from '@/lib/outlook/sync';
+import { syncTwitterMessages } from '@/lib/twitter/sync';
+import { syncTelegramMessages } from '@/lib/telegram/sync';
+import { syncLinkedInMessages } from '@/lib/linkedin/sync';
 import { classifyMessage } from '@/lib/ai/classifier';
 
 export type ChannelProvider =
@@ -16,9 +19,11 @@ export type ChannelProvider =
   | 'slack'
   | 'teams'
   | 'whatsapp'
+  | 'telegram'
   | 'instagram'
   | 'facebook_messenger'
-  | 'linkedin';
+  | 'linkedin'
+  | 'twitter';
 
 export interface SyncResult {
   provider: ChannelProvider;
@@ -79,6 +84,24 @@ export async function syncChannelConnection(
           maxMessages: options.maxMessages || 50,
           // No filter = sync recent messages (like Gmail) to ensure contacts are created
           // Previously was 'isRead eq false' which only synced unread messages
+        });
+        break;
+
+      case 'twitter':
+        syncResult = await syncTwitterMessages(connectionId, workspaceId, {
+          maxMessages: options.maxMessages || 50,
+        });
+        break;
+
+      case 'telegram':
+        syncResult = await syncTelegramMessages(connectionId, workspaceId, {
+          maxMessages: options.maxMessages || 50,
+        });
+        break;
+
+      case 'linkedin':
+        syncResult = await syncLinkedInMessages(connectionId, workspaceId, {
+          maxMessages: options.maxMessages || 50,
         });
         break;
 

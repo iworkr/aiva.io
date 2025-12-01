@@ -12,8 +12,12 @@ import { createCalendarConnectionAction } from '@/data/user/calendar';
  * Initiate Google Calendar OAuth
  */
 export async function getGoogleCalendarAuthUrl(workspaceId: string, userId: string): Promise<string> {
-  const clientId = process.env.GOOGLE_CLIENT_ID!;
-  const redirectUri = `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/calendar/google/callback`;
+  const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
+  if (!clientId) throw new Error('Google Calendar OAuth not configured');
+  
+  // Build redirect URI dynamically
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, '').replace(/^https?:\/\//, '') || 'www.tryaiva.io';
+  const redirectUri = `https://${siteUrl}/api/auth/google-calendar/callback`;
 
   const scopes = [
     'https://www.googleapis.com/auth/calendar.readonly',

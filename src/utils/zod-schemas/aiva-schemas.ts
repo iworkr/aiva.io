@@ -15,9 +15,11 @@ export const ChannelProviderSchema = z.enum([
   'slack',
   'teams',
   'whatsapp',
+  'telegram',
   'instagram',
   'facebook_messenger',
   'linkedin',
+  'twitter',
 ]);
 
 export const ChannelConnectionStatusSchema = z.enum([
