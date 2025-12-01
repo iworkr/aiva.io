@@ -12,18 +12,18 @@ export function Footer() {
               <Link href="/">
                 <div className="relative flex gap-2 items-center">
                   <Image
-                    src={"/logos/nextbase.png"}
-                    alt="logo"
-                    width={64}
-                    height={64}
+                    src={"/logos/aiva-logo-dark.svg"}
+                    alt="Aiva logo"
+                    width={140}
+                    height={40}
                   />
                   <span className="font-medium text-2xl text-foreground sm:inline-block">
-                    Nextbase
+                    Aiva.io
                   </span>
                 </div>
               </Link>
               <p className="text-muted-foreground max-w-[350px] dark:font-light">
-                Acme Inc. 123 Acme Street, London, UK, SW1A 1AA
+                Aiva.io – Unified AI communication assistant for professionals and teams.
               </p>
             </div>
             <div className="flex flex-wrap w-full justify-start lg:justify-end gap-8 lg:gap-16">

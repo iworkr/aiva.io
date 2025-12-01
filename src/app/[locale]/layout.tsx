@@ -9,12 +9,12 @@ import { AppProviders } from "./AppProviders";
 
 export const metadata: Metadata = {
   icons: {
-    icon: "/images/logo-black-main.ico",
+    icon: "/logos/aiva-mark-dark.svg",
   },
-  title: "Nextbase Ultimate",
-  description: "Nextbase Ultimate",
+  title: "Aiva.io",
+  description: "Aiva.io – Unified AI communication assistant",
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? `https://usenextbase.com`,
+    process.env.NEXT_PUBLIC_SITE_URL ?? `https://www.tryaiva.io`,
   ),
 };
 

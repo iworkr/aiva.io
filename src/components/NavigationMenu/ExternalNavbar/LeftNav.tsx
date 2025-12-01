@@ -22,22 +22,28 @@ export function LeftNav() {
         <Link href="/" className={cn("font-bold text-xl ")}>
           <div className="relative flex space-x-2 h-10 md:w-fit items-center justify-center dark:-ml-4 -ml-2">
             <Image
-              src={`/logos/nextbase.png`}
-              width={32}
+              src={`/logos/aiva-logo-dark.svg`}
+              width={120}
               height={32}
-              alt="light-logo"
+              alt="Aiva logo"
+              className="hidden dark:block"
+            />
+            <Image
+              src={`/logos/aiva-logo-dark.svg`}
+              width={120}
+              height={32}
+              alt="Aiva logo"
+              className="block dark:hidden"
             />
 
             {isBlogPage && (
-              <span className="font-bold text-foreground">Nextbase Blog</span>
+              <span className="font-bold text-foreground">Aiva Blog</span>
             )}
             {isDocsPage && (
-              <span className="font-bold font-bold text-foreground">
-                Nextbase Docs
-              </span>
+              <span className="font-bold text-foreground">Aiva Docs</span>
             )}
             {!isBlogPage && !isDocsPage && (
-              <span className="font-bold">Nextbase</span>
+              <span className="font-bold">Aiva.io</span>
             )}
           </div>
         </Link>
