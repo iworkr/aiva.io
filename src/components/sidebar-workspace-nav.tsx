@@ -83,10 +83,14 @@ export const SidebarWorkspaceNav = memo(function SidebarWorkspaceNav({
           const isActive = pathname === href || pathname?.startsWith(href + '/');
           return (
             <SidebarMenuItem key={link.label}>
-              <SidebarMenuButton asChild isActive={isActive}>
+              <SidebarMenuButton 
+                asChild 
+                isActive={isActive}
+              >
                 <Link 
                   href={href}
                   onMouseEnter={onMouseEnter(href)}
+                  className={isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : ""}
                 >
                   {link.icon}
                   <span>{link.label}</span>
