@@ -62,13 +62,13 @@ export function NotificationItem({
       className={cn(
         "flex items-start w-full p-4 gap-4 relative",
         isRead ? "bg-muted/50" : "bg-card",
-        "hover:bg-accent/10 transition-colors duration-200",
+        "hover:bg-muted/50 transition-colors duration-200",
         href && "cursor-pointer",
       )}
     >
       {/* Render either a custom icon or a default avatar image */}
       {icon ? (
-        <div className="w-12 h-12 flex items-center justify-center rounded-full bg-primary/10">
+        <div className="w-12 h-12 flex items-center justify-center rounded-full bg-muted">
           {icon}
         </div>
       ) : (

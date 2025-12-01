@@ -62,13 +62,13 @@ export function BriefingSection({ items }: BriefingSectionProps) {
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'urgent':
-        return 'border-red-500/70 bg-red-500/5';
+        return 'border-red-500/70 bg-card';
       case 'high':
-        return 'border-orange-500/70 bg-orange-500/5';
+        return 'border-orange-500/70 bg-card';
       case 'medium':
-        return 'border-yellow-500/70 bg-yellow-500/5';
+        return 'border-yellow-500/70 bg-card';
       default:
-        return 'border-primary/70 bg-primary/5';
+        return 'border-primary/70 bg-card';
     }
   };
 
