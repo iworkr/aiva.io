@@ -37,15 +37,17 @@ export async function ProjectSidebar(props: { params: Promise<unknown> }) {
       <Sidebar variant="inset" collapsible="icon">
         <SidebarHeader>
           <div className="flex items-center gap-2 px-1 py-1">
+            {/* Dark theme: light logo on dark background */}
             <Image
-              src="/logos/aiva-logo-dark.svg"
+              src="/logos/aiva-logo-light.svg"
               width={120}
               height={32}
               alt="Aiva logo"
               className="hidden dark:block"
             />
+            {/* Light theme: dark logo on light background */}
             <Image
-              src="/logos/aiva-logo-light.svg"
+              src="/logos/aiva-logo-dark.svg"
               width={120}
               height={32}
               alt="Aiva logo"

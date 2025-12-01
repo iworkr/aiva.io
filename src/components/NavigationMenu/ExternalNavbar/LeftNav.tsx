@@ -21,13 +21,15 @@ export function LeftNav() {
       <div className="flex space-x-8">
         <Link href="/" className={cn("font-bold text-xl ")}>
           <div className="relative flex space-x-2 h-10 md:w-fit items-center justify-center dark:-ml-4 -ml-2">
+            {/* Dark theme: light logo on dark background */}
             <Image
-              src={`/logos/aiva-logo-dark.svg`}
+              src={`/logos/aiva-logo-light.svg`}
               width={120}
               height={32}
               alt="Aiva logo"
               className="hidden dark:block"
             />
+            {/* Light theme: dark logo on light background */}
             <Image
               src={`/logos/aiva-logo-dark.svg`}
               width={120}
