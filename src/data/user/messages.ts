@@ -107,16 +107,51 @@ export const getMessagesAction = authActionClient
       throw new Error(`Failed to fetch messages: ${error.message}`);
     }
 
+    // Enrich messages with contact avatars (from unified contacts system)
+    let messagesWithAvatars = data ?? [];
+    if (messagesWithAvatars.length > 0) {
+      const emails = Array.from(
+        new Set(
+          messagesWithAvatars
+            .map((m: any) => (m.sender_email as string | null)?.toLowerCase().trim())
+            .filter(Boolean) as string[]
+        )
+      );
+
+      if (emails.length > 0) {
+        const { data: contacts } = await supabase
+          .from('contacts')
+          .select('email, avatar_url')
+          .eq('workspace_id', workspaceId)
+          .in('email', emails);
+
+        const avatarMap = new Map<string, string>();
+        contacts?.forEach((c: any) => {
+          if (c.email && c.avatar_url) {
+            avatarMap.set((c.email as string).toLowerCase().trim(), c.avatar_url as string);
+          }
+        });
+
+        messagesWithAvatars = messagesWithAvatars.map((m: any) => ({
+          ...m,
+          sender_avatar_url:
+            (m.sender_email &&
+              avatarMap.get((m.sender_email as string).toLowerCase().trim())) ||
+            null,
+        }));
+      }
+    }
+
     console.log('📨 getMessagesAction result:', {
       workspaceId,
       channelConnectionId,
       total: count,
-      returned: data?.length ?? 0,
+      returned: messagesWithAvatars.length ?? 0,
       hasMore: count ? offset + limit < count : false,
     });
 
     return {
-      messages: data,
+      messages: messagesWithAvatars,
       total: count,
       hasMore: count ? offset + limit < count : false,
     };
@@ -209,8 +244,43 @@ export const getNewMessagesAction = authActionClient
       throw new Error(`Failed to fetch new messages: ${error.message}`);
     }
 
+    // Enrich messages with contact avatars (from unified contacts system)
+    let messagesWithAvatars = data ?? [];
+    if (messagesWithAvatars.length > 0) {
+      const emails = Array.from(
+        new Set(
+          messagesWithAvatars
+            .map((m: any) => (m.sender_email as string | null)?.toLowerCase().trim())
+            .filter(Boolean) as string[]
+        )
+      );
+
+      if (emails.length > 0) {
+        const { data: contacts } = await supabase
+          .from('contacts')
+          .select('email, avatar_url')
+          .eq('workspace_id', workspaceId)
+          .in('email', emails);
+
+        const avatarMap = new Map<string, string>();
+        contacts?.forEach((c: any) => {
+          if (c.email && c.avatar_url) {
+            avatarMap.set((c.email as string).toLowerCase().trim(), c.avatar_url as string);
+          }
+        });
+
+        messagesWithAvatars = messagesWithAvatars.map((m: any) => ({
+          ...m,
+          sender_avatar_url:
+            (m.sender_email &&
+              avatarMap.get((m.sender_email as string).toLowerCase().trim())) ||
+            null,
+        }));
+      }
+    }
+
     return {
-      messages: data || [],
+      messages: messagesWithAvatars,
     };
   });
 

@@ -180,8 +180,8 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
       : 'S';
 
   const senderAvatarUrl =
-    typeof message.sender_email === 'string' && message.sender_email.length > 0
-      ? `https://unavatar.io/${encodeURIComponent(message.sender_email)}`
+    (message as any).sender_avatar_url && typeof (message as any).sender_avatar_url === 'string'
+      ? ((message as any).sender_avatar_url as string)
       : undefined;
 
   return (
