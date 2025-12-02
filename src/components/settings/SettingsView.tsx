@@ -30,6 +30,8 @@ import {
   Lock,
   Crown,
   Loader2,
+  Save,
+  CheckCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAction } from 'next-safe-action/hooks';
@@ -190,7 +192,10 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   // AI Settings
   const { execute: saveAISettings, status: aiStatus } = useAction(updateAISettingsAction, {
     onSuccess: () => {
-      toast.success('AI settings saved successfully');
+      toast.success('AI settings saved successfully', {
+        description: 'Your AI feature preferences have been updated.',
+        duration: 4000,
+      });
     },
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to save AI settings');
@@ -200,7 +205,10 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   // Notification Settings
   const { execute: saveNotificationSettings, status: notifStatus } = useAction(updateNotificationSettingsAction, {
     onSuccess: () => {
-      toast.success('Notification settings saved successfully');
+      toast.success('Notification settings saved', {
+        description: 'Your notification preferences have been updated.',
+        duration: 4000,
+      });
     },
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to save notification settings');
@@ -210,7 +218,10 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   // Account Settings
   const { execute: saveAccountSettings, status: accountStatus } = useAction(updateAccountSettingsAction, {
     onSuccess: () => {
-      toast.success('Account settings saved successfully');
+      toast.success('Profile updated successfully', {
+        description: 'Your profile information has been saved.',
+        duration: 4000,
+      });
     },
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to save account settings');
@@ -220,7 +231,10 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   // Sync Settings (Timezone & Sync Frequency)
   const { execute: saveSyncSettings, status: syncStatus } = useAction(updateSyncSettingsAction, {
     onSuccess: () => {
-      toast.success('Settings saved successfully');
+      toast.success('Preferences saved successfully', {
+        description: 'Your timezone and sync settings have been updated.',
+        duration: 4000,
+      });
     },
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to save settings');
@@ -315,9 +329,9 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>AI Classification</CardTitle>
-                <CardDescription>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl font-bold">AI Classification</CardTitle>
+                <CardDescription className="text-base">
                   Configure how AI analyzes and categorizes your messages (Available on all plans)
                 </CardDescription>
               </CardHeader>
@@ -390,11 +404,11 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
             </Card>
 
             <Card className={!hasPro ? 'opacity-60' : ''}>
-              <CardHeader>
+              <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="flex items-center gap-2">
-                      <CardTitle>AI Reply Generation</CardTitle>
+                      <CardTitle className="text-xl font-bold">AI Reply Generation</CardTitle>
                       {!hasPro && (
                         <Badge variant="secondary">
                           <Lock className="mr-1 h-3 w-3" />
@@ -402,7 +416,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                         </Badge>
                       )}
                     </div>
-                    <CardDescription>
+                    <CardDescription className="text-base">
                       AI-powered reply drafts and auto-responses {!hasPro && '(Requires Pro plan)'}
                     </CardDescription>
                   </div>
@@ -450,24 +464,30 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
               <Button 
                 onClick={handleSaveAISettings}
                 disabled={aiStatus === 'executing' || loading}
-                className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all h-10 px-6 font-medium"
+                size="lg"
+                className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all h-11 px-8 font-semibold text-base bg-primary text-primary-foreground"
               >
                 {aiStatus === 'executing' ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                     Saving...
                   </>
-                ) : 'Save AI Settings'}
+                ) : (
+                  <>
+                    <Save className="mr-2 h-5 w-5" />
+                    Save AI Settings
+                  </>
+                )}
               </Button>
             </div>
           </TabsContent>
 
           {/* Notifications Settings */}
-          <TabsContent value="notifications" className="space-y-4">
+          <TabsContent value="notifications" className="space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle>Email Notifications</CardTitle>
-                <CardDescription>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl font-bold">Email Notifications</CardTitle>
+                <CardDescription className="text-base">
                   Choose what email notifications you receive
                 </CardDescription>
               </CardHeader>
@@ -514,24 +534,30 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
               <Button 
                 onClick={handleSaveNotificationSettings}
                 disabled={notifStatus === 'executing' || loading}
-                className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all h-10 px-6 font-medium"
+                size="lg"
+                className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all h-11 px-8 font-semibold text-base bg-primary text-primary-foreground"
               >
                 {notifStatus === 'executing' ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                     Saving...
                   </>
-                ) : 'Save Notification Settings'}
+                ) : (
+                  <>
+                    <Save className="mr-2 h-5 w-5" />
+                    Save Notification Settings
+                  </>
+                )}
               </Button>
             </div>
           </TabsContent>
 
           {/* Account Settings */}
-          <TabsContent value="account" className="space-y-4">
+          <TabsContent value="account" className="space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle>Profile Information</CardTitle>
-                <CardDescription>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl font-bold">Profile Information</CardTitle>
+                <CardDescription className="text-base">
                   Update your personal information
                 </CardDescription>
               </CardHeader>
@@ -585,9 +611,9 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>Preferences</CardTitle>
-                <CardDescription>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl font-bold">Preferences</CardTitle>
+                <CardDescription className="text-base">
                   Configure your timezone and sync preferences. Your timezone affects calendar events and message timestamps.
                 </CardDescription>
               </CardHeader>
@@ -656,31 +682,43 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
               </CardContent>
             </Card>
 
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-4">
               <Button 
                 onClick={handleSaveAccountSettings}
                 disabled={accountStatus === 'executing' || loading}
                 variant="outline"
-                className="h-10 px-5 border-2 hover:bg-muted/50 transition-all font-medium"
+                size="lg"
+                className="h-11 px-6 border-2 hover:bg-muted/50 transition-all font-semibold text-base"
               >
                 {accountStatus === 'executing' ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                     Saving...
                   </>
-                ) : 'Save Profile'}
+                ) : (
+                  <>
+                    <User className="mr-2 h-5 w-5" />
+                    Save Profile
+                  </>
+                )}
               </Button>
               <Button 
                 onClick={handleSaveSyncSettings}
                 disabled={syncStatus === 'executing' || loading}
-                className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all h-10 px-6 font-medium"
+                size="lg"
+                className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all h-11 px-8 font-semibold text-base bg-primary text-primary-foreground"
               >
                 {syncStatus === 'executing' ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                     Saving...
                   </>
-                ) : 'Save Preferences'}
+                ) : (
+                  <>
+                    <Save className="mr-2 h-5 w-5" />
+                    Save Preferences
+                  </>
+                )}
               </Button>
             </div>
           </TabsContent>

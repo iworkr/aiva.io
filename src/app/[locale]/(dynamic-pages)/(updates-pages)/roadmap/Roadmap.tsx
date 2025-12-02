@@ -1,8 +1,10 @@
 "use server";
 import { Link } from "@/components/intl-link";
 import { T } from "@/components/ui/Typography";
+import { Button } from "@/components/ui/button";
 import { RoadmapList } from "./_components/RoadmapList";
 import type { RoadmapData } from "./types";
+import { MessageSquare, Map } from "lucide-react";
 
 export async function Roadmap({ roadmapData }: { roadmapData: RoadmapData }) {
   const allItems = [...roadmapData.inProgress, ...roadmapData.plannedCards];
@@ -14,16 +16,20 @@ export async function Roadmap({ roadmapData }: { roadmapData: RoadmapData }) {
           {allItems.length > 0 ? (
             <RoadmapList cards={allItems} />
           ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-center px-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-3">
-                <svg className="h-6 w-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                </svg>
+            <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 mb-6">
+                <Map className="h-10 w-10 text-primary" />
               </div>
-              <h3 className="text-base font-semibold mb-1">Roadmap Coming Soon</h3>
-              <p className="text-sm text-muted-foreground max-w-xs">
-                We're planning exciting features for Aiva.io. Check back soon to see what's next!
+              <h3 className="text-2xl font-bold mb-3">Roadmap Coming Soon</h3>
+              <p className="text-base text-muted-foreground max-w-md mb-8">
+                We're planning exciting features for Aiva.io. Want to influence what we build next? Share your ideas with us!
               </p>
+              <Button asChild size="lg" className="shadow-lg hover:shadow-xl transition-all h-11 px-6 font-semibold">
+                <Link href="/feedback">
+                  <MessageSquare className="mr-2 h-5 w-5" />
+                  Submit Your Ideas
+                </Link>
+              </Button>
             </div>
           )}
         </div>

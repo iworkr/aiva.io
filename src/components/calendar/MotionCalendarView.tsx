@@ -348,9 +348,10 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
               <Button 
                 onClick={() => setShowCreateDialog(true)}
                 aria-label="Create new calendar event"
-                className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all h-10 px-5 font-medium"
+                size="lg"
+                className="shadow-lg hover:shadow-xl hover:scale-[1.03] transition-all h-12 px-6 font-semibold text-base bg-primary text-primary-foreground"
               >
-                <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+                <Plus className="mr-2 h-5 w-5" aria-hidden="true" />
                 Add Event
               </Button>
             </div>
@@ -384,7 +385,7 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
                     <Button 
                       onClick={() => setShowCreateDialog(true)}
                       size="lg"
-                      className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all h-11 px-6 font-medium"
+                      className="shadow-lg hover:shadow-xl hover:scale-[1.03] transition-all h-12 px-8 font-semibold text-base bg-primary text-primary-foreground"
                     >
                       <Plus className="mr-2 h-5 w-5" />
                       Create Event
@@ -393,7 +394,7 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
                       variant="outline"
                       size="lg"
                       onClick={() => setShowManageAccountsDialog(true)}
-                      className="h-11 px-6 border-2 hover:bg-muted/50 transition-all"
+                      className="h-12 px-8 border-2 hover:bg-muted/50 transition-all font-semibold text-base"
                     >
                       <CalendarIcon className="mr-2 h-5 w-5" />
                       Connect Calendar

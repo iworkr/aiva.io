@@ -153,10 +153,10 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
 
   return (
     <div className={cn('relative', className)}>
-      {/* Search Input with Animated Gradient Border - Emphasized for visibility */}
-      <div className="relative aiva-input-wrapper shadow-md hover:shadow-lg transition-shadow rounded-lg">
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10">
-          <Sparkles className="h-5 w-5 text-primary" />
+      {/* Search Input with Animated Gradient Border - Highly prominent on all screens */}
+      <div className="relative aiva-input-wrapper shadow-lg lg:shadow-xl hover:shadow-xl lg:hover:shadow-2xl transition-all duration-300 rounded-xl bg-muted/20">
+        <div className="absolute left-4 lg:left-5 top-1/2 -translate-y-1/2 z-10">
+          <Sparkles className="h-5 w-5 lg:h-6 lg:w-6 text-primary" />
         </div>
         <Input
           ref={inputRef}
@@ -166,11 +166,11 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={handleInputFocus}
-          className="pl-12 h-14 text-base bg-background border-2 border-border hover:border-primary/40 focus:border-primary focus:ring-2 focus:ring-primary/20 focus-visible:ring-2 focus-visible:ring-primary/20 relative z-10 placeholder:text-muted-foreground/60 rounded-lg"
+          className="pl-12 lg:pl-14 h-14 lg:h-16 text-base lg:text-lg bg-background/80 backdrop-blur-sm border-2 border-primary/30 hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/30 focus-visible:ring-2 focus-visible:ring-primary/30 relative z-10 placeholder:text-muted-foreground/50 rounded-xl"
         />
         {isLoading && (
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 z-10">
-            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          <div className="absolute right-4 lg:right-5 top-1/2 -translate-y-1/2 z-10">
+            <Loader2 className="h-5 w-5 lg:h-6 lg:w-6 animate-spin text-primary" />
           </div>
         )}
       </div>

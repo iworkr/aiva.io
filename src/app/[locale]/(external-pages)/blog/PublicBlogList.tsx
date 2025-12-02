@@ -1,10 +1,11 @@
 import { Link } from "@/components/intl-link";
 import { T } from "@/components/ui/Typography";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { anonGetMarketingAuthorById } from "@/data/anon/marketing-authors";
 import { DBTable } from "@/types";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, Bell, MessageSquare } from "lucide-react";
 import moment from "moment";
 import { Fragment } from "react";
 import { AuthorProfileImage } from "./AuthorProfileImage";
@@ -91,13 +92,27 @@ export function PublicBlogList({
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
-            <CalendarDays className="h-8 w-8 text-primary" />
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 mb-6">
+            <CalendarDays className="h-10 w-10 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">Blog Coming Soon</h3>
-          <p className="text-sm text-muted-foreground max-w-md">
-            We're working on sharing our insights about AI-powered communication, productivity tips, and product updates. Check back soon!
+          <h3 className="text-2xl font-bold mb-3">Blog Coming Soon</h3>
+          <p className="text-base text-muted-foreground max-w-lg mb-8">
+            We're working on sharing our insights about AI-powered communication, productivity tips, and product updates. Be the first to know when we publish!
           </p>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Button asChild size="lg" className="shadow-lg hover:shadow-xl transition-all h-11 px-6 font-semibold">
+              <Link href="/feedback">
+                <MessageSquare className="mr-2 h-5 w-5" />
+                Share Your Ideas
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="lg" className="h-11 px-6 font-medium border-2">
+              <Link href="/roadmap">
+                <Bell className="mr-2 h-5 w-5" />
+                View Roadmap
+              </Link>
+            </Button>
+          </div>
         </div>
       )}
     </Fragment>

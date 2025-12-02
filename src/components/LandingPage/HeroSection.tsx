@@ -52,17 +52,17 @@ export default function HeroSection() {
               </Link>
             </Button>
           </div>
-          <div className="pt-4 flex items-center gap-6 text-sm text-muted-foreground">
+          <div className="pt-4 flex flex-wrap justify-center lg:justify-start items-center gap-4 sm:gap-6 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-sky-500"></div>
+              <div className="h-2 w-2 rounded-full bg-sky-500 flex-shrink-0"></div>
               <span>No credit card required</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-sky-500"></div>
+              <div className="h-2 w-2 rounded-full bg-sky-500 flex-shrink-0"></div>
               <span>14-day free trial</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-sky-500"></div>
+              <div className="h-2 w-2 rounded-full bg-sky-500 flex-shrink-0"></div>
               <span>Cancel anytime</span>
             </div>
           </div>

@@ -1,10 +1,12 @@
 import { TiptapJSONContentToHTML } from "@/components/TiptapJSONContentToHTML";
+import { Link } from "@/components/intl-link";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import type { Tables } from "@/lib/database.types";
 import { AspectRatio } from "@radix-ui/react-aspect-ratio";
 import { formatDistance } from "date-fns";
-import { CalendarDaysIcon, Sparkles } from "lucide-react";
+import { CalendarDaysIcon, Sparkles, MessageSquare, Map } from "lucide-react";
 import Image from "next/image";
 
 type Props = {
@@ -15,14 +17,28 @@ export const ChangelogPosts = ({ changelogs }: Props) => {
   // Show empty state if no changelog entries
   if (!changelogs || changelogs.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
-          <Sparkles className="h-8 w-8 text-primary" />
+      <div className="flex flex-col items-center justify-center py-16 text-center max-w-lg mx-auto">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 mb-6">
+          <Sparkles className="h-10 w-10 text-primary" />
         </div>
-        <h3 className="text-lg font-semibold mb-2">Changelog Coming Soon</h3>
-        <p className="text-sm text-muted-foreground">
-          We're building something exciting! Check back soon for updates on new features, improvements, and releases.
+        <h3 className="text-2xl font-bold mb-3">Changelog Coming Soon</h3>
+        <p className="text-base text-muted-foreground mb-8">
+          We're building something exciting! Check back soon for updates on new features, improvements, and releases. Want to shape what we build next?
         </p>
+        <div className="flex flex-col sm:flex-row gap-4">
+          <Button asChild size="lg" className="shadow-lg hover:shadow-xl transition-all h-11 px-6 font-semibold">
+            <Link href="/feedback">
+              <MessageSquare className="mr-2 h-5 w-5" />
+              Share Feedback
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="lg" className="h-11 px-6 font-medium border-2">
+            <Link href="/roadmap">
+              <Map className="mr-2 h-5 w-5" />
+              View Roadmap
+            </Link>
+          </Button>
+        </div>
       </div>
     );
   }
