@@ -21,9 +21,11 @@ interface AivaChatInputProps {
 
 export function AivaChatInput({ className }: AivaChatInputProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [manualClose, setManualClose] = useState(false);
   const [chatId] = useState(() => `brief-${Date.now()}`);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const panelInputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const isClosingRef = useRef(false);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -48,18 +50,23 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
     },
   });
 
-  // Close panel handler with proper cleanup
+  // Close panel handler - properly handles focus
   const closePanel = useCallback(() => {
-    // Prevent multiple close attempts
-    if (isClosingRef.current) return;
+    // Set flags to prevent re-opening
     isClosingRef.current = true;
+    setManualClose(true);
     
     // Stop any ongoing AI request
     stop?.();
     
-    // Blur the input to prevent focus-triggered re-open
+    // Blur the main input first (this is critical)
     inputRef.current?.blur();
-    document.activeElement instanceof HTMLElement && document.activeElement.blur();
+    panelInputRef.current?.blur();
+    
+    // Blur any other focused element
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     
     // Close the panel
     setIsOpen(false);
@@ -69,9 +76,10 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
       clearTimeout(closeTimeoutRef.current);
     }
     
-    // Reset closing flag after delay to allow re-opening
+    // Reset flags after delay to allow re-opening
     closeTimeoutRef.current = setTimeout(() => {
       isClosingRef.current = false;
+      setManualClose(false);
     }, 300);
   }, [stop]);
 
@@ -97,12 +105,13 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
     }
   };
 
-  // Handle focus on input - only open if not currently closing
+  // Handle focus on input - only open if not manually closed
   const handleInputFocus = useCallback(() => {
-    if (!isClosingRef.current) {
+    // Don't re-open if user manually closed or we're in closing state
+    if (!isClosingRef.current && !manualClose) {
       setIsOpen(true);
     }
-  }, []);
+  }, [manualClose]);
 
   // Click outside handler
   useEffect(() => {
@@ -152,7 +161,7 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
   }, [input, isOpen]);
 
   return (
-    <div className={cn('relative', className)}>
+    <div className={cn('relative', isOpen ? 'mb-[350px]' : '', className)}>
       {/* Search Input with Animated Gradient Border - Highly prominent on all screens */}
       <div className="relative aiva-input-wrapper shadow-md hover:shadow-lg transition-all duration-300 rounded-lg bg-muted/20">
         <div className="absolute left-3.5 top-1/2 -translate-y-1/2 z-10">
@@ -175,106 +184,120 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
         )}
       </div>
 
-      {/* Chat Panel */}
+      {/* Chat Panel Overlay - Floats above content, doesn't push layout */}
       {isOpen && (
-        <Card 
-          ref={panelRef}
-          className="animated-border animated-border-active absolute top-full left-0 right-0 mt-2 z-50 shadow-lg flex flex-col overflow-hidden" 
-          style={{ maxHeight: 'min(calc(100vh - 180px), 600px)' }}
-        >
-          <div className="flex items-center justify-between p-3 border-b flex-shrink-0">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <span className="font-semibold text-sm">Aiva Assistant</span>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                closePanel();
-              }}
-              onMouseDown={(e) => {
-                // Prevent focus from shifting before click completes
-                e.preventDefault();
-              }}
-              className="h-8 w-8 p-0 hover:bg-destructive/10 focus:ring-2 focus:ring-destructive/20"
-              aria-label="Close Aiva Assistant"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-
-          <ScrollArea className="flex-1 p-4" style={{ maxHeight: 'calc(100vh - 300px)' }}>
-            {messages.length === 0 ? (
-              <div className="text-sm text-muted-foreground space-y-2">
-                <p>Ask me anything about your messages, tasks, or schedule.</p>
-                <p className="text-xs">Examples:</p>
-                <ul className="text-xs list-disc list-inside space-y-1 ml-2">
-                  <li>&quot;What urgent messages do I have?&quot;</li>
-                  <li>&quot;Show me tasks due today&quot;</li>
-                  <li>&quot;Summarize my unread messages&quot;</li>
-                </ul>
-                <p className="text-xs pt-2">
-                  Tip: Connect your Gmail, Outlook, or other channels so Aiva can give richer answers.{" "}
-                  <a
-                    href="/inbox"
-                    className="underline text-primary"
-                  >
-                    Go to channels
-                  </a>
-                </p>
+        <>
+          {/* Backdrop overlay for click-outside detection */}
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={closePanel}
+            aria-hidden="true"
+          />
+          <Card 
+            ref={panelRef}
+            className="animated-border animated-border-active absolute top-full left-0 right-0 mt-2 z-50 shadow-2xl flex flex-col overflow-hidden bg-card/95 backdrop-blur-md border-2 border-border/50" 
+            style={{ maxHeight: 'min(calc(100vh - 200px), 450px)' }}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0 bg-muted/30">
+              <div className="flex items-center gap-2">
+                <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Sparkles className="h-3.5 w-3.5 text-primary" />
+                </div>
+                <span className="font-semibold text-sm">Aiva Assistant</span>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={cn(
-                      'flex flex-col gap-2',
-                      message.role === 'user' ? 'items-end' : 'items-start'
-                    )}
-                  >
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  // Prevent focus shift before we can close
+                  e.preventDefault();
+                  e.stopPropagation();
+                  closePanel();
+                }}
+                className="h-7 w-7 p-0 rounded-full flex items-center justify-center hover:bg-destructive/10 hover:text-destructive focus:outline-none focus:ring-2 focus:ring-destructive/20 transition-colors cursor-pointer"
+                aria-label="Close Aiva Assistant"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <ScrollArea className="flex-1 p-4" style={{ maxHeight: '300px' }}>
+              {messages.length === 0 ? (
+                <div className="text-sm text-muted-foreground space-y-3">
+                  <p>Ask me anything about your messages, tasks, or schedule.</p>
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-foreground">Try asking:</p>
+                    <ul className="text-xs space-y-1 ml-1">
+                      <li className="flex items-center gap-2">
+                        <span className="h-1 w-1 rounded-full bg-primary"></span>
+                        &quot;What urgent messages do I have?&quot;
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span className="h-1 w-1 rounded-full bg-primary"></span>
+                        &quot;Show me tasks due today&quot;
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <span className="h-1 w-1 rounded-full bg-primary"></span>
+                        &quot;Summarize my unread messages&quot;
+                      </li>
+                    </ul>
+                  </div>
+                  <p className="text-xs pt-1 text-muted-foreground/80">
+                    Tip: Connect your channels for richer answers.{" "}
+                    <a href="/inbox" className="underline text-primary hover:text-primary/80">
+                      Go to channels →
+                    </a>
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {messages.map((message) => (
                     <div
+                      key={message.id}
                       className={cn(
-                        'rounded-lg px-4 py-2 max-w-[80%] text-sm',
-                        message.role === 'user'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted'
+                        'flex flex-col gap-1',
+                        message.role === 'user' ? 'items-end' : 'items-start'
                       )}
                     >
-                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      <div
+                        className={cn(
+                          'rounded-lg px-3 py-2 max-w-[85%] text-sm',
+                          message.role === 'user'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted'
+                        )}
+                      >
+                        <p className="whitespace-pre-wrap">{message.content}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
-                {isLoading && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground p-3 bg-primary/5 rounded-lg border border-primary/20 animate-pulse">
-                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    <span className="font-medium">Aiva is thinking...</span>
-                  </div>
-                )}
-              </div>
-            )}
-            <div ref={scrollRef} />
-          </ScrollArea>
+                  ))}
+                  {isLoading && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground p-2.5 bg-primary/5 rounded-lg border border-primary/20">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                      <span className="text-xs font-medium">Aiva is thinking...</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div ref={scrollRef} />
+            </ScrollArea>
 
-          <div className="border-t p-3 flex-shrink-0">
-            <form onSubmit={handleSubmit} className="flex gap-2">
-              <Input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Type your question..."
-                className="flex-1"
-                disabled={isLoading}
-              />
-              <Button type="submit" disabled={isLoading || !input.trim()}>
-                <Send className="h-4 w-4" />
-              </Button>
-            </form>
-          </div>
-        </Card>
+            <div className="border-t px-3 py-2.5 flex-shrink-0 bg-muted/20">
+              <form onSubmit={handleSubmit} className="flex gap-2">
+                <Input
+                  ref={panelInputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Type your question..."
+                  className="flex-1 h-9 text-sm"
+                  disabled={isLoading}
+                />
+                <Button type="submit" disabled={isLoading || !input.trim()} className="h-9 px-3">
+                  <Send className="h-4 w-4" />
+                </Button>
+              </form>
+            </div>
+          </Card>
+        </>
       )}
     </div>
   );
