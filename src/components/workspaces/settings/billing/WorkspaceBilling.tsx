@@ -1,10 +1,11 @@
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { T, Typography } from "@/components/ui/Typography";
 import { getCachedWorkspaceBySlug } from "@/rsc-data/user/workspaces";
 import { Suspense } from "react";
 import { CustomerDetailsServer } from "./CustomerDetailsServer";
 import { OneTimeProductsServer } from "./OneTimeProductsServer";
 import { SubscriptionProductsServer } from "./SubscriptionProductsServer";
+import { CreditCard, AlertCircle } from "lucide-react";
 
 export async function WorkspaceBilling({
   workspaceSlug,

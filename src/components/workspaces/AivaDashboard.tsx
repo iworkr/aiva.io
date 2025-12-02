@@ -153,9 +153,10 @@ export async function AivaDashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
+          const isEmpty = stat.value === 0;
           return (
             <Link key={stat.title} href={stat.href}>
-              <Card className="transition-all hover:shadow-md cursor-pointer">
+              <Card className={`transition-all hover:shadow-md cursor-pointer ${isEmpty ? 'opacity-60' : ''}`}>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -163,16 +164,24 @@ export async function AivaDashboard() {
                         {stat.title}
                       </p>
                       <div className="flex items-baseline gap-2">
-                        <p className="text-3xl font-bold">{stat.value}</p>
-                        {stat.total !== undefined && (
-                          <p className="text-sm text-muted-foreground">
-                            of {stat.total}
+                        {isEmpty ? (
+                          <p className="text-2xl font-semibold text-muted-foreground">
+                            No {stat.title.toLowerCase()} yet
                           </p>
+                        ) : (
+                          <>
+                            <p className="text-3xl font-bold">{stat.value}</p>
+                            {stat.total !== undefined && (
+                              <p className="text-sm text-muted-foreground">
+                                of {stat.total}
+                              </p>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
-                    <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${stat.bgColor}`}>
-                      <Icon className={`h-6 w-6 ${stat.color}`} />
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${isEmpty ? 'bg-muted' : stat.bgColor}`}>
+                      <Icon className={`h-6 w-6 ${isEmpty ? 'text-muted-foreground' : stat.color}`} />
                     </div>
                   </div>
                 </CardContent>

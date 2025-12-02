@@ -111,6 +111,7 @@ export function ConnectChannelDialog({
                 variant={isAvailable ? 'default' : 'outline'}
                 className="w-full"
                 disabled={!isAvailable}
+                title={isAvailable ? 'Click to connect this channel' : 'This integration is coming soon'}
               >
                 {isAvailable ? (
                   <>

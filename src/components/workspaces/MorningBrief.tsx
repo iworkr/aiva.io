@@ -212,24 +212,32 @@ export async function MorningBrief() {
         </p>
       </div>
 
-      {/* Today's Briefing Button */}
-      <div className="flex justify-center">
-        <Button
-          variant="outline"
-          size="default"
-          className="group"
-          asChild
-        >
-          <Link href="#briefing">
+      {/* Today's Briefing Button - Only show if there are briefing items */}
+      {briefingItems.length > 0 && (
+        <div className="flex justify-center">
+          <Button
+            variant="outline"
+            size="default"
+            className="group"
+            onClick={() => {
+              // Scroll to briefing section if it exists
+              const briefingElement = document.getElementById('briefing');
+              if (briefingElement) {
+                briefingElement.scrollIntoView({ behavior: 'smooth' });
+              }
+            }}
+          >
             <span>Today's briefing</span>
             <ChevronRight className="ml-2 h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
-          </Link>
-        </Button>
-      </div>
+          </Button>
+        </div>
+      )}
 
       {/* Briefing Items */}
       {briefingItems.length > 0 && (
-        <BriefingSection items={briefingItems} />
+        <div id="briefing">
+          <BriefingSection items={briefingItems} />
+        </div>
       )}
 
       {/* AI Chat Input */}
@@ -237,21 +245,33 @@ export async function MorningBrief() {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-3 gap-3 pt-3">
-        <Card>
+        <Card className={newMessages === 0 ? 'opacity-60' : ''}>
           <CardContent className="p-3 text-center">
-            <div className="text-xl font-bold">{newMessages}</div>
+            {newMessages === 0 ? (
+              <div className="text-sm font-medium text-muted-foreground">No new messages yet</div>
+            ) : (
+              <div className="text-xl font-bold">{newMessages}</div>
+            )}
             <div className="text-xs text-muted-foreground">New Messages</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={(todayEventsCount || 0) === 0 ? 'opacity-60' : ''}>
           <CardContent className="p-3 text-center">
-            <div className="text-xl font-bold">{todayEventsCount || 0}</div>
+            {(todayEventsCount || 0) === 0 ? (
+              <div className="text-sm font-medium text-muted-foreground">No events today</div>
+            ) : (
+              <div className="text-xl font-bold">{todayEventsCount || 0}</div>
+            )}
             <div className="text-xs text-muted-foreground">Today's Events</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={(upcomingEvents?.length || 0) === 0 ? 'opacity-60' : ''}>
           <CardContent className="p-3 text-center">
-            <div className="text-xl font-bold">{upcomingEvents?.length || 0}</div>
+            {(upcomingEvents?.length || 0) === 0 ? (
+              <div className="text-sm font-medium text-muted-foreground">No upcoming events</div>
+            ) : (
+              <div className="text-xl font-bold">{upcomingEvents?.length || 0}</div>
+            )}
             <div className="text-xs text-muted-foreground">Upcoming Events</div>
           </CardContent>
         </Card>

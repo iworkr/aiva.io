@@ -71,7 +71,7 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
         </div>
         <Input
           type="text"
-          placeholder="Start typing to ask or search Aiva"
+          placeholder="Try: 'Summarise my inbox', 'Find emails from John', 'Schedule a meeting with Dan tomorrow'"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}

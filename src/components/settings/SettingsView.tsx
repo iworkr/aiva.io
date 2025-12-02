@@ -270,11 +270,14 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                       Automatically classify priority, category, and sentiment for new messages
                     </p>
                   </div>
-                  <Switch
-                    id="auto-classify"
-                    checked={autoClassify}
-                    onCheckedChange={setAutoClassify}
-                  />
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{autoClassify ? 'On' : 'Off'}</span>
+                    <Switch
+                      id="auto-classify"
+                      checked={autoClassify}
+                      onCheckedChange={setAutoClassify}
+                    />
+                  </div>
                 </div>
 
                 <Separator />
@@ -291,11 +294,14 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                       Automatically create calendar events from messages with scheduling intent
                     </p>
                   </div>
-                  <Switch
-                    id="auto-tasks"
-                    checked={autoTasks}
-                    onCheckedChange={setAutoTasks}
-                  />
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{autoTasks ? 'On' : 'Off'}</span>
+                    <Switch
+                      id="auto-tasks"
+                      checked={autoTasks}
+                      onCheckedChange={setAutoTasks}
+                    />
+                  </div>
                 </div>
 
                 <Separator />
@@ -312,11 +318,14 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                       AI-powered search across all messages and intelligent conversation linking
                     </p>
                   </div>
-                  <Switch
-                    id="auto-events"
-                    checked={autoEvents}
-                    onCheckedChange={setAutoEvents}
-                  />
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{autoEvents ? 'On' : 'Off'}</span>
+                    <Switch
+                      id="auto-events"
+                      checked={autoEvents}
+                      onCheckedChange={setAutoEvents}
+                    />
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -405,11 +414,14 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                       Receive email notifications for important messages
                     </p>
                   </div>
-                  <Switch
-                    id="email-notif"
-                    checked={emailNotifications}
-                    onCheckedChange={setEmailNotifications}
-                  />
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{emailNotifications ? 'On' : 'Off'}</span>
+                    <Switch
+                      id="email-notif"
+                      checked={emailNotifications}
+                      onCheckedChange={setEmailNotifications}
+                    />
+                  </div>
                 </div>
 
                 <Separator />
@@ -421,11 +433,14 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                       Receive push notifications for urgent messages
                     </p>
                   </div>
-                  <Switch
-                    id="push-notif"
-                    checked={pushNotifications}
-                    onCheckedChange={setPushNotifications}
-                  />
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{pushNotifications ? 'On' : 'Off'}</span>
+                    <Switch
+                      id="push-notif"
+                      checked={pushNotifications}
+                      onCheckedChange={setPushNotifications}
+                    />
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -459,7 +474,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                     disabled
                   />
                   <p className="text-sm text-muted-foreground">
-                    Email cannot be changed
+                    Contact support to update your email address
                   </p>
                 </div>
 
@@ -484,10 +499,17 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Button variant="outline" onClick={handleChangePassword}>
+                <Button 
+                  variant="outline" 
+                  onClick={handleChangePassword}
+                  title="Change your account password"
+                >
                   <Shield className="mr-2 h-4 w-4" />
                   Change Password
                 </Button>
+                <p className="text-sm text-muted-foreground">
+                  Update your password to keep your account secure
+                </p>
               </CardContent>
             </Card>
 
@@ -503,7 +525,13 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                   <Label htmlFor="timezone">Timezone</Label>
                   <Select value={timezone} onValueChange={setTimezone}>
                     <SelectTrigger id="timezone">
-                      <SelectValue />
+                      <SelectValue placeholder="Select timezone">
+                        {timezone === 'utc' ? 'UTC' : 
+                         timezone === 'america-new_york' ? 'America/New York' :
+                         timezone === 'america-los_angeles' ? 'America/Los Angeles' :
+                         timezone === 'europe-london' ? 'Europe/London' :
+                         timezone === 'asia-tokyo' ? 'Asia/Tokyo' : 'UTC'}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="utc">UTC</SelectItem>
@@ -513,13 +541,25 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                       <SelectItem value="asia-tokyo">Asia/Tokyo</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-sm text-muted-foreground">
+                    Current timezone: {timezone === 'utc' ? 'UTC' : 
+                     timezone === 'america-new_york' ? 'America/New York' :
+                     timezone === 'america-los_angeles' ? 'America/Los Angeles' :
+                     timezone === 'europe-london' ? 'Europe/London' :
+                     timezone === 'asia-tokyo' ? 'Asia/Tokyo' : 'UTC'}
+                  </p>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="sync-frequency">Sync Frequency</Label>
                   <Select value={syncFrequency} onValueChange={setSyncFrequency}>
                     <SelectTrigger id="sync-frequency">
-                      <SelectValue />
+                      <SelectValue placeholder="Select sync frequency">
+                        {syncFrequency === '5' ? 'Every 5 minutes' :
+                         syncFrequency === '15' ? 'Every 15 minutes' :
+                         syncFrequency === '30' ? 'Every 30 minutes' :
+                         syncFrequency === '60' ? 'Every hour' : 'Every 15 minutes'}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="5">Every 5 minutes</SelectItem>
@@ -529,7 +569,10 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                     </SelectContent>
                   </Select>
                   <p className="text-sm text-muted-foreground">
-                    How often channels sync new messages
+                    Current: {syncFrequency === '5' ? 'Every 5 minutes' :
+                     syncFrequency === '15' ? 'Every 15 minutes' :
+                     syncFrequency === '30' ? 'Every 30 minutes' :
+                     syncFrequency === '60' ? 'Every hour' : 'Every 15 minutes'} • How often channels sync new messages
                   </p>
                 </div>
               </CardContent>

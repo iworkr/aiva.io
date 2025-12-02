@@ -360,6 +360,20 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
               <div className="flex h-full items-center justify-center">
                 <CalendarIcon className="h-8 w-8 animate-pulse text-muted-foreground" />
               </div>
+            ) : events.length === 0 ? (
+              <div className="flex h-full items-center justify-center">
+                <div className="text-center max-w-md px-6">
+                  <CalendarIcon className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No events scheduled</h3>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Your calendar is empty. Create your first event to get started, or connect a calendar account to sync existing events.
+                  </p>
+                  <Button onClick={() => setShowCreateDialog(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Event
+                  </Button>
+                </div>
+              </div>
             ) : viewMode === 'month' ? (
               <MonthView
                 currentDate={currentDate}
@@ -501,12 +515,15 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Filter Events</DialogTitle>
+            <DialogDescription>
+              Filter events by calendar and category
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <h3 className="text-sm font-semibold mb-2">Filter by Calendar</h3>
-              <div className="text-sm text-muted-foreground">
-                Filter functionality ready for calendar selection
+              <div className="text-sm text-muted-foreground p-4 bg-muted rounded-lg">
+                Calendar filtering will be available once you connect calendar accounts.
               </div>
             </div>
             <div className="flex justify-end gap-2">
@@ -520,7 +537,7 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
                 Clear All
               </Button>
               <Button onClick={() => setShowFilterDialog(false)}>
-                Apply
+                Close
               </Button>
             </div>
           </div>
