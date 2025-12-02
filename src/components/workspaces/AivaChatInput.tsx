@@ -23,6 +23,23 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [chatId] = useState(() => `brief-${Date.now()}`);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const justClosedRef = useRef(false);
+  const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Helper to close the panel and prevent immediate re-open
+  const closePanel = () => {
+    setIsOpen(false);
+    stop();
+    justClosedRef.current = true;
+    // Clear any existing timeout
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+    }
+    // Allow re-opening after 300ms
+    closeTimeoutRef.current = setTimeout(() => {
+      justClosedRef.current = false;
+    }, 300);
+  };
 
   const { messages, append, isLoading, input, setInput, stop } = useChat({
     id: chatId,
@@ -62,8 +79,7 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
     }
     if (e.key === 'Escape') {
       e.preventDefault();
-      setIsOpen(false);
-      stop();
+      closePanel();
     }
   };
 
@@ -71,13 +87,21 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
   useEffect(() => {
     const handleGlobalEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
-        setIsOpen(false);
-        stop();
+        closePanel();
       }
     };
     document.addEventListener('keydown', handleGlobalEsc);
     return () => document.removeEventListener('keydown', handleGlobalEsc);
-  }, [isOpen, stop]);
+  }, [isOpen]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Auto-open when user starts typing
   useEffect(() => {
@@ -99,7 +123,12 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          onFocus={() => setIsOpen(true)}
+          onFocus={() => {
+            // Only open if not just closed (prevents immediate re-open)
+            if (!justClosedRef.current) {
+              setIsOpen(true);
+            }
+          }}
           className="pl-10 h-12 text-base bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-0 focus:ring-0 focus-visible:ring-0 relative z-10"
         />
         {isLoading && (
@@ -123,8 +152,7 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                setIsOpen(false);
-                stop();
+                closePanel();
               }}
               className="h-8 w-8 p-0 hover:bg-destructive/10"
               aria-label="Close Aiva Assistant"

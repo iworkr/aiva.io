@@ -44,7 +44,7 @@ interface ContactsViewProps {
 }
 
 export const ContactsView = memo(function ContactsView({ workspaceId, userId }: ContactsViewProps) {
-  const [contacts, setContacts] = useState<any[]>([]);
+  const [allContacts, setAllContacts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showFavoritesOnly, setShowFavoritesOnly] = useLocalStorage(
@@ -59,28 +59,47 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
   // Debounce search query for better performance
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
 
-  // Fetch contacts with memoization
+  // Fetch all contacts (server handles favorites filter)
   const fetchContacts = useCallback(async () => {
     setLoading(true);
     try {
       const data = await getContacts(workspaceId, userId, {
-        search: debouncedSearchQuery || undefined,
         isFavorite: showFavoritesOnly || undefined,
       });
-      setContacts(data || []);
+      setAllContacts(data || []);
     } catch (error) {
       toast.error('Failed to load contacts');
       console.error(error);
     } finally {
       setLoading(false);
     }
-  }, [workspaceId, userId, debouncedSearchQuery, showFavoritesOnly]);
+  }, [workspaceId, userId, showFavoritesOnly]);
 
   useEffect(() => {
     startTransition(() => {
       fetchContacts();
     });
   }, [fetchContacts]);
+
+  // Client-side filtering for instant search feedback
+  const contacts = useMemo(() => {
+    if (!debouncedSearchQuery) return allContacts;
+    
+    const query = debouncedSearchQuery.toLowerCase();
+    return allContacts.filter((contact) => {
+      const fullName = (contact.full_name || '').toLowerCase();
+      const email = (contact.email || '').toLowerCase();
+      const company = (contact.company || '').toLowerCase();
+      const phone = (contact.phone || '').toLowerCase();
+      
+      return (
+        fullName.includes(query) ||
+        email.includes(query) ||
+        company.includes(query) ||
+        phone.includes(query)
+      );
+    });
+  }, [allContacts, debouncedSearchQuery]);
 
   // Toggle favorite with optimistic update
   const { execute: toggleFavorite } = useAction(toggleContactFavoriteAction, {
@@ -98,7 +117,7 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
   // Optimistic toggle favorite
   const handleToggleFavorite = useCallback((contact: any) => {
     // Optimistically update UI
-    setContacts((prev) =>
+    setAllContacts((prev) =>
       prev.map((c) =>
         c.id === contact.id ? { ...c, is_favorite: !c.is_favorite } : c
       )
@@ -125,7 +144,7 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
     if (!confirm(`Are you sure you want to delete ${contact.full_name}?`)) return;
     
     // Optimistically remove from UI
-    setContacts((prev) => prev.filter((c) => c.id !== contact.id));
+    setAllContacts((prev) => prev.filter((c) => c.id !== contact.id));
     // Execute actual delete
     deleteContact({ id: contact.id, workspaceId });
   }, [deleteContact, workspaceId]);

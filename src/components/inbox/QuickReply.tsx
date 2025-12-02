@@ -158,30 +158,34 @@ export function QuickReply({
                   <span>AI Confidence: {Math.round(confidenceScore * 100)}%</span>
                 </div>
               )}
-              <div className="flex items-center justify-end gap-2">
+              <div className="flex items-center justify-end gap-3 pt-1">
                 <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsExpanded(false)}
-                  className="h-8 text-xs"
+                  variant="outline"
+                  size="default"
+                  onClick={() => {
+                    setIsExpanded(false);
+                    toast.info('Reply cancelled');
+                  }}
+                  className="h-9 px-4"
                 >
                   Cancel
                 </Button>
                 <Button
-                  size="sm"
+                  variant="default"
+                  size="default"
                   onClick={handleSend}
                   disabled={isSending || !replyText.trim()}
-                  className="h-8 text-xs"
+                  className="h-9 px-4"
                 >
                   {isSending ? (
                     <>
-                      <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Sending...
                     </>
                   ) : (
                     <>
-                      <Send className="mr-1.5 h-3 w-3" />
-                      Send
+                      <Send className="mr-2 h-4 w-4" />
+                      Send Reply
                     </>
                   )}
                 </Button>

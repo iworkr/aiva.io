@@ -31,8 +31,11 @@ const Pricing = () => {
           <TabsTrigger className="w-full" value="monthly">
             Monthly
           </TabsTrigger>
-          <TabsTrigger className="w-full" value="annual">
+          <TabsTrigger className="w-full relative" value="annual">
             Annual
+            <Badge variant="secondary" className="absolute -top-2 -right-2 text-[10px] px-1.5 py-0.5 bg-green-500 text-white border-0">
+              Save 20%
+            </Badge>
           </TabsTrigger>
         </TabsList>
         <TabsContent value="monthly" className="w-full">
@@ -109,10 +112,13 @@ const PricingCard = ({
         </div>
         <div className="flex items-baseline gap-2 py-3">
           <h3 className="text-4xl font-bold tracking-tighter">${price}</h3>
-          <span className="text-muted-foreground">
-            /month {billingLabel && <span className="text-xs ml-1">({billingLabel})</span>}
-          </span>
+          <span className="text-muted-foreground">/month</span>
         </div>
+        {billingLabel && (
+          <p className="text-xs text-green-600 dark:text-green-400 font-medium -mt-2 mb-2">
+            {billingLabel}
+          </p>
+        )}
         <Button className="w-full" size="lg" variant="default">Start Free Trial</Button>
       </CardHeader>
 
