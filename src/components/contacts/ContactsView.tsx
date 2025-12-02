@@ -215,8 +215,13 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
             {/* Add Contact */}
             <Button 
               onClick={() => {
+                // Clear search to ensure dialog opens properly
+                setSearchQuery('');
                 setSelectedContact(null);
-                setShowCreateDialog(true);
+                // Use setTimeout to ensure state is cleared before opening dialog
+                setTimeout(() => {
+                  setShowCreateDialog(true);
+                }, 0);
               }}
               aria-label="Add new contact"
             >

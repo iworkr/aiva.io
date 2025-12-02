@@ -5,11 +5,11 @@
 
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useChat } from 'ai/react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Sparkles, Send, X, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -23,15 +23,16 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [chatId] = useState(() => `brief-${Date.now()}`);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const justClosedRef = useRef(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const isClosingRef = useRef(false);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // useChat hook MUST be declared before closePanel to avoid stale closure
+  // useChat hook
   const { messages, append, isLoading, input, setInput, stop } = useChat({
     id: chatId,
     api: '/api/chat',
     onFinish: () => {
-      // Auto-scroll to bottom when message finishes
       setTimeout(() => {
         scrollRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
       }, 100);
@@ -47,24 +48,32 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
     },
   });
 
-  // Helper to close the panel and prevent immediate re-open
-  // NOTE: This must be defined AFTER useChat so `stop` is available
-  const closePanel = () => {
-    console.log('closePanel called, isOpen:', isOpen); // Debug log
+  // Close panel handler with proper cleanup
+  const closePanel = useCallback(() => {
+    // Prevent multiple close attempts
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
+    
+    // Stop any ongoing AI request
+    stop?.();
+    
+    // Blur the input to prevent focus-triggered re-open
+    inputRef.current?.blur();
+    document.activeElement instanceof HTMLElement && document.activeElement.blur();
+    
+    // Close the panel
     setIsOpen(false);
-    if (stop) {
-      stop();
-    }
-    justClosedRef.current = true;
+    
     // Clear any existing timeout
     if (closeTimeoutRef.current) {
       clearTimeout(closeTimeoutRef.current);
     }
-    // Allow re-opening after 500ms (increased from 300ms for reliability)
+    
+    // Reset closing flag after delay to allow re-opening
     closeTimeoutRef.current = setTimeout(() => {
-      justClosedRef.current = false;
-    }, 500);
-  };
+      isClosingRef.current = false;
+    }, 300);
+  }, [stop]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,16 +97,43 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
     }
   };
 
-  // Global ESC key handler for closing the panel
+  // Handle focus on input - only open if not currently closing
+  const handleInputFocus = useCallback(() => {
+    if (!isClosingRef.current) {
+      setIsOpen(true);
+    }
+  }, []);
+
+  // Click outside handler
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (!isOpen) return;
+      
+      const target = e.target as Node;
+      const panel = panelRef.current;
+      const input = inputRef.current;
+      
+      // Check if click is outside both panel and input
+      if (panel && !panel.contains(target) && input && !input.contains(target)) {
+        closePanel();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen, closePanel]);
+
+  // Global ESC key handler
   useEffect(() => {
     const handleGlobalEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
+        e.preventDefault();
         closePanel();
       }
     };
     document.addEventListener('keydown', handleGlobalEsc);
     return () => document.removeEventListener('keydown', handleGlobalEsc);
-  }, [isOpen]);
+  }, [isOpen, closePanel]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -108,9 +144,9 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
     };
   }, []);
 
-  // Auto-open when user starts typing
+  // Auto-open when user starts typing (but not if closing)
   useEffect(() => {
-    if (input.trim() && !isOpen) {
+    if (input.trim() && !isOpen && !isClosingRef.current) {
       setIsOpen(true);
     }
   }, [input, isOpen]);
@@ -123,17 +159,13 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
           <Sparkles className="h-5 w-5 text-primary" />
         </div>
         <Input
+          ref={inputRef}
           type="text"
           placeholder="Try: 'Summarise my inbox', 'Find emails from John', 'Schedule a meeting with Dan tomorrow'"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          onFocus={() => {
-            // Only open if not just closed (prevents immediate re-open)
-            if (!justClosedRef.current) {
-              setIsOpen(true);
-            }
-          }}
+          onFocus={handleInputFocus}
           className="pl-10 h-12 text-base bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-0 focus:ring-0 focus-visible:ring-0 relative z-10"
         />
         {isLoading && (
@@ -145,7 +177,11 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
 
       {/* Chat Panel */}
       {isOpen && (
-        <Card className="animated-border animated-border-active absolute top-full left-0 right-0 mt-2 z-50 shadow-lg flex flex-col overflow-hidden" style={{ maxHeight: 'min(calc(100vh - 180px), 600px)' }}>
+        <Card 
+          ref={panelRef}
+          className="animated-border animated-border-active absolute top-full left-0 right-0 mt-2 z-50 shadow-lg flex flex-col overflow-hidden" 
+          style={{ maxHeight: 'min(calc(100vh - 180px), 600px)' }}
+        >
           <div className="flex items-center justify-between p-3 border-b flex-shrink-0">
             <div className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary" />
@@ -158,14 +194,11 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                // Direct state manipulation for reliability
-                setIsOpen(false);
-                stop?.();
-                justClosedRef.current = true;
-                if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
-                closeTimeoutRef.current = setTimeout(() => {
-                  justClosedRef.current = false;
-                }, 500);
+                closePanel();
+              }}
+              onMouseDown={(e) => {
+                // Prevent focus from shifting before click completes
+                e.preventDefault();
               }}
               className="h-8 w-8 p-0 hover:bg-destructive/10 focus:ring-2 focus:ring-destructive/20"
               aria-label="Close Aiva Assistant"
@@ -180,9 +213,9 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
                 <p>Ask me anything about your messages, tasks, or schedule.</p>
                 <p className="text-xs">Examples:</p>
                 <ul className="text-xs list-disc list-inside space-y-1 ml-2">
-                  <li>"What urgent messages do I have?"</li>
-                  <li>"Show me tasks due today"</li>
-                  <li>"Summarize my unread messages"</li>
+                  <li>&quot;What urgent messages do I have?&quot;</li>
+                  <li>&quot;Show me tasks due today&quot;</li>
+                  <li>&quot;Summarize my unread messages&quot;</li>
                 </ul>
                 <p className="text-xs pt-2">
                   Tip: Connect your Gmail, Outlook, or other channels so Aiva can give richer answers.{" "}
@@ -246,4 +279,3 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
     </div>
   );
 }
-

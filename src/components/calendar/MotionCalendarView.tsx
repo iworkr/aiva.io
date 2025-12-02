@@ -1528,13 +1528,15 @@ function MonthView({
           const dayEvents = getEventsForDate(day);
           const isCurrentMonth = isSameMonth(day, currentDate);
           const isDayToday = isToday(day);
+          const weekNumber = Math.floor(idx / 7);
 
           return (
             <div
               key={idx}
               className={cn(
-                'border-b border-r border-border p-2 transition-all hover:bg-primary/5 hover:border-primary/30',
-                !isCurrentMonth && 'bg-muted/50'
+                'border-b border-r border-border/80 dark:border-border p-2 transition-all hover:bg-primary/5 hover:border-primary/30',
+                !isCurrentMonth && 'bg-muted/40 dark:bg-muted/20',
+                isCurrentMonth && weekNumber % 2 === 1 && 'bg-muted/15 dark:bg-muted/5'
               )}
             >
               <div className="mb-1 flex items-center justify-between">
@@ -1707,11 +1709,14 @@ function DayView({
           return (
             <div
               key={hour}
-              className="flex border-b border-border"
+              className={cn(
+                "flex border-b border-border/80 dark:border-border",
+                hour % 2 === 0 ? "bg-muted/20 dark:bg-muted/10" : ""
+              )}
               style={{ minHeight: '70px' }}
             >
               {/* Time label */}
-              <div className="w-20 flex-shrink-0 border-r border-border p-2 text-right">
+              <div className="w-20 flex-shrink-0 border-r border-border/80 dark:border-border p-2 text-right">
                 <span className="text-xs font-medium text-muted-foreground">
                   {format(new Date().setHours(hour, 0, 0, 0), 'h a')}
                 </span>

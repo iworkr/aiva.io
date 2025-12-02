@@ -5,13 +5,14 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { supabaseUserClientComponent } from '@/supabase-clients/user/supabaseUserClientComponent';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Toggle } from '@/components/ui/toggle';
 import {
   Mail,
   Calendar,
@@ -20,6 +21,8 @@ import {
   MessageSquare,
   Archive,
   Star,
+  FileText,
+  Code,
 } from 'lucide-react';
 import { PriorityBadge, CategoryBadge, SentimentBadge } from './ClassificationBadges';
 import { AIReplyComposer } from './AIReplyComposer';
@@ -34,6 +37,40 @@ import {
 import { useAction } from 'next-safe-action/hooks';
 import { autoCreateEventFromMessage } from '@/lib/ai/scheduling';
 
+/**
+ * Basic HTML sanitizer that removes dangerous tags and attributes
+ * For production, consider using DOMPurify
+ */
+function sanitizeHtml(html: string): string {
+  if (!html) return '';
+  
+  // Remove script tags and their content
+  let sanitized = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  
+  // Remove event handlers (onclick, onerror, etc.)
+  sanitized = sanitized.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '');
+  sanitized = sanitized.replace(/\s*on\w+\s*=\s*[^\s>]+/gi, '');
+  
+  // Remove javascript: URLs
+  sanitized = sanitized.replace(/href\s*=\s*["']javascript:[^"']*["']/gi, 'href="#"');
+  sanitized = sanitized.replace(/src\s*=\s*["']javascript:[^"']*["']/gi, 'src=""');
+  
+  // Remove data: URLs in src (potential XSS vector)
+  sanitized = sanitized.replace(/src\s*=\s*["']data:[^"']*["']/gi, 'src=""');
+  
+  // Remove iframe, object, embed tags
+  sanitized = sanitized.replace(/<(iframe|object|embed|form|input|button)[^>]*>.*?<\/\1>/gi, '');
+  sanitized = sanitized.replace(/<(iframe|object|embed|form|input|button)[^>]*\/?>/gi, '');
+  
+  // Remove style tags (can contain expressions in older IE)
+  sanitized = sanitized.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
+  
+  // Add target="_blank" and rel="noopener noreferrer" to links for security
+  sanitized = sanitized.replace(/<a\s+([^>]*href\s*=)/gi, '<a target="_blank" rel="noopener noreferrer" $1');
+  
+  return sanitized;
+}
+
 interface MessageDetailViewProps {
   messageId: string;
   workspaceId: string;
@@ -45,6 +82,7 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('message');
   const [creatingEvent, setCreatingEvent] = useState(false);
+  const [showHtmlView, setShowHtmlView] = useState(false);
 
   // Fetch message
   useEffect(() => {
@@ -170,6 +208,24 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
   const stripHtml = (input: string | null | undefined) =>
     input ? input.replace(/<[^>]+>/g, '').trim() : '';
 
+  // Determine if message has HTML content
+  const hasHtmlContent = useMemo(() => {
+    const body = message?.body_html || message?.body || '';
+    return /<[a-z][\s\S]*>/i.test(body);
+  }, [message]);
+
+  // Get sanitized HTML content
+  const sanitizedHtmlContent = useMemo(() => {
+    const body = message?.body_html || message?.body || '';
+    return sanitizeHtml(body);
+  }, [message]);
+
+  // Get plain text content
+  const plainTextContent = useMemo(() => {
+    const body = message?.body || message?.body_html || '';
+    return stripHtml(body);
+  }, [message]);
+
   return (
     <div className="flex h-full">
       {/* Main content */}
@@ -256,10 +312,43 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
             {/* Message content */}
             <TabsContent value="message">
               <Card>
-                <CardContent className="prose prose-sm max-w-none p-6 dark:prose-invert">
-                  <div className="whitespace-pre-wrap text-foreground">
-                    {stripHtml(message.body || message.body_html || '')}
+                {/* View toggle for HTML content */}
+                {hasHtmlContent && (
+                  <div className="flex items-center justify-end gap-2 p-3 border-b bg-muted/30">
+                    <span className="text-xs text-muted-foreground mr-2">View:</span>
+                    <Toggle
+                      size="sm"
+                      pressed={!showHtmlView}
+                      onPressedChange={() => setShowHtmlView(false)}
+                      aria-label="Plain text view"
+                      className="h-7 px-2 text-xs"
+                    >
+                      <FileText className="h-3 w-3 mr-1" />
+                      Plain Text
+                    </Toggle>
+                    <Toggle
+                      size="sm"
+                      pressed={showHtmlView}
+                      onPressedChange={() => setShowHtmlView(true)}
+                      aria-label="Formatted HTML view"
+                      className="h-7 px-2 text-xs"
+                    >
+                      <Code className="h-3 w-3 mr-1" />
+                      Formatted
+                    </Toggle>
                   </div>
+                )}
+                <CardContent className="prose prose-sm max-w-none p-6 dark:prose-invert">
+                  {showHtmlView && hasHtmlContent ? (
+                    <div 
+                      className="message-html-content text-foreground"
+                      dangerouslySetInnerHTML={{ __html: sanitizedHtmlContent }}
+                    />
+                  ) : (
+                    <div className="whitespace-pre-wrap text-foreground">
+                      {plainTextContent || '(No message content)'}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

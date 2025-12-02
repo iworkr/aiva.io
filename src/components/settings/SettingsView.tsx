@@ -41,7 +41,7 @@ import {
   getWorkspaceSettings,
   getUserProfile,
 } from '@/data/user/settings';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/i18n/routing';
 import { ReactNode } from 'react';
 import { useProSubscription } from '@/components/ProFeatureGate';
 
