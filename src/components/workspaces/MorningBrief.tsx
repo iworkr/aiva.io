@@ -219,16 +219,12 @@ export async function MorningBrief() {
             variant="outline"
             size="default"
             className="group"
-            onClick={() => {
-              // Scroll to briefing section if it exists
-              const briefingElement = document.getElementById('briefing');
-              if (briefingElement) {
-                briefingElement.scrollIntoView({ behavior: 'smooth' });
-              }
-            }}
+            asChild
           >
-            <span>Today's briefing</span>
-            <ChevronRight className="ml-2 h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+            <Link href="#briefing">
+              <span>Today's briefing</span>
+              <ChevronRight className="ml-2 h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+            </Link>
           </Button>
         </div>
       )}
