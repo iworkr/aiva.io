@@ -8,13 +8,13 @@ import { AvatarCirclesDemo } from "./AvatarCirclesDemo";
 export default function HeroSection() {
   const t = useTranslations("HomePage");
   return (
-    <section className="py-10 lg:py-20 text-left px-6 lg:text-center max-w-5xl mx-auto">
-      <div className="flex flex-col gap-10 w-full">
-        <div className="space-y-4 flex flex-col  lg:items-center  flex-1">
+    <section className="py-14 lg:py-28 text-left px-6 lg:text-center max-w-5xl mx-auto">
+      <div className="flex flex-col gap-12 w-full">
+        <div className="space-y-5 flex flex-col lg:items-center flex-1">
           <Link href={"#features"} aria-label="Learn about AI-Powered Communication Assistant features">
-            <div className="flex items-center  gap-2 py-1 px-3 w-fit rounded-full border border-border dark:border-none bg-secondary">
-              <Sparkles size={16} aria-hidden="true" />
-              <span className="text-md font-medium lg:text-base">
+            <div className="flex items-center gap-2 py-1.5 px-4 w-fit rounded-full border border-border dark:border-primary/30 bg-secondary hover:bg-secondary/80 transition-colors">
+              <Sparkles size={16} aria-hidden="true" className="text-primary" />
+              <span className="text-sm font-medium lg:text-base">
                 🚀 New: AI-Powered Communication Assistant
               </span>
               <ArrowRight size={16} aria-hidden="true" />
@@ -26,22 +26,29 @@ export default function HeroSection() {
           <p className="text-muted-foreground leading-loose lg:text-xl lg:leading-relaxed max-w-4xl">
             {t("description")}
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 w-full sm:justify-center pt-6">
-            <Button className="w-full sm:w-auto sm:min-w-40 text-lg h-12" size="lg" variant="default" asChild>
+          <div className="flex flex-col sm:flex-row gap-4 w-full sm:justify-center pt-8">
+            {/* Primary CTA - High contrast with shadow */}
+            <Button 
+              className="w-full sm:w-auto sm:min-w-48 text-lg h-14 px-8 font-semibold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:scale-[1.02] transition-all duration-200" 
+              size="lg" 
+              variant="default" 
+              asChild
+            >
               <Link href={"/sign-up"}>
                 Start Free Trial
-                <ArrowRight size={18} className="ml-2" />
+                <ArrowRight size={20} className="ml-2" />
               </Link>
             </Button>
+            {/* Secondary CTA - Visible outline */}
             <Button
-              className="w-full sm:w-auto sm:min-w-40 text-lg h-12"
-              variant={"secondary"}
+              className="w-full sm:w-auto sm:min-w-48 text-lg h-14 px-8 font-medium border-2 hover:scale-[1.02] transition-all duration-200"
+              variant="outline"
               size="lg"
               asChild
             >
               <Link href={"#features"}>
                 See How It Works
-                <ChevronRight size={18} className="ml-2" />
+                <ChevronRight size={20} className="ml-2" />
               </Link>
             </Button>
           </div>
@@ -60,10 +67,10 @@ export default function HeroSection() {
             </div>
           </div>
         </div>
-        <div className="flex justify-center items-center">
+        <div className="flex justify-center items-center pt-2">
           <AvatarCirclesDemo />
         </div>
-        <div className="relative w-full aspect-21/9 rounded-md border-2 border-border shadow-xs overflow-hidden">
+        <div className="relative w-full aspect-21/9 rounded-lg border-2 border-border shadow-xl overflow-hidden">
           <Image
             alt="Aiva.io unified inbox dashboard showing AI-powered message management across Gmail, Outlook, Slack, and other communication channels"
             src="/images/hero.jpeg"

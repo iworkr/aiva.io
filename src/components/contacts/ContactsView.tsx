@@ -240,7 +240,7 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
                 placeholder="Search contacts..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-64 pl-9"
+                className="w-64 pl-9 bg-muted/50 border-border/60 focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
                 aria-label="Search contacts by name, email, or company"
               />
             </div>

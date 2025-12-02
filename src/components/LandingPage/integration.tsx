@@ -519,7 +519,7 @@ const Icons = {
 
 export default function Integration() {
   return (
-    <section className="py-16 max-w-6xl flex flex-col justify-center items-center  mx-auto space-y-10 overflow-hidden">
+    <section className="py-20 lg:py-28 max-w-6xl flex flex-col justify-center items-center mx-auto space-y-12 overflow-hidden">
       <div className="px-6">
         <TitleBlock
           icon={<GitForkIcon size={16} />}

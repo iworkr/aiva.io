@@ -12,6 +12,12 @@ import { Star, X, Edit } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ChannelLogo } from './ChannelLogo';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface ContactTileProps {
   contact: any;
@@ -74,19 +80,29 @@ export const ContactTile = memo(function ContactTile({
       className="group relative bg-card border border-border rounded-xl p-6 hover:border-primary/50 cursor-pointer transition-all duration-200 hover:shadow-lg"
     >
       {/* Favorite Star - Top Right */}
-      <button
-        onClick={onToggleFavorite}
-        className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
-      >
-        <Star
-          className={cn(
-            'h-5 w-5 transition-colors',
-            contact.is_favorite
-              ? 'fill-yellow-500 text-yellow-500 opacity-100'
-              : 'text-muted-foreground hover:text-yellow-500'
-          )}
-        />
-      </button>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={onToggleFavorite}
+              className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+              aria-label={contact.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
+            >
+              <Star
+                className={cn(
+                  'h-5 w-5 transition-colors',
+                  contact.is_favorite
+                    ? 'fill-yellow-500 text-yellow-500 opacity-100'
+                    : 'text-muted-foreground hover:text-yellow-500'
+                )}
+              />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{contact.is_favorite ? 'Remove from favorites' : 'Add to favorites'}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
 
       {/* Profile Picture with Glow */}
       <div className="flex items-start gap-4 mb-4">
@@ -178,24 +194,44 @@ export const ContactTile = memo(function ContactTile({
       {/* Action Buttons - Bottom Right */}
       <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
         {onEdit && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={onEdit}
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={onEdit}
+                  aria-label="Edit contact"
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Edit contact</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
         {onDelete && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-destructive hover:text-destructive"
-            onClick={onDelete}
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-destructive hover:text-destructive"
+                  onClick={onDelete}
+                  aria-label="Delete contact"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Delete contact</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
       </div>
     </div>

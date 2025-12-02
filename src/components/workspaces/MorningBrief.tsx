@@ -239,6 +239,17 @@ export async function MorningBrief() {
     return 0;
   });
 
+  // Final deduplication: remove items with identical titles (edge case for duplicates)
+  const seenTitles = new Set<string>();
+  const deduplicatedItems = briefingItems.filter((item) => {
+    const normalizedTitle = item.title.toLowerCase().trim();
+    if (seenTitles.has(normalizedTitle)) {
+      return false;
+    }
+    seenTitles.add(normalizedTitle);
+    return true;
+  });
+
   return (
     <div className="space-y-5">
       {/* Greeting and Summary */}
@@ -254,30 +265,30 @@ export async function MorningBrief() {
       </div>
 
       {/* Today's Briefing Button - Only show if there are briefing items */}
-      {briefingItems.length > 0 && (
+      {deduplicatedItems.length > 0 && (
         <div className="flex justify-center">
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant="outline"
+                  variant="default"
                   size="default"
-                  className="group"
+                  className="group h-10 px-5 shadow-md hover:shadow-lg transition-all"
                   asChild
-                  aria-label={`View today's briefing with ${briefingItems.length} items that need your attention`}
+                  aria-label={`View today's briefing with ${deduplicatedItems.length} items that need your attention`}
                 >
                   <Link href="#briefing">
                     <FileText className="mr-2 h-4 w-4" />
-                    <span>Today's briefing</span>
-                    <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
-                      {briefingItems.length}
+                    <span className="font-medium">Today's briefing</span>
+                    <span className="ml-2 inline-flex h-5 min-w-5 px-1.5 items-center justify-center rounded-full bg-primary-foreground/20 text-xs font-semibold">
+                      {deduplicatedItems.length}
                     </span>
-                    <ChevronRight className="ml-2 h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                    <ChevronRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                   </Link>
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Jump to your {briefingItems.length} priority items: urgent messages and upcoming events</p>
+                <p>Jump to your {deduplicatedItems.length} priority items: urgent messages and upcoming events</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -285,9 +296,9 @@ export async function MorningBrief() {
       )}
 
       {/* Briefing Items */}
-      {briefingItems.length > 0 && (
+      {deduplicatedItems.length > 0 && (
         <div id="briefing">
-          <BriefingSection items={briefingItems} />
+          <BriefingSection items={deduplicatedItems} />
         </div>
       )}
 
@@ -296,36 +307,65 @@ export async function MorningBrief() {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-3 gap-3 pt-3">
-        <Card className={newMessages === 0 ? 'opacity-60' : ''}>
-          <CardContent className="p-3 text-center">
-            {newMessages === 0 ? (
-              <div className="text-sm font-medium text-muted-foreground">No new messages yet</div>
-            ) : (
-              <div className="text-xl font-bold">{newMessages}</div>
-            )}
-            <div className="text-xs text-muted-foreground">New Messages</div>
-          </CardContent>
-        </Card>
-        <Card className={(todayEventsCount || 0) === 0 ? 'opacity-60' : ''}>
-          <CardContent className="p-3 text-center">
-            {(todayEventsCount || 0) === 0 ? (
-              <div className="text-sm font-medium text-muted-foreground">No events today</div>
-            ) : (
-              <div className="text-xl font-bold">{todayEventsCount || 0}</div>
-            )}
-            <div className="text-xs text-muted-foreground">Today's Events</div>
-          </CardContent>
-        </Card>
-        <Card className={(upcomingEvents?.length || 0) === 0 ? 'opacity-60' : ''}>
-          <CardContent className="p-3 text-center">
-            {(upcomingEvents?.length || 0) === 0 ? (
-              <div className="text-sm font-medium text-muted-foreground">No upcoming events</div>
-            ) : (
-              <div className="text-xl font-bold">{upcomingEvents?.length || 0}</div>
-            )}
-            <div className="text-xs text-muted-foreground">Upcoming Events</div>
-          </CardContent>
-        </Card>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card className={`cursor-help transition-all hover:shadow-md ${newMessages === 0 ? 'opacity-60' : ''}`}>
+                <CardContent className="p-3 text-center">
+                  {newMessages === 0 ? (
+                    <div className="text-sm font-medium text-muted-foreground">No new messages yet</div>
+                  ) : (
+                    <div className="text-xl font-bold">{newMessages}</div>
+                  )}
+                  <div className="text-xs text-muted-foreground">New Messages</div>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Unread messages across all connected channels</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card className={`cursor-help transition-all hover:shadow-md ${(todayEventsCount || 0) === 0 ? 'opacity-60' : ''}`}>
+                <CardContent className="p-3 text-center">
+                  {(todayEventsCount || 0) === 0 ? (
+                    <div className="text-sm font-medium text-muted-foreground">No events today</div>
+                  ) : (
+                    <div className="text-xl font-bold">{todayEventsCount || 0}</div>
+                  )}
+                  <div className="text-xs text-muted-foreground">Today's Events</div>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Calendar events scheduled for today</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card className={`cursor-help transition-all hover:shadow-md ${(upcomingEvents?.length || 0) === 0 ? 'opacity-60' : ''}`}>
+                <CardContent className="p-3 text-center">
+                  {(upcomingEvents?.length || 0) === 0 ? (
+                    <div className="text-sm font-medium text-muted-foreground">No upcoming events</div>
+                  ) : (
+                    <div className="text-xl font-bold">{upcomingEvents?.length || 0}</div>
+                  )}
+                  <div className="text-xs text-muted-foreground">Upcoming Events</div>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Events scheduled in the next 48 hours</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
     </div>
   );

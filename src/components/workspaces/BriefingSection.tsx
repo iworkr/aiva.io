@@ -139,10 +139,10 @@ export function BriefingSection({ items }: BriefingSectionProps) {
         <h2 className="text-lg font-semibold">What needs your attention</h2>
         {items.length > 3 && (
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="gap-1.5 h-7 text-xs"
+            className="gap-1.5 h-8 text-xs font-medium border-primary/30 hover:bg-primary/10 hover:border-primary/50 transition-all"
           >
             {isExpanded ? (
               <>

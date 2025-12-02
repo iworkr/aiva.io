@@ -17,11 +17,35 @@ import { useState } from "react";
 import { MagicLinkSignupForm } from "./MagicLinkSignupForm";
 import { PasswordSignupForm } from "./PasswordSignupForm";
 import { ProviderSignupForm } from "./ProviderSignupForm";
+import { Mail, Calendar, Sparkles, Shield, CheckCircle2 } from "lucide-react";
 
 interface SignUpProps {
   next?: string;
   nextActionType?: string;
 }
+
+const features = [
+  {
+    icon: Mail,
+    title: "Unified Inbox",
+    description: "All your emails, DMs, and messages in one place",
+  },
+  {
+    icon: Sparkles,
+    title: "AI-Powered",
+    description: "Smart prioritization and auto-generated replies",
+  },
+  {
+    icon: Calendar,
+    title: "Smart Scheduling",
+    description: "Automatic meeting detection and calendar sync",
+  },
+  {
+    icon: Shield,
+    title: "Enterprise Security",
+    description: "Bank-grade encryption and privacy controls",
+  },
+];
 
 export function SignUp({ next, nextActionType }: SignUpProps) {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -29,7 +53,7 @@ export function SignUp({ next, nextActionType }: SignUpProps) {
   return (
     <div
       data-success={successMessage}
-      className="container data-success:flex items-center data-success:justify-center text-left max-w-lg mx-auto overflow-auto data-success:h-full min-h-[470px]"
+      className="container data-success:flex items-center data-success:justify-center text-left max-w-6xl mx-auto overflow-auto data-success:h-full min-h-[470px] px-4"
     >
       {successMessage ? (
         <EmailConfirmationPendingCard
@@ -39,59 +63,102 @@ export function SignUp({ next, nextActionType }: SignUpProps) {
           resetSuccessMessage={setSuccessMessage}
         />
       ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Create your Aiva.io account</CardTitle>
-            <CardDescription>
-              Start your AI-powered unified inbox by creating an Aiva.io workspace.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="password">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="password">Password</TabsTrigger>
-                <TabsTrigger value="magic-link">Magic Link</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="password">
-                <PasswordSignupForm
-                  next={next}
-                  setSuccessMessage={setSuccessMessage}
-                />
-              </TabsContent>
-              <TabsContent value="magic-link">
-                <MagicLinkSignupForm
-                  next={next}
-                  setSuccessMessage={setSuccessMessage}
-                />
-              </TabsContent>
-            </Tabs>
-            <Separator className="my-4" />
-            <div className="space-y-3">
-              <div className="text-sm text-center text-muted-foreground">
-                Sign up with your email provider to automatically connect your inbox
-              </div>
-              <OAuthWithChannelButtons />
-              <Separator className="my-4" />
-              <div className="text-sm text-center text-muted-foreground">
-                Or sign up with other providers
-              </div>
-              <ProviderSignupForm next={next} />
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center w-full py-8">
+          {/* Left side - Feature highlights */}
+          <div className="hidden lg:flex flex-col space-y-8">
+            <div className="space-y-4">
+              <h2 className="text-3xl font-bold tracking-tight">
+                Transform how you communicate
+              </h2>
+              <p className="text-lg text-muted-foreground">
+                Join thousands of professionals saving 10+ hours per week with AI-powered inbox management.
+              </p>
             </div>
-          </CardContent>
-          <CardFooter>
-            <div className="w-full text-center">
-              <div className="text-sm">
-                <Link
-                  href="/login"
-                  className="font-medium text-muted-foreground hover:text-foreground"
+            
+            <div className="grid gap-4">
+              {features.map((feature) => (
+                <div
+                  key={feature.title}
+                  className="flex items-start gap-4 p-4 rounded-lg bg-muted/50 border border-border/50 hover:border-primary/30 transition-colors"
                 >
-                  Already have an account? Log in
-                </Link>
+                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <feature.icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">{feature.title}</h3>
+                    <p className="text-sm text-muted-foreground">{feature.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-6 pt-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-primary" />
+                <span>14-day free trial</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-primary" />
+                <span>No credit card required</span>
               </div>
             </div>
-          </CardFooter>
-        </Card>
+          </div>
+
+          {/* Right side - Sign up form */}
+          <Card className="border-2 shadow-lg">
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-2xl">Create your Aiva.io account</CardTitle>
+              <CardDescription>
+                Start your AI-powered unified inbox by creating an Aiva.io workspace.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="password">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="password">Password</TabsTrigger>
+                  <TabsTrigger value="magic-link">Magic Link</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="password">
+                  <PasswordSignupForm
+                    next={next}
+                    setSuccessMessage={setSuccessMessage}
+                  />
+                </TabsContent>
+                <TabsContent value="magic-link">
+                  <MagicLinkSignupForm
+                    next={next}
+                    setSuccessMessage={setSuccessMessage}
+                  />
+                </TabsContent>
+              </Tabs>
+              <Separator className="my-4" />
+              <div className="space-y-3">
+                <div className="text-sm text-center text-muted-foreground">
+                  Sign up with your email provider to automatically connect your inbox
+                </div>
+                <OAuthWithChannelButtons />
+                <Separator className="my-4" />
+                <div className="text-sm text-center text-muted-foreground">
+                  Or sign up with other providers
+                </div>
+                <ProviderSignupForm next={next} />
+              </div>
+            </CardContent>
+            <CardFooter>
+              <div className="w-full text-center">
+                <div className="text-sm">
+                  <Link
+                    href="/login"
+                    className="font-medium text-primary hover:text-primary/80 transition-colors"
+                  >
+                    Already have an account? Log in
+                  </Link>
+                </div>
+              </div>
+            </CardFooter>
+          </Card>
+        </div>
       )}
     </div>
   );

@@ -166,7 +166,7 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={handleInputFocus}
-          className="pl-10 h-12 text-base bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-0 focus:ring-0 focus-visible:ring-0 relative z-10"
+          className="pl-10 h-12 text-base bg-muted/80 dark:bg-muted/50 border border-border/60 focus:border-primary/50 focus:ring-1 focus:ring-primary/20 focus-visible:ring-1 focus-visible:ring-primary/20 relative z-10 placeholder:text-muted-foreground/70"
         />
         {isLoading && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10">

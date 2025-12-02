@@ -132,14 +132,14 @@ export function QuickReply({
   return (
     <div className="mt-2 border-t pt-2" onClick={(e) => e.stopPropagation()}>
       <Button
-        variant="ghost"
+        variant="outline"
         size="sm"
         onClick={handleToggle}
-        className="h-8 w-full justify-between text-xs text-muted-foreground hover:text-foreground"
+        className="h-8 w-full justify-between text-xs border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary/50 text-foreground transition-all"
       >
         <div className="flex items-center gap-2">
-          <Sparkles className="h-3 w-3" />
-          <span>Quick Reply</span>
+          <Sparkles className="h-3 w-3 text-primary" />
+          <span className="font-medium">Quick Reply</span>
         </div>
         {isExpanded ? (
           <ChevronUp className="h-3 w-3" />
@@ -185,7 +185,7 @@ export function QuickReply({
                     setReplyText('');
                     setConfidenceScore(null);
                   }}
-                  className="h-9 px-4"
+                  className="h-9 px-4 border-border/70 hover:bg-muted"
                 >
                   Cancel
                 </Button>
@@ -194,7 +194,7 @@ export function QuickReply({
                   size="default"
                   onClick={handleSend}
                   disabled={isSending || !replyText.trim()}
-                  className="h-9 px-4"
+                  className="h-9 px-4 shadow-sm hover:shadow-md transition-shadow"
                 >
                   {isSending ? (
                     <>

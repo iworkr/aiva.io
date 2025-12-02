@@ -12,7 +12,7 @@ import Features from "./features";
 export const LandingPage = () => {
   return (
     <div>
-      <div className="flex flex-col gap-16">
+      <div className="flex flex-col gap-20 lg:gap-28">
         <HeroSection />
         <LogoCloud />
         <Features />

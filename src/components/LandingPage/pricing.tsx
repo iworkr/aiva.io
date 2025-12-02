@@ -15,7 +15,7 @@ import TitleBlock from "../title-block";
 
 const Pricing = () => {
   return (
-    <section id="pricing" className="py-16 max-w-6xl flex flex-col justify-center items-center  mx-auto space-y-10 overflow-hidden px-6">
+    <section id="pricing" className="py-20 lg:py-28 max-w-6xl flex flex-col justify-center items-center mx-auto space-y-12 overflow-hidden px-6">
       <TitleBlock
         icon={<DollarSign size={16} />}
         title="Simple, Transparent Pricing"

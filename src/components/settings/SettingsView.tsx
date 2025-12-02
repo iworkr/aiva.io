@@ -450,6 +450,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
               <Button 
                 onClick={handleSaveAISettings}
                 disabled={aiStatus === 'executing' || loading}
+                className="shadow-md hover:shadow-lg transition-shadow px-6"
               >
                 {aiStatus === 'executing' ? (
                   <>
@@ -513,6 +514,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
               <Button 
                 onClick={handleSaveNotificationSettings}
                 disabled={notifStatus === 'executing' || loading}
+                className="shadow-md hover:shadow-lg transition-shadow px-6"
               >
                 {notifStatus === 'executing' ? (
                   <>
@@ -654,11 +656,12 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
               </CardContent>
             </Card>
 
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-3">
               <Button 
                 onClick={handleSaveAccountSettings}
                 disabled={accountStatus === 'executing' || loading}
                 variant="outline"
+                className="px-5"
               >
                 {accountStatus === 'executing' ? (
                   <>
@@ -670,6 +673,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
               <Button 
                 onClick={handleSaveSyncSettings}
                 disabled={syncStatus === 'executing' || loading}
+                className="shadow-md hover:shadow-lg transition-shadow px-6"
               >
                 {syncStatus === 'executing' ? (
                   <>
@@ -686,16 +690,44 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
             {billingContent || (
               <Card className="border-dashed">
                 <CardContent className="pt-6">
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
                     <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
                       <CreditCard className="h-8 w-8 text-primary" />
                     </div>
                     <h3 className="text-lg font-semibold mb-2">Billing Coming Soon</h3>
-                    <p className="text-sm text-muted-foreground max-w-sm">
+                    <p className="text-sm text-muted-foreground max-w-sm mb-6">
                       Subscription management and billing features are being set up.
                       You'll be able to manage your plan and payment methods here.
                     </p>
-                    <Badge variant="secondary" className="mt-4">
+                    
+                    {/* Roadmap */}
+                    <div className="w-full max-w-md text-left bg-muted/50 rounded-lg p-4 mb-4">
+                      <h4 className="text-sm font-semibold mb-3">What's Coming:</h4>
+                      <ul className="space-y-2 text-sm text-muted-foreground">
+                        <li className="flex items-center gap-2">
+                          <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                          Plan upgrades and downgrades
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                          Payment method management
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                          Invoice history and downloads
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                          Usage analytics and quotas
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                          Team seat management
+                        </li>
+                      </ul>
+                    </div>
+                    
+                    <Badge variant="secondary">
                       <Sparkles className="mr-1 h-3 w-3" />
                       In Development
                     </Badge>

@@ -348,6 +348,7 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
               <Button 
                 onClick={() => setShowCreateDialog(true)}
                 aria-label="Create new calendar event"
+                className="shadow-md hover:shadow-lg transition-shadow h-9 px-4"
               >
                 <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
                 Add event
@@ -366,10 +367,12 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
             ) : getFilteredEvents().length === 0 ? (
               <div className="flex h-full items-center justify-center">
                 <div className="text-center max-w-md px-6">
-                  <CalendarIcon className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">
+                  <div className="mx-auto h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+                    <CalendarIcon className="h-10 w-10 text-primary" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">
                     {searchQuery
-                      ? `No events found for “${searchQuery}”`
+                      ? `No events found for "${searchQuery}"`
                       : 'No events scheduled'}
                   </h3>
                   <p className="text-sm text-muted-foreground mb-6">
@@ -377,10 +380,22 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
                       ? 'Try a different keyword or clear the search to see all events.'
                       : 'Your calendar is empty. Create your first event to get started, or connect a calendar account to sync existing events.'}
                   </p>
-                  <Button onClick={() => setShowCreateDialog(true)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Event
-                  </Button>
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <Button 
+                      onClick={() => setShowCreateDialog(true)}
+                      className="shadow-md hover:shadow-lg transition-shadow"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create Event
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => setShowManageAccountsDialog(true)}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      Connect Calendar
+                    </Button>
+                  </div>
                 </div>
               </div>
             ) : viewMode === 'month' ? (

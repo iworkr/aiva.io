@@ -75,7 +75,7 @@ export default function Features() {
   return (
     <section
       id="features"
-      className="py-16 lg:py-24 max-w-7xl mx-auto px-6 space-y-12"
+      className="py-20 lg:py-32 max-w-7xl mx-auto px-6 space-y-14"
     >
       <TitleBlock
         icon={<Sparkles size={16} />}

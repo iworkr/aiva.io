@@ -28,20 +28,21 @@ export default function Testimonials() {
   const secondRow = reviews.slice(3, 6);
 
   return (
-    <section className="bg-muted/40 py-24 px-6 ">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <section className="bg-muted/40 py-28 px-6">
+      <div className="max-w-6xl mx-auto space-y-10">
         <TitleBlock
           title="Don't take our word for it"
           subtitle="Join thousands of professionals who save 10+ hours per week with Aiva"
         />
-        <div className="relative flex h-full w-full flex-col  pt-10 items-center justify-center overflow-hidden ">
-          <Marquee pauseOnHover className="[--duration:20s]">
+        <div className="relative flex h-full w-full flex-col pt-10 items-center justify-center overflow-hidden">
+          {/* First row - uses repeat={2} for minimal duplication while maintaining smooth scroll */}
+          <Marquee pauseOnHover className="[--duration:30s]" repeat={2}>
             {firstRow.map((review) => (
               <ReviewCard key={review.username} {...review} />
             ))}
           </Marquee>
           {secondRow.length > 0 && (
-            <Marquee reverse pauseOnHover className="[--duration:20s]">
+            <Marquee reverse pauseOnHover className="[--duration:30s]" repeat={2}>
               {secondRow.map((review) => (
                 <ReviewCard key={review.username} {...review} />
               ))}
@@ -69,24 +70,24 @@ const ReviewCard = ({
   return (
     <figure
       className={cn(
-        "relative w-64 cursor-pointer overflow-hidden rounded-xl border p-4",
-        "border-border bg-background hover:bg-accent-foreground hover:text-background",
+        "relative w-72 cursor-pointer overflow-hidden rounded-xl border p-5 transition-all duration-300",
+        "border-border bg-background hover:bg-primary/5 hover:border-primary/30 hover:shadow-md",
       )}
     >
-      <div className="flex flex-row items-center gap-2">
+      <div className="flex flex-row items-center gap-3">
         <Image
-          className="rounded-full"
-          width="32"
-          height="32"
+          className="rounded-full ring-2 ring-primary/20"
+          width="40"
+          height="40"
           alt={`${name} avatar`}
           src={img}
         />
         <div className="flex flex-col">
-          <figcaption className="text-sm font-medium ">{name}</figcaption>
-          <p className="text-xs font-medium ">{username}</p>
+          <figcaption className="text-sm font-semibold">{name}</figcaption>
+          <p className="text-xs text-muted-foreground">{username}</p>
         </div>
       </div>
-      <blockquote className="mt-2 text-sm">{body}</blockquote>
+      <blockquote className="mt-3 text-sm leading-relaxed text-muted-foreground">{body}</blockquote>
     </figure>
   );
 };
