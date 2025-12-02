@@ -8,8 +8,9 @@ const SearchParamsSchema = z.object({
 });
 
 export const metadata: Metadata = {
-  title: "Login | Nextbase Starter Kits Demo",
-  description: "Login to your Nextbase Starter Kits Demo account",
+  title: "Log in | Aiva.io – AI Inbox & Communication Hub",
+  description:
+    "Log in to Aiva.io to manage your unified inbox, messages, and calendar with AI assistance.",
 };
 
 export default async function LoginPage(props: {

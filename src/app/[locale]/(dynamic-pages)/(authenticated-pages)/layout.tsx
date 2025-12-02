@@ -4,21 +4,35 @@ import { LoggedInUserProvider } from "@/contexts/LoggedInUserContext";
 import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import { serverGetLoggedInUserVerified } from "@/utils/server/serverGetLoggedInUser";
 import { User } from "@supabase/supabase-js";
-import { unauthorized } from "next/navigation";
+import { redirect } from "next/navigation";
 import { type ReactNode } from "react";
 import PosthogIdentify from "./PosthogIdentify";
 
-export default async function Layout({ children }: { children: ReactNode }) {
+interface AuthenticatedLayoutProps {
+  children: ReactNode;
+  params: {
+    locale: string;
+  };
+}
+
+function buildLoginRedirectPath(locale: string) {
+  // For now we send unauthenticated users to the locale-aware login page.
+  // The login flow already supports an optional `next` parameter from links.
+  return `/${locale}/login`;
+}
+
+export default async function Layout({ children, params }: AuthenticatedLayoutProps) {
   let user: User | null = null;
+
   try {
     user = await serverGetLoggedInUserVerified();
   } catch (fetchDataError) {
     console.log("fetchDataError", fetchDataError);
-    unauthorized();
   }
 
   if (!user) {
-    unauthorized();
+    const loginUrl = buildLoginRedirectPath(params.locale);
+    redirect(loginUrl);
   }
 
   return (

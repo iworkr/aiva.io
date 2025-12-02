@@ -8,9 +8,9 @@ const SearchParamsSchema = z.object({
 });
 
 export const metadata: Metadata = {
-  title: "Sign Up | Nextbase Starter Kits Demo",
+  title: "Create your Aiva.io account – Start free",
   description:
-    "Create an account to get started with Nextbase Starter Kits Demo",
+    "Create your Aiva.io account to unify email, DMs, and calendar into a single AI-powered inbox.",
 };
 
 export default async function SignUpPage(props: {

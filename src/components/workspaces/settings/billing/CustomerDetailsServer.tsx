@@ -6,42 +6,6 @@ import {
 import { StripePaymentGateway } from "@/payments/StripePaymentGateway";
 import { WorkspaceWithMembershipType } from "@/types";
 import { CustomerDetailsClient } from "./CustomerDetailsClient";
-
-async function getInvoices(workspaceId: string): Promise<InvoiceData[]> {
-  const stripePaymentGateway = new StripePaymentGateway();
-  const invoices =
-    await stripePaymentGateway.userScope.getWorkspaceDatabaseInvoices(
-      workspaceId,
-    );
-  return invoices.data;
-}
-
-async function getOneTimePurchases(
-  workspaceId: string,
-): Promise<OneTimePaymentData[]> {
-  const stripePaymentGateway = new StripePaymentGateway();
-  return await stripePaymentGateway.userScope.getWorkspaceDatabaseOneTimePurchases(
-    workspaceId,
-  );
-}
-
-async function getSubscriptions(
-  workspaceId: string,
-): Promise<SubscriptionData[]> {
-  const stripePaymentGateway = new StripePaymentGateway();
-  return await stripePaymentGateway.userScope.getWorkspaceDatabaseSubscriptions(
-    workspaceId,
-  );
-}
-
-import {
-  InvoiceData,
-  OneTimePaymentData,
-  SubscriptionData,
-} from "@/payments/AbstractPaymentGateway";
-import { StripePaymentGateway } from "@/payments/StripePaymentGateway";
-import { WorkspaceWithMembershipType } from "@/types";
-import { CustomerDetailsClient } from "./CustomerDetailsClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
 

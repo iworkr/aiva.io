@@ -41,9 +41,9 @@ export function SignUp({ next, nextActionType }: SignUpProps) {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>Create your Nextbase Account</CardTitle>
+            <CardTitle>Create your Aiva.io account</CardTitle>
             <CardDescription>
-              Choose your preferred signup method
+              Start your AI-powered unified inbox by creating an Aiva.io workspace.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -86,7 +86,7 @@ export function SignUp({ next, nextActionType }: SignUpProps) {
                   href="/login"
                   className="font-medium text-muted-foreground hover:text-foreground"
                 >
-                  Already have an account? Login
+                  Already have an account? Log in
                 </Link>
               </div>
             </div>

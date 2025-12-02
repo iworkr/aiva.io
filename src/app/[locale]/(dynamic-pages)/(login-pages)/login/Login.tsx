@@ -92,8 +92,10 @@ export function Login({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Login to Your Account</CardTitle>
-        <CardDescription>Choose your preferred login method</CardDescription>
+        <CardTitle>Log in to Aiva.io</CardTitle>
+        <CardDescription>
+          Access your unified AI inbox, messages, and calendar in one place.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="password">
@@ -142,8 +144,11 @@ export function Login({
         >
           Forgot password?
         </Link>
-        <Link href="/sign-up" className="text-sm text-blue-600 hover:underline">
-          Sign up instead
+        <Link
+          href="/sign-up"
+          className="text-sm font-medium text-blue-600 hover:underline"
+        >
+          Don&apos;t have an account? Start free trial
         </Link>
       </CardFooter>
     </Card>
