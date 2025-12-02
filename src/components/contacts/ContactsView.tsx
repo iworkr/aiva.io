@@ -215,16 +215,32 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
         ) : contacts.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-center">
             <UserCircle className="h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No contacts yet</h3>
+            <h3 className="text-lg font-semibold mb-2">
+              {showFavoritesOnly 
+                ? 'No favorite contacts yet'
+                : searchQuery 
+                  ? 'No contacts found'
+                  : 'No contacts yet'}
+            </h3>
             <p className="text-sm text-muted-foreground mb-4">
-              {searchQuery
-                ? 'No contacts match your search'
-                : 'Add your first contact to get started'}
+              {showFavoritesOnly
+                ? 'Star some contacts to see them here'
+                : searchQuery
+                  ? `No contacts match "${searchQuery}"`
+                  : 'Add your first contact to get started'}
             </p>
-            {!searchQuery && (
+            {!searchQuery && !showFavoritesOnly && (
               <Button onClick={() => setShowCreateDialog(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Contact
+              </Button>
+            )}
+            {showFavoritesOnly && (
+              <Button 
+                variant="outline"
+                onClick={() => setShowFavoritesOnly(false)}
+              >
+                Show All Contacts
               </Button>
             )}
           </div>

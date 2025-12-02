@@ -55,9 +55,19 @@ export function QuickReply({
 
   const { execute: generateDraft } = useAction(generateReplyDraftAction, {
     onSuccess: ({ data }) => {
-      if (data?.data?.body) {
-        setReplyText(data.data.body);
-        setConfidenceScore(data.data.confidenceScore || null);
+      // Handle both possible data structures: data.data.body or direct body
+      const result = data?.data;
+      const body = result?.body;
+      const confidence = result?.confidenceScore;
+      
+      if (body) {
+        setReplyText(body);
+        setConfidenceScore(confidence || null);
+        toast.success('AI draft generated! Review and edit before sending.');
+      } else {
+        // Draft generated but empty - show placeholder
+        setReplyText('');
+        toast.info('AI could not generate a draft. Please type your reply manually.');
       }
       setIsGenerating(false);
     },

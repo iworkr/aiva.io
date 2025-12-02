@@ -32,7 +32,16 @@ const createEventFormSchema = z.object({
   startTime: z.string().min(1, 'Start time is required'),
   endTime: z.string().min(1, 'End time is required'),
   isAllDay: z.boolean().default(false),
-});
+}).refine(
+  (data) => {
+    if (!data.startTime || !data.endTime) return true;
+    return new Date(data.endTime) > new Date(data.startTime);
+  },
+  {
+    message: 'End time must be after start time',
+    path: ['endTime'],
+  }
+);
 
 type CreateEventForm = z.infer<typeof createEventFormSchema>;
 

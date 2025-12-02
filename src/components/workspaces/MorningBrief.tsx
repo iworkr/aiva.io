@@ -155,14 +155,33 @@ export async function MorningBrief() {
   const stripHtml = (input: string | null | undefined) =>
     input ? input.replace(/<[^>]+>/g, '').trim() : '';
 
+  // Utility: detect and mask sensitive content (OTPs, passwords, etc.)
+  const maskSensitiveContent = (text: string): string => {
+    // Patterns for sensitive content
+    const sensitivePatterns = [
+      /\b(OTP|code|verification|pin)[\s:]*\d{4,8}\b/gi,
+      /\b(password|pwd|pass)[\s:]*\S+\b/gi,
+      /\b\d{4,8}\s*(is your|is the|code)\b/gi,
+    ];
+    
+    let maskedText = text;
+    for (const pattern of sensitivePatterns) {
+      maskedText = maskedText.replace(pattern, '••••••');
+    }
+    return maskedText;
+  };
+
   // Add urgent messages
   if (urgentMessages) {
     urgentMessages.forEach((msg: any) => {
+      const cleanBody = stripHtml(msg.body)?.substring(0, 140) || '';
+      const safeDescription = maskSensitiveContent(cleanBody);
+      
       briefingItems.push({
         id: msg.id,
         type: 'message',
-        title: msg.subject || 'No subject',
-        description: stripHtml(msg.body)?.substring(0, 140) || '',
+        title: maskSensitiveContent(msg.subject || 'No subject'),
+        description: safeDescription,
         priority: msg.priority === 'urgent' ? 'urgent' : 'high',
         timestamp: msg.created_at ? new Date(msg.created_at) : undefined,
         href: `/inbox/${msg.id}`,

@@ -1642,7 +1642,10 @@ function WeekView({
               <React.Fragment key={`hour-${hour}`}>
                 {/* Time label */}
                 <div
-                  className="border-b border-r border-border p-2 text-right text-xs text-muted-foreground"
+                  className={cn(
+                    "border-b border-r border-border/70 dark:border-border p-2 text-right text-xs text-muted-foreground",
+                    hour % 2 === 0 ? "bg-muted/20 dark:bg-muted/10" : ""
+                  )}
                   style={{ height: '60px' }}
                 >
                   {format(new Date().setHours(hour, 0, 0, 0), 'h a')}
@@ -1651,7 +1654,10 @@ function WeekView({
                 {weekDays.map((day) => (
                   <div
                     key={`${day.toISOString()}-${hour}`}
-                    className="relative border-b border-r border-border transition-all hover:bg-primary/5 hover:border-primary/30"
+                    className={cn(
+                      "relative border-b border-r border-border/70 dark:border-border transition-all hover:bg-primary/5 hover:border-primary/30",
+                      hour % 2 === 0 ? "bg-muted/20 dark:bg-muted/10" : ""
+                    )}
                     style={{ height: '60px' }}
                   >
                     {/* Only render events in the first hour (hour === 0) to avoid duplicates */}

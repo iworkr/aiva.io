@@ -8,24 +8,36 @@ type FooterItem = {
 
 export const footerItems: FooterItem[] = [
   {
-    title: "Resources",
+    title: "Product",
     items: [
       {
-        name: "NextBase",
-        url: "#",
+        name: "Features",
+        url: "/#features",
+      },
+      {
+        name: "Pricing",
+        url: "/#pricing",
+      },
+      {
+        name: "Documentation",
+        url: "/docs",
       },
     ],
   },
   {
-    title: "Follow Us",
+    title: "Company",
     items: [
       {
-        name: "Github",
-        url: "#",
+        name: "Blog",
+        url: "/blog",
       },
       {
-        name: "Twitter",
-        url: "#",
+        name: "Changelog",
+        url: "/changelog",
+      },
+      {
+        name: "Roadmap",
+        url: "/roadmap",
       },
     ],
   },
@@ -34,11 +46,11 @@ export const footerItems: FooterItem[] = [
     items: [
       {
         name: "Privacy Policy",
-        url: "#",
+        url: "/privacy",
       },
       {
-        name: "Terms & Conditions",
-        url: "#",
+        name: "Terms of Service",
+        url: "/terms",
       },
     ],
   },

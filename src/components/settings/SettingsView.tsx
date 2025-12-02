@@ -598,9 +598,22 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
           {/* Billing Settings */}
           <TabsContent value="billing" className="space-y-4">
             {billingContent || (
-              <Card>
+              <Card className="border-dashed">
                 <CardContent className="pt-6">
-                  <p className="text-sm text-muted-foreground">Loading billing information...</p>
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
+                      <CreditCard className="h-8 w-8 text-primary" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2">Billing Coming Soon</h3>
+                    <p className="text-sm text-muted-foreground max-w-sm">
+                      Subscription management and billing features are being set up.
+                      You'll be able to manage your plan and payment methods here.
+                    </p>
+                    <Badge variant="secondary" className="mt-4">
+                      <Sparkles className="mr-1 h-3 w-3" />
+                      In Development
+                    </Badge>
+                  </div>
                 </CardContent>
               </Card>
             )}

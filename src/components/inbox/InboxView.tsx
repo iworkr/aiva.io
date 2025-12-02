@@ -445,6 +445,12 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
                 Search across message subjects, senders, and content. Results update as you type.
               </span>
             </div>
+            {/* Search result count */}
+            {debouncedSearchQuery && !loading && (
+              <span className="text-sm text-muted-foreground whitespace-nowrap">
+                {filteredMessages.length} {filteredMessages.length === 1 ? 'result' : 'results'}
+              </span>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -497,17 +503,29 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
             </div>
           ) : filteredMessages.length === 0 ? (
             <div className="flex h-full items-center justify-center">
-              <div className="text-center">
+              <div className="text-center max-w-md px-6">
                 <InboxIcon className="mx-auto h-12 w-12 text-muted-foreground" />
-                <h3 className="mt-4 text-lg font-semibold">No messages</h3>
+                <h3 className="mt-4 text-lg font-semibold">
+                  {searchQuery
+                    ? `No messages found for "${searchQuery}"`
+                    : 'No messages'}
+                </h3>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {searchQuery
-                    ? 'No messages match your search'
+                    ? 'Try a different search term or clear the search to see all messages.'
                     : selectedChannel
-                      ? 'No messages in this channel'
+                      ? 'No messages in this channel. Try syncing to fetch new messages.'
                       : 'Your inbox is empty. Click sync to fetch new messages.'}
                 </p>
-                {!searchQuery && (
+                {searchQuery ? (
+                  <Button
+                    className="mt-4"
+                    variant="outline"
+                    onClick={() => setSearchQuery('')}
+                  >
+                    Clear Search
+                  </Button>
+                ) : (
                   <Button
                     className="mt-4"
                     variant="outline"

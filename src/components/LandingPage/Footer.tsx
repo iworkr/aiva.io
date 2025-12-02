@@ -49,16 +49,7 @@ export function Footer() {
           <div className="w-full h-[1px] bg-border/50 dark:bg-slate-800"></div>
           <div className="flex flex-col gap-6 md:flex-row md:gap-0 justify-between items-center py-8 w-full">
             <p className="text-muted-foreground dark:text-slate-400 text-sm text-center md:text-left order-2 md:order-1">
-              © 2023
-              <a
-                href="https://usenextbase.com/"
-                className="mx-2 hover:underline"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Arni Creative Private Limited.
-              </a>
-              All Rights Reserved
+              © {new Date().getFullYear()} Aiva.io. All Rights Reserved.
             </p>
             <div className="flex justify-center md:justify-end gap-6 w-full md:w-auto order-1 md:order-2">
               {footerSocialItems.map((item) => (

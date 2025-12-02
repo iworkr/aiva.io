@@ -61,9 +61,23 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
       handleSubmit(e);
     }
     if (e.key === 'Escape') {
+      e.preventDefault();
       setIsOpen(false);
+      stop();
     }
   };
+
+  // Global ESC key handler for closing the panel
+  useEffect(() => {
+    const handleGlobalEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        setIsOpen(false);
+        stop();
+      }
+    };
+    document.addEventListener('keydown', handleGlobalEsc);
+    return () => document.removeEventListener('keydown', handleGlobalEsc);
+  }, [isOpen, stop]);
 
   // Auto-open when user starts typing
   useEffect(() => {
@@ -106,11 +120,14 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => {
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 setIsOpen(false);
                 stop();
               }}
-              className="h-6 w-6 p-0"
+              className="h-8 w-8 p-0 hover:bg-destructive/10"
+              aria-label="Close Aiva Assistant"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -159,9 +176,9 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
                   </div>
                 ))}
                 {isLoading && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Aiva is thinking...</span>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground p-3 bg-primary/5 rounded-lg border border-primary/20 animate-pulse">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    <span className="font-medium">Aiva is thinking...</span>
                   </div>
                 )}
               </div>

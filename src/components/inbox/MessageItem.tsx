@@ -57,11 +57,11 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
   // Mark as read action with optimistic update
   const { execute: markAsRead } = useAction(markMessageAsReadAction, {
     onSuccess: () => {
-      // Already optimistically updated
+      toast.success('Marked as read');
       onUpdate();
     },
     onError: () => {
-      // Revert on error - would need to track previous state
+      toast.error('Failed to mark as read');
       onUpdate();
     },
   });
@@ -206,6 +206,24 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
   const stripHtml = (input: string | null | undefined) =>
     input ? input.replace(/<[^>]+>/g, '').trim() : '';
 
+  // Mask sensitive content (OTPs, passwords, verification codes)
+  const maskSensitiveContent = (text: string): string => {
+    const sensitivePatterns = [
+      /\b(OTP|code|verification|pin)[\s:]*\d{4,8}\b/gi,
+      /\b(password|pwd|pass)[\s:]*\S+\b/gi,
+      /\b\d{4,8}\s*(is your|is the|code)\b/gi,
+    ];
+    let maskedText = text;
+    for (const pattern of sensitivePatterns) {
+      maskedText = maskedText.replace(pattern, '••••••');
+    }
+    return maskedText;
+  };
+
+  const safeSnippet = maskSensitiveContent(
+    message.snippet || stripHtml(message.body)?.substring(0, 200) || 'No preview available'
+  );
+
   return (
     <div
       onClick={handleClick}
@@ -218,7 +236,7 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
     >
       <div className="flex items-start gap-4">
         {/* Sender Avatar */}
-        <div className="mt-1 flex-shrink-0">
+        <div className="mt-1 flex-shrink-0 relative">
           <Avatar className="h-8 w-8">
             {senderAvatarUrl && (
               <AvatarImage
@@ -230,6 +248,13 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
               {senderInitial}
             </AvatarFallback>
           </Avatar>
+          {/* Unread indicator dot */}
+          {!message.is_read && (
+            <span 
+              className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-background"
+              aria-label="Unread message"
+            />
+          )}
         </div>
 
         {/* Message content */}
@@ -301,7 +326,7 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
 
           {/* Snippet */}
           <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">
-            {message.snippet || stripHtml(message.body)?.substring(0, 200) || 'No preview available'}
+            {safeSnippet}
           </p>
 
           {/* AI Classifications */}
