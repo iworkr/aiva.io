@@ -100,15 +100,15 @@ export function PublicBlogList({
             We're working on sharing our insights about AI-powered communication, productivity tips, and product updates. Be the first to know when we publish!
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
-            <Button asChild size="lg" className="shadow-lg hover:shadow-xl transition-all h-11 px-6 font-semibold">
+            <Button asChild className="shadow-md hover:shadow-lg transition-all h-9 px-5 font-medium">
               <Link href="/feedback">
-                <MessageSquare className="mr-2 h-5 w-5" />
+                <MessageSquare className="mr-2 h-4 w-4" />
                 Share Your Ideas
               </Link>
             </Button>
-            <Button asChild variant="outline" size="lg" className="h-11 px-6 font-medium border-2">
+            <Button asChild variant="outline" className="h-9 px-5 font-medium border-2">
               <Link href="/roadmap">
-                <Bell className="mr-2 h-5 w-5" />
+                <Bell className="mr-2 h-4 w-4" />
                 View Roadmap
               </Link>
             </Button>

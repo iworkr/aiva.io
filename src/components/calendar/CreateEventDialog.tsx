@@ -217,20 +217,19 @@ export function CreateEventDialog({
               </Badge>
             </div>
           </div>
-          <DialogFooter className="gap-3">
+          <DialogFooter className="gap-2">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              className="h-11 px-6 font-medium"
+              className="h-9 px-4"
             >
               Cancel
             </Button>
             <Button 
               type="submit" 
               disabled={status === 'executing'}
-              size="lg"
-              className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all h-11 px-8 font-semibold bg-primary text-primary-foreground"
+              className="shadow-md hover:shadow-lg transition-all h-9 px-5 font-medium bg-primary text-primary-foreground"
             >
               {status === 'executing' ? 'Creating...' : 'Create Event'}
             </Button>

@@ -17,19 +17,18 @@ export default function FAQ() {
         title="Frequently Asked Questions"
         subtitle="Get detailed answers to common inquiries. Enhance your understanding of our offerings and policies."
       />
-      {faq.map((item, i) => (
-        <Accordion
-          key={i}
-          type="single"
-          collapsible
-          className="w-full max-w-3xl"
-        >
-          <AccordionItem value={`item-${i + 1}`}>
-            <AccordionTrigger>{item.question}</AccordionTrigger>
+      <Accordion
+        type="single"
+        collapsible
+        className="w-full max-w-3xl"
+      >
+        {faq.map((item, i) => (
+          <AccordionItem key={i} value={`item-${i + 1}`}>
+            <AccordionTrigger className="text-left">{item.question}</AccordionTrigger>
             <AccordionContent>{item.answer}</AccordionContent>
           </AccordionItem>
-        </Accordion>
-      ))}
+        ))}
+      </Accordion>
     </section>
   );
 }

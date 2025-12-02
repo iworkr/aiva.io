@@ -348,10 +348,9 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
               <Button 
                 onClick={() => setShowCreateDialog(true)}
                 aria-label="Create new calendar event"
-                size="lg"
-                className="shadow-lg hover:shadow-xl hover:scale-[1.03] transition-all h-12 px-6 font-semibold text-base bg-primary text-primary-foreground"
+                className="shadow-md hover:shadow-lg transition-all h-9 px-4 font-medium bg-primary text-primary-foreground"
               >
-                <Plus className="mr-2 h-5 w-5" aria-hidden="true" />
+                <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
                 Add Event
               </Button>
             </div>
@@ -381,22 +380,20 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
                       ? 'Try a different keyword or clear the search to see all events.'
                       : 'Your calendar is empty. Create your first event to get started, or connect a calendar account to sync existing events.'}
                   </p>
-                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <Button 
                       onClick={() => setShowCreateDialog(true)}
-                      size="lg"
-                      className="shadow-lg hover:shadow-xl hover:scale-[1.03] transition-all h-12 px-8 font-semibold text-base bg-primary text-primary-foreground"
+                      className="shadow-md hover:shadow-lg transition-all h-10 px-5 font-medium bg-primary text-primary-foreground"
                     >
-                      <Plus className="mr-2 h-5 w-5" />
+                      <Plus className="mr-2 h-4 w-4" />
                       Create Event
                     </Button>
                     <Button 
                       variant="outline"
-                      size="lg"
                       onClick={() => setShowManageAccountsDialog(true)}
-                      className="h-12 px-8 border-2 hover:bg-muted/50 transition-all font-semibold text-base"
+                      className="h-10 px-5 border-2 hover:bg-muted/50 transition-all font-medium"
                     >
-                      <CalendarIcon className="mr-2 h-5 w-5" />
+                      <CalendarIcon className="mr-2 h-4 w-4" />
                       Connect Calendar
                     </Button>
                   </div>

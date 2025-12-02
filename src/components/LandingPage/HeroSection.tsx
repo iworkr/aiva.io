@@ -29,26 +29,26 @@ export default function HeroSection() {
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:justify-center pt-8">
             {/* Primary CTA - Maximum contrast with solid background */}
             <Button 
-              className="w-full sm:w-auto sm:min-w-52 text-lg h-14 px-10 font-bold bg-primary text-primary-foreground shadow-xl shadow-primary/30 hover:shadow-2xl hover:shadow-primary/40 hover:scale-[1.03] hover:bg-primary/90 transition-all duration-200 ring-2 ring-primary/20" 
-              size="lg" 
+              className="w-full sm:w-auto sm:min-w-44 text-base h-10 px-6 font-semibold bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:bg-primary/90 transition-all duration-200" 
+              size="default" 
               variant="default" 
               asChild
             >
               <Link href={"/sign-up"}>
                 Start Free Trial
-                <ArrowRight size={20} className="ml-2" />
+                <ArrowRight size={18} className="ml-2" />
               </Link>
             </Button>
             {/* Secondary CTA - High contrast outline */}
             <Button
-              className="w-full sm:w-auto sm:min-w-52 text-lg h-14 px-10 font-semibold border-2 border-primary text-primary bg-primary/5 hover:bg-primary/10 hover:scale-[1.03] transition-all duration-200"
+              className="w-full sm:w-auto sm:min-w-44 text-base h-10 px-6 font-medium border-2 border-primary text-primary bg-primary/5 hover:bg-primary/10 transition-all duration-200"
               variant="outline"
-              size="lg"
+              size="default"
               asChild
             >
               <Link href={"#features"}>
                 See How It Works
-                <ChevronRight size={20} className="ml-2" />
+                <ChevronRight size={18} className="ml-2" />
               </Link>
             </Button>
           </div>

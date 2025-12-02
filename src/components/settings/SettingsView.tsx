@@ -464,17 +464,16 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
               <Button 
                 onClick={handleSaveAISettings}
                 disabled={aiStatus === 'executing' || loading}
-                size="lg"
-                className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all h-11 px-8 font-semibold text-base bg-primary text-primary-foreground"
+                className="shadow-md hover:shadow-lg transition-all h-9 px-5 font-medium bg-primary text-primary-foreground"
               >
                 {aiStatus === 'executing' ? (
                   <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Saving...
                   </>
                 ) : (
                   <>
-                    <Save className="mr-2 h-5 w-5" />
+                    <Save className="mr-2 h-4 w-4" />
                     Save AI Settings
                   </>
                 )}
@@ -534,17 +533,16 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
               <Button 
                 onClick={handleSaveNotificationSettings}
                 disabled={notifStatus === 'executing' || loading}
-                size="lg"
-                className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all h-11 px-8 font-semibold text-base bg-primary text-primary-foreground"
+                className="shadow-md hover:shadow-lg transition-all h-9 px-5 font-medium bg-primary text-primary-foreground"
               >
                 {notifStatus === 'executing' ? (
                   <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Saving...
                   </>
                 ) : (
                   <>
-                    <Save className="mr-2 h-5 w-5" />
+                    <Save className="mr-2 h-4 w-4" />
                     Save Notification Settings
                   </>
                 )}
@@ -682,22 +680,21 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
               </CardContent>
             </Card>
 
-            <div className="flex justify-end gap-4">
+            <div className="flex justify-end gap-3">
               <Button 
                 onClick={handleSaveAccountSettings}
                 disabled={accountStatus === 'executing' || loading}
                 variant="outline"
-                size="lg"
-                className="h-11 px-6 border-2 hover:bg-muted/50 transition-all font-semibold text-base"
+                className="h-9 px-4 border-2 hover:bg-muted/50 transition-all font-medium"
               >
                 {accountStatus === 'executing' ? (
                   <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Saving...
                   </>
                 ) : (
                   <>
-                    <User className="mr-2 h-5 w-5" />
+                    <User className="mr-2 h-4 w-4" />
                     Save Profile
                   </>
                 )}
@@ -705,17 +702,16 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
               <Button 
                 onClick={handleSaveSyncSettings}
                 disabled={syncStatus === 'executing' || loading}
-                size="lg"
-                className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all h-11 px-8 font-semibold text-base bg-primary text-primary-foreground"
+                className="shadow-md hover:shadow-lg transition-all h-9 px-5 font-medium bg-primary text-primary-foreground"
               >
                 {syncStatus === 'executing' ? (
                   <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Saving...
                   </>
                 ) : (
                   <>
-                    <Save className="mr-2 h-5 w-5" />
+                    <Save className="mr-2 h-4 w-4" />
                     Save Preferences
                   </>
                 )}
