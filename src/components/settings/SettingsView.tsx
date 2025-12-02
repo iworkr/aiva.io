@@ -29,6 +29,7 @@ import {
   CreditCard,
   Lock,
   Crown,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAction } from 'next-safe-action/hooks';
@@ -392,7 +393,12 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                 onClick={handleSaveAISettings}
                 disabled={aiStatus === 'executing' || loading}
               >
-                {aiStatus === 'executing' ? 'Saving...' : 'Save AI Settings'}
+                {aiStatus === 'executing' ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : 'Save AI Settings'}
               </Button>
             </div>
           </TabsContent>
@@ -450,7 +456,12 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                 onClick={handleSaveNotificationSettings}
                 disabled={notifStatus === 'executing' || loading}
               >
-                {notifStatus === 'executing' ? 'Saving...' : 'Save Notification Settings'}
+                {notifStatus === 'executing' ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : 'Save Notification Settings'}
               </Button>
             </div>
           </TabsContent>
@@ -584,13 +595,23 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                 disabled={accountStatus === 'executing' || loading}
                 variant="outline"
               >
-                {accountStatus === 'executing' ? 'Saving...' : 'Save Profile'}
+                {accountStatus === 'executing' ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : 'Save Profile'}
               </Button>
               <Button 
                 onClick={handleSaveSyncSettings}
                 disabled={syncStatus === 'executing' || loading}
               >
-                {syncStatus === 'executing' ? 'Saving...' : 'Save Preferences'}
+                {syncStatus === 'executing' ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : 'Save Preferences'}
               </Button>
             </div>
           </TabsContent>

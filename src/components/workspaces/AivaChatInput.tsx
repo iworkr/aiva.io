@@ -26,21 +26,7 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
   const justClosedRef = useRef(false);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Helper to close the panel and prevent immediate re-open
-  const closePanel = () => {
-    setIsOpen(false);
-    stop();
-    justClosedRef.current = true;
-    // Clear any existing timeout
-    if (closeTimeoutRef.current) {
-      clearTimeout(closeTimeoutRef.current);
-    }
-    // Allow re-opening after 300ms
-    closeTimeoutRef.current = setTimeout(() => {
-      justClosedRef.current = false;
-    }, 300);
-  };
-
+  // useChat hook MUST be declared before closePanel to avoid stale closure
   const { messages, append, isLoading, input, setInput, stop } = useChat({
     id: chatId,
     api: '/api/chat',
@@ -60,6 +46,25 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
       }
     },
   });
+
+  // Helper to close the panel and prevent immediate re-open
+  // NOTE: This must be defined AFTER useChat so `stop` is available
+  const closePanel = () => {
+    console.log('closePanel called, isOpen:', isOpen); // Debug log
+    setIsOpen(false);
+    if (stop) {
+      stop();
+    }
+    justClosedRef.current = true;
+    // Clear any existing timeout
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+    }
+    // Allow re-opening after 500ms (increased from 300ms for reliability)
+    closeTimeoutRef.current = setTimeout(() => {
+      justClosedRef.current = false;
+    }, 500);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,12 +154,20 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
             <Button
               variant="ghost"
               size="sm"
+              type="button"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                closePanel();
+                // Direct state manipulation for reliability
+                setIsOpen(false);
+                stop?.();
+                justClosedRef.current = true;
+                if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+                closeTimeoutRef.current = setTimeout(() => {
+                  justClosedRef.current = false;
+                }, 500);
               }}
-              className="h-8 w-8 p-0 hover:bg-destructive/10"
+              className="h-8 w-8 p-0 hover:bg-destructive/10 focus:ring-2 focus:ring-destructive/20"
               aria-label="Close Aiva Assistant"
             >
               <X className="h-4 w-4" />

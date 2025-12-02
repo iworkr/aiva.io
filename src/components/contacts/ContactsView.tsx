@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useEffect, useState, useMemo, useCallback, useTransition, useDeferredValue, memo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useTransition, useDeferredValue, memo, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -283,32 +283,36 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
       </div>
 
       {/* Create/Edit Contact Dialog - Lazy Loaded */}
-      <LazyCreateEditContactDialog
-        open={showCreateDialog}
-        onOpenChange={setShowCreateDialog}
-        workspaceId={workspaceId}
-        userId={userId}
-        contact={selectedContact}
-        onSuccess={() => {
-          fetchContacts();
-          setSelectedContact(null);
-        }}
-      />
+      <Suspense fallback={null}>
+        <LazyCreateEditContactDialog
+          open={showCreateDialog}
+          onOpenChange={setShowCreateDialog}
+          workspaceId={workspaceId}
+          userId={userId}
+          contact={selectedContact}
+          onSuccess={() => {
+            fetchContacts();
+            setSelectedContact(null);
+          }}
+        />
+      </Suspense>
 
       {/* Contact Detail Dialog - Lazy Loaded */}
       {selectedContact && (
-        <LazyContactDetailDialog
-          open={showDetailDialog}
-          onOpenChange={setShowDetailDialog}
-          contact={selectedContact}
-          workspaceId={workspaceId}
-          userId={userId}
-          onEdit={() => {
-            setShowDetailDialog(false);
-            setShowCreateDialog(true);
-          }}
-          onUpdate={fetchContacts}
-        />
+        <Suspense fallback={null}>
+          <LazyContactDetailDialog
+            open={showDetailDialog}
+            onOpenChange={setShowDetailDialog}
+            contact={selectedContact}
+            workspaceId={workspaceId}
+            userId={userId}
+            onEdit={() => {
+              setShowDetailDialog(false);
+              setShowCreateDialog(true);
+            }}
+            onUpdate={fetchContacts}
+          />
+        </Suspense>
       )}
     </div>
   );
