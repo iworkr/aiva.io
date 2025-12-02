@@ -1,7 +1,6 @@
 import { reviews } from "@/data/anon/reviews";
 import { cn } from "@/utils/cn";
 import Image from "next/image";
-import { Marquee } from "../magicui/marquee";
 import TitleBlock from "../title-block";
 
 export default function Testimonials() {
@@ -24,8 +23,8 @@ export default function Testimonials() {
     );
   }
 
-  const firstRow = reviews.slice(0, 3);
-  const secondRow = reviews.slice(3, 6);
+  // Show all testimonials in a responsive grid - no repetition
+  const displayedReviews = reviews.slice(0, 6);
 
   return (
     <section className="bg-muted/40 py-28 px-6">
@@ -34,22 +33,11 @@ export default function Testimonials() {
           title="Don't take our word for it"
           subtitle="Join thousands of professionals who save 10+ hours per week with Aiva"
         />
-        <div className="relative flex h-full w-full flex-col pt-10 items-center justify-center overflow-hidden">
-          {/* First row - uses repeat={2} for minimal duplication while maintaining smooth scroll */}
-          <Marquee pauseOnHover className="[--duration:30s]" repeat={2}>
-            {firstRow.map((review) => (
-              <ReviewCard key={review.username} {...review} />
-            ))}
-          </Marquee>
-          {secondRow.length > 0 && (
-            <Marquee reverse pauseOnHover className="[--duration:30s]" repeat={2}>
-              {secondRow.map((review) => (
-                <ReviewCard key={review.username} {...review} />
-              ))}
-            </Marquee>
-          )}
-          <div className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-linear-to-r from-muted/40 "></div>
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 bg-linear-to-l from-muted/40 "></div>
+        {/* Static grid layout - shows all testimonials without repetition */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-6">
+          {displayedReviews.map((review) => (
+            <ReviewCard key={review.username} {...review} />
+          ))}
         </div>
       </div>
     </section>

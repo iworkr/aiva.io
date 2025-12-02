@@ -450,7 +450,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
               <Button 
                 onClick={handleSaveAISettings}
                 disabled={aiStatus === 'executing' || loading}
-                className="shadow-md hover:shadow-lg transition-shadow px-6"
+                className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all h-10 px-6 font-medium"
               >
                 {aiStatus === 'executing' ? (
                   <>
@@ -514,7 +514,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
               <Button 
                 onClick={handleSaveNotificationSettings}
                 disabled={notifStatus === 'executing' || loading}
-                className="shadow-md hover:shadow-lg transition-shadow px-6"
+                className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all h-10 px-6 font-medium"
               >
                 {notifStatus === 'executing' ? (
                   <>
@@ -661,7 +661,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                 onClick={handleSaveAccountSettings}
                 disabled={accountStatus === 'executing' || loading}
                 variant="outline"
-                className="px-5"
+                className="h-10 px-5 border-2 hover:bg-muted/50 transition-all font-medium"
               >
                 {accountStatus === 'executing' ? (
                   <>
@@ -673,7 +673,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
               <Button 
                 onClick={handleSaveSyncSettings}
                 disabled={syncStatus === 'executing' || loading}
-                className="shadow-md hover:shadow-lg transition-shadow px-6"
+                className="shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all h-10 px-6 font-medium"
               >
                 {syncStatus === 'executing' ? (
                   <>

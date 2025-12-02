@@ -28,6 +28,7 @@ import {
   Linkedin,
   Instagram,
   Facebook,
+  ShieldAlert,
 } from 'lucide-react';
 import {
   markMessageAsReadAction,
@@ -43,6 +44,12 @@ import { cn } from '@/lib/utils';
 import { PriorityBadge, CategoryBadge, SentimentBadge } from './ClassificationBadges';
 import { QuickReply } from './QuickReply';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface MessageItemProps {
   message: any;
@@ -203,26 +210,52 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
       ? ((message as any).sender_avatar_url as string)
       : undefined;
 
-  const stripHtml = (input: string | null | undefined) =>
-    input ? input.replace(/<[^>]+>/g, '').trim() : '';
+  // Robust HTML sanitization - strips all HTML tags and entities
+  const stripHtml = (input: string | null | undefined): string => {
+    if (!input) return '';
+    return input
+      // Remove all HTML tags including doctype, comments, scripts, styles
+      .replace(/<!DOCTYPE[^>]*>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, '')
+      // Decode common HTML entities
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&[a-z]+;/gi, ' ')
+      // Clean up whitespace
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
 
   // Mask sensitive content (OTPs, passwords, verification codes)
-  const maskSensitiveContent = (text: string): string => {
+  const maskSensitiveContent = (text: string): { masked: string; hasMaskedContent: boolean } => {
     const sensitivePatterns = [
       /\b(OTP|code|verification|pin)[\s:]*\d{4,8}\b/gi,
       /\b(password|pwd|pass)[\s:]*\S+\b/gi,
       /\b\d{4,8}\s*(is your|is the|code)\b/gi,
     ];
     let maskedText = text;
+    let hasMaskedContent = false;
     for (const pattern of sensitivePatterns) {
+      if (pattern.test(maskedText)) {
+        hasMaskedContent = true;
+      }
       maskedText = maskedText.replace(pattern, '••••••');
     }
-    return maskedText;
+    return { masked: maskedText, hasMaskedContent };
   };
 
-  const safeSnippet = maskSensitiveContent(
-    message.snippet || stripHtml(message.body)?.substring(0, 200) || 'No preview available'
-  );
+  // Apply HTML stripping to both snippet and body, then mask sensitive content
+  const rawSnippet = message.snippet || message.body || '';
+  const cleanedSnippet = stripHtml(rawSnippet).substring(0, 200);
+  const { masked: safeSnippet, hasMaskedContent } = maskSensitiveContent(cleanedSnippet);
+  const displaySnippet = safeSnippet || 'No preview available';
 
   return (
     <div
@@ -324,10 +357,26 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
             {message.subject || '(no subject)'}
           </div>
 
-          {/* Snippet */}
-          <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">
-            {safeSnippet}
-          </p>
+          {/* Snippet with masked content indicator */}
+          <div className="mt-1.5 flex items-start gap-1.5">
+            <p className="line-clamp-2 text-sm text-muted-foreground flex-1">
+              {displaySnippet}
+            </p>
+            {hasMaskedContent && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="flex-shrink-0 mt-0.5">
+                      <ShieldAlert className="h-3.5 w-3.5 text-amber-500" aria-label="Contains masked sensitive content" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">Sensitive content (codes, passwords) hidden for security</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
 
           {/* AI Classifications */}
           {(message.category || message.sentiment || message.actionability) && (

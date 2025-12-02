@@ -2,16 +2,21 @@ import { Pagination } from "@/components/Pagination";
 import { Link } from "@/components/intl-link";
 import { T } from "@/components/ui/Typography";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { DBTable } from "@/types";
 import { NEW_STATUS_OPTIONS } from "@/utils/feedback";
 import {
   Bug,
   LucideCloudLightning,
+  Lightbulb,
   MessageSquare,
   ThumbsUp,
+  Sparkles,
 } from "lucide-react";
 import { Suspense } from "react";
 import { FeedbackAvatarServer } from "./FeedbackAvatarServer";
+import { GiveFeedbackAnonUser } from "@/components/give-feedback-anon-use";
+import { GiveFeedbackDialog } from "./GiveFeedbackDialog";
 import type { FiltersSchema } from "./schema";
 
 const typeIcons = {
@@ -137,11 +142,38 @@ function FeedbackListContent({
             />
           ))
         ) : (
-          <div className="flex h-full w-full items-center justify-center p-6">
-            <div className="flex flex-col items-center gap-1.5 text-center">
-              <h3 className="font-semibold text-sm">No Feedbacks Available</h3>
-              <p className="text-xs text-muted-foreground">
-                {emptyStateMessages[userType]}
+          <div className="flex h-full w-full items-center justify-center p-10">
+            <div className="flex flex-col items-center gap-4 text-center max-w-md">
+              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <Lightbulb className="h-8 w-8 text-primary" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="font-semibold text-lg">Be the First to Share Your Ideas!</h3>
+                <p className="text-sm text-muted-foreground">
+                  {userType === "anon" 
+                    ? "Help shape the future of Aiva.io. Share your feature requests, report bugs, or give us feedback on how we can improve."
+                    : emptyStateMessages[userType]}
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                {userType === "anon" ? (
+                  <GiveFeedbackAnonUser>
+                    <Button className="shadow-md hover:shadow-lg transition-shadow">
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Submit Feedback
+                    </Button>
+                  </GiveFeedbackAnonUser>
+                ) : userType === "loggedIn" ? (
+                  <GiveFeedbackDialog>
+                    <Button className="shadow-md hover:shadow-lg transition-shadow">
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Submit Feedback
+                    </Button>
+                  </GiveFeedbackDialog>
+                ) : null}
+              </div>
+              <p className="text-xs text-muted-foreground pt-2">
+                Your feedback helps us build a better product for everyone.
               </p>
             </div>
           </div>

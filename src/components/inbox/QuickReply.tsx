@@ -130,21 +130,21 @@ export function QuickReply({
   };
 
   return (
-    <div className="mt-2 border-t pt-2" onClick={(e) => e.stopPropagation()}>
+    <div className="mt-3 border-t pt-3" onClick={(e) => e.stopPropagation()}>
       <Button
         variant="outline"
         size="sm"
         onClick={handleToggle}
-        className="h-8 w-full justify-between text-xs border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary/50 text-foreground transition-all"
+        className="h-9 w-full justify-between text-sm border-2 border-primary/40 bg-primary/10 hover:bg-primary/20 hover:border-primary/60 text-foreground font-medium shadow-sm hover:shadow-md transition-all"
       >
         <div className="flex items-center gap-2">
-          <Sparkles className="h-3 w-3 text-primary" />
-          <span className="font-medium">Quick Reply</span>
+          <Sparkles className="h-4 w-4 text-primary" />
+          <span>Quick Reply with AI</span>
         </div>
         {isExpanded ? (
-          <ChevronUp className="h-3 w-3" />
+          <ChevronUp className="h-4 w-4" />
         ) : (
-          <ChevronDown className="h-3 w-3" />
+          <ChevronDown className="h-4 w-4" />
         )}
       </Button>
 

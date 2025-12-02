@@ -305,19 +305,19 @@ export async function MorningBrief() {
       {/* AI Chat Input */}
       <AivaChatInput />
 
-      {/* Quick Stats */}
+      {/* Quick Stats - Interactive cards with clear hover states */}
       <div className="grid grid-cols-3 gap-3 pt-3">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Card className={`cursor-help transition-all hover:shadow-md ${newMessages === 0 ? 'opacity-60' : ''}`}>
-                <CardContent className="p-3 text-center">
+              <Card className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:border-primary/30 ${newMessages === 0 ? 'opacity-60' : 'border-primary/10'}`}>
+                <CardContent className="p-4 text-center">
                   {newMessages === 0 ? (
                     <div className="text-sm font-medium text-muted-foreground">No new messages yet</div>
                   ) : (
-                    <div className="text-xl font-bold">{newMessages}</div>
+                    <div className="text-2xl font-bold text-primary">{newMessages}</div>
                   )}
-                  <div className="text-xs text-muted-foreground">New Messages</div>
+                  <div className="text-xs text-muted-foreground mt-1">New Messages</div>
                 </CardContent>
               </Card>
             </TooltipTrigger>
@@ -330,14 +330,14 @@ export async function MorningBrief() {
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Card className={`cursor-help transition-all hover:shadow-md ${(todayEventsCount || 0) === 0 ? 'opacity-60' : ''}`}>
-                <CardContent className="p-3 text-center">
+              <Card className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:border-primary/30 ${(todayEventsCount || 0) === 0 ? 'opacity-60' : 'border-primary/10'}`}>
+                <CardContent className="p-4 text-center">
                   {(todayEventsCount || 0) === 0 ? (
                     <div className="text-sm font-medium text-muted-foreground">No events today</div>
                   ) : (
-                    <div className="text-xl font-bold">{todayEventsCount || 0}</div>
+                    <div className="text-2xl font-bold text-primary">{todayEventsCount || 0}</div>
                   )}
-                  <div className="text-xs text-muted-foreground">Today's Events</div>
+                  <div className="text-xs text-muted-foreground mt-1">Today's Events</div>
                 </CardContent>
               </Card>
             </TooltipTrigger>
@@ -350,14 +350,14 @@ export async function MorningBrief() {
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Card className={`cursor-help transition-all hover:shadow-md ${(upcomingEvents?.length || 0) === 0 ? 'opacity-60' : ''}`}>
-                <CardContent className="p-3 text-center">
+              <Card className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:border-primary/30 ${(upcomingEvents?.length || 0) === 0 ? 'opacity-60' : 'border-primary/10'}`}>
+                <CardContent className="p-4 text-center">
                   {(upcomingEvents?.length || 0) === 0 ? (
                     <div className="text-sm font-medium text-muted-foreground">No upcoming events</div>
                   ) : (
-                    <div className="text-xl font-bold">{upcomingEvents?.length || 0}</div>
+                    <div className="text-2xl font-bold text-primary">{upcomingEvents?.length || 0}</div>
                   )}
-                  <div className="text-xs text-muted-foreground">Upcoming Events</div>
+                  <div className="text-xs text-muted-foreground mt-1">Upcoming Events</div>
                 </CardContent>
               </Card>
             </TooltipTrigger>
