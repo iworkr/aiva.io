@@ -9,10 +9,11 @@ export function ExternalNavigationCTAButton({
   isLoading?: boolean;
 }) {
   const href = isLoggedIn ? "/dashboard" : "/login";
-  const text = isLoggedIn ? "Dashboard" : "Log In";
+  // Use "Open App" instead of "Dashboard" on marketing pages for clarity
+  const text = isLoggedIn ? "Open App" : "Log In";
   return (
     <Link href={href} className="w-full">
-      <Button variant="default" size="default" className="group w-full">
+      <Button variant="default" size="default" className="group w-full" aria-label={isLoading ? "Please wait" : isLoggedIn ? "Open Aiva.io app" : "Log in to Aiva.io"}>
         {isLoading ? (
           "Please wait..."
         ) : (
@@ -23,6 +24,7 @@ export function ExternalNavigationCTAButton({
               fill="currentColor"
               viewBox="0 0 20 20"
               xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
             >
               <path
                 fillRule="evenodd"

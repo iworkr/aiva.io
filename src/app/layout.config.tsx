@@ -4,7 +4,7 @@ import { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
 
 export const baseOptions: BaseLayoutProps = {
   nav: {
-    title: "Nextbase Ultimate docs",
+    title: "Aiva.io docs",
     url: "/docs",
   },
 };

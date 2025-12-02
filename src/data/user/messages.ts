@@ -31,6 +31,7 @@ export const getMessagesAction = authActionClient
       priority,
       category,
       isRead,
+      isStarred,
       limit,
       offset,
       orderBy,
@@ -81,6 +82,9 @@ export const getMessagesAction = authActionClient
     }
     if (isRead !== undefined) {
       query = query.eq('is_read', isRead);
+    }
+    if (isStarred !== undefined) {
+      query = query.eq('is_starred', isStarred);
     }
 
     // Apply ordering and pagination
@@ -783,6 +787,46 @@ export const archiveMessageAction = authActionClient
 
     if (error) {
       throw new Error(`Failed to archive message: ${error.message}`);
+    }
+
+    revalidatePath(`/inbox`);
+
+    return {
+      success: true,
+      data,
+    };
+  });
+
+// ============================================================================
+// UNARCHIVE MESSAGE
+// ============================================================================
+
+export const unarchiveMessageAction = authActionClient
+  .schema(updateMessageSchema.pick({ id: true, workspaceId: true }))
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    const { id, workspaceId } = parsedInput;
+
+    // Verify workspace membership
+    const isMember = await isWorkspaceMember(userId, workspaceId);
+    if (!isMember) {
+      throw new Error('You are not a member of this workspace');
+    }
+
+    const supabase = await createSupabaseUserServerActionClient();
+
+    const { data, error } = await supabase
+      .from('messages')
+      .update({
+        status: 'read',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to unarchive message: ${error.message}`);
     }
 
     revalidatePath(`/inbox`);

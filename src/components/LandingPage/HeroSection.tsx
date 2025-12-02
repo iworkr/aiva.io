@@ -11,13 +11,13 @@ export default function HeroSection() {
     <section className="py-10 lg:py-20 text-left px-6 lg:text-center max-w-5xl mx-auto">
       <div className="flex flex-col gap-10 w-full">
         <div className="space-y-4 flex flex-col  lg:items-center  flex-1">
-          <Link href={"#pricing"}>
+          <Link href={"#features"} aria-label="Learn about AI-Powered Communication Assistant features">
             <div className="flex items-center  gap-2 py-1 px-3 w-fit rounded-full border border-border dark:border-none bg-secondary">
-              <Sparkles size={16} />
+              <Sparkles size={16} aria-hidden="true" />
               <span className="text-md font-medium lg:text-base">
                 🚀 New: AI-Powered Communication Assistant
               </span>
-              <ArrowRight size={16} />
+              <ArrowRight size={16} aria-hidden="true" />
             </div>
           </Link>
           <h1 className="font-semibold text-3xl lg:text-6xl leading-tight">
@@ -65,7 +65,7 @@ export default function HeroSection() {
         </div>
         <div className="relative w-full aspect-21/9 rounded-md border-2 border-border shadow-xs overflow-hidden">
           <Image
-            alt="Hero Image"
+            alt="Aiva.io unified inbox dashboard showing AI-powered message management across Gmail, Outlook, Slack, and other communication channels"
             src="/images/hero.jpeg"
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"

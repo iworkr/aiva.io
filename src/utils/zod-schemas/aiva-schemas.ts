@@ -210,6 +210,7 @@ export const getMessagesSchema = z.object({
   priority: MessagePrioritySchema.optional(),
   category: MessageCategorySchema.optional(),
   isRead: z.boolean().optional(),
+  isStarred: z.boolean().optional(),
   limit: z.number().min(1).max(100).default(50),
   offset: z.number().min(0).default(0),
   orderBy: z.enum(['timestamp', 'priority']).default('timestamp'),

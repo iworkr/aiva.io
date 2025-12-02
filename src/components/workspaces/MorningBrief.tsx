@@ -151,6 +151,10 @@ export async function MorningBrief() {
   // Build briefing items
   const briefingItems: BriefingItem[] = [];
 
+  // Utility: strip basic HTML tags from message bodies for cleaner snippets
+  const stripHtml = (input: string | null | undefined) =>
+    input ? input.replace(/<[^>]+>/g, '').trim() : '';
+
   // Add urgent messages
   if (urgentMessages) {
     urgentMessages.forEach((msg: any) => {
@@ -158,7 +162,7 @@ export async function MorningBrief() {
         id: msg.id,
         type: 'message',
         title: msg.subject || 'No subject',
-        description: msg.body?.substring(0, 100) || '',
+        description: stripHtml(msg.body)?.substring(0, 140) || '',
         priority: msg.priority === 'urgent' ? 'urgent' : 'high',
         timestamp: msg.created_at ? new Date(msg.created_at) : undefined,
         href: `/inbox/${msg.id}`,

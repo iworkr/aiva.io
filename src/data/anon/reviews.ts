@@ -5,41 +5,13 @@ type Review = {
   img: string;
 };
 
+// Placeholder testimonials - replace with real customer quotes when available
+// For now, using a simplified "coming soon" approach per FIX02 guidance
 export const reviews: Review[] = [
   {
-    name: "Jack",
-    username: "@jack",
-    body: "I've never seen anything like this before. It's amazing. I love it.",
-    img: "/images/quote.png",
-  },
-  {
-    name: "Jill",
-    username: "@jill",
-    body: "I don't know what to say. I'm speechless. This is amazing.",
-    img: "/images/quote.png",
-  },
-  {
-    name: "John",
-    username: "@john",
-    body: "I'm at a loss for words. This is amazing. I love it.",
-    img: "/images/quote.png",
-  },
-  {
-    name: "Jane",
-    username: "@jane",
-    body: "I'm at a loss for words. This is amazing. I love it.",
-    img: "/images/quote.png",
-  },
-  {
-    name: "Jenny",
-    username: "@jenny",
-    body: "I'm at a loss for words. This is amazing. I love it.",
-    img: "/images/quote.png",
-  },
-  {
-    name: "James",
-    username: "@james",
-    body: "I'm at a loss for words. This is amazing. I love it.",
+    name: "Customer Stories",
+    username: "Coming Soon",
+    body: "We're collecting feedback from early users. Real customer testimonials will be added here soon.",
     img: "/images/quote.png",
   },
 ];

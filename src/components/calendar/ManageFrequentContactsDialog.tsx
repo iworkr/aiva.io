@@ -123,7 +123,7 @@ export function ManageFrequentContactsDialog({
             Frequently Met With
           </DialogTitle>
           <DialogDescription>
-            Manage your frequently met contacts for quick scheduling
+            Manage your frequently met contacts for quick scheduling. These contacts will appear as suggestions when creating events.
           </DialogDescription>
         </DialogHeader>
 

@@ -32,6 +32,18 @@ export function AuthFormInput<TFieldValues extends FieldValues>({
   inputProps,
   ...restProps
 }: AuthFormInputProps<TFieldValues>) {
+  // Generate accessible label from name
+  const getAccessibleLabel = (fieldName: string) => {
+    const labels: Record<string, string> = {
+      email: 'Email address',
+      password: 'Password',
+    };
+    return labels[fieldName] || fieldName;
+  };
+
+  const accessibleLabel = getAccessibleLabel(name as string);
+  const ariaLabel = inputProps?.['aria-label'] || accessibleLabel;
+
   return (
     <FormField
       control={control}
@@ -43,11 +55,17 @@ export function AuthFormInput<TFieldValues extends FieldValues>({
               id={id}
               type={type}
               placeholder={placeholder}
+              aria-label={ariaLabel}
+              aria-describedby={description ? `${id}-description` : undefined}
               {...inputProps}
               {...field}
             />
           </FormControl>
-          {description && <FormDescription>{description}</FormDescription>}
+          {description && (
+            <FormDescription id={`${id}-description`}>
+              {description}
+            </FormDescription>
+          )}
           <FormMessage />
         </FormItem>
       )}

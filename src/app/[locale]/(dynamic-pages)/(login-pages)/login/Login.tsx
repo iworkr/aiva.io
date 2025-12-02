@@ -141,6 +141,7 @@ export function Login({
         <Link
           href="/forgot-password"
           className="text-sm text-blue-600 hover:underline"
+          aria-label="Forgot password? Reset your password"
         >
           Forgot password?
         </Link>

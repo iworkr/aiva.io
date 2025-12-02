@@ -9,8 +9,9 @@ import { PublicBlogList } from "../PublicBlogList";
 import { TagsNav } from "../TagsNav";
 
 export const metadata = {
-  title: "Blog List | Nextbase",
-  description: "Collection of the latest blog posts from the team at Nextbase",
+  title: "Aiva.io Blog – Product updates, ideas, and best practices",
+  description:
+    "Read the latest product updates, ideas, and best practices from the Aiva.io team.",
   icons: {
     icon: "/images/logo-black-main.ico",
   },
@@ -38,11 +39,11 @@ export default async function BlogListPage(props: {
     <div className="space-y-8 w-full">
       <div className="flex items-center flex-col space-y-4">
         <div className="space-y-2 text-center">
-          <T.Subtle>Blog</T.Subtle>
-          <T.H1>All blog posts</T.H1>
+          <T.Subtle>Aiva.io Blog</T.Subtle>
+          <T.H1>All posts from the Aiva.io team</T.H1>
           <T.P className="text-xl leading-[30px] text-muted-foreground">
-            Here is a collection of the latest blog posts from the team at
-            Nextbase.
+            Here is a collection of the latest articles, guides, and product
+            updates from the team behind Aiva.io.
           </T.P>
         </div>
         <Suspense fallback={<T.Subtle>Loading tags...</T.Subtle>}>

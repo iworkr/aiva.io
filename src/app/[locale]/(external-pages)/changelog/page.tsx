@@ -19,9 +19,9 @@ export default async function Page(props: {
     <div className="space-y-10 max-w-[1296px] py-8 select-none">
       <div className="flex w-full justify-between items-center">
         <PageHeading
-          title="Changelog"
+          title="Aiva.io Changelog"
           titleClassName="text-2xl font-semibold tracking-normal"
-          subTitle="Stay updated with the latest features and improvements."
+          subTitle="Stay updated with the latest features and improvements across Aiva.io and its underlying platform."
         />
       </div>
       <Suspense fallback={<ChangelogListSkeletonFallBack />}>

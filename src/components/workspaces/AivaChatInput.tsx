@@ -13,6 +13,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Sparkles, Send, X, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { toast } from 'sonner';
 
 interface AivaChatInputProps {
   className?: string;
@@ -31,6 +32,15 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
       setTimeout(() => {
         scrollRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
       }, 100);
+    },
+    onError: (error) => {
+      console.error('Aiva assistant error:', error);
+      toast.error('Aiva had trouble answering that. Please try again in a moment.');
+    },
+    onResponse: (response) => {
+      if (response.status === 401) {
+        toast.error('Your session has expired. Please log in again.');
+      }
     },
   });
 
@@ -116,6 +126,15 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
                   <li>"Show me tasks due today"</li>
                   <li>"Summarize my unread messages"</li>
                 </ul>
+                <p className="text-xs pt-2">
+                  Tip: Connect your Gmail, Outlook, or other channels so Aiva can give richer answers.{" "}
+                  <a
+                    href="/inbox"
+                    className="underline text-primary"
+                  >
+                    Go to channels
+                  </a>
+                </p>
               </div>
             ) : (
               <div className="space-y-4">

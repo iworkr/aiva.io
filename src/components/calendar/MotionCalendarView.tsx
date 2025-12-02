@@ -274,16 +274,18 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
                   size="icon"
                   onClick={goToPrevious}
                   className="h-8 w-8"
+                  aria-label="Go to previous period"
                 >
-                  <ChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={goToNext}
                   className="h-8 w-8"
+                  aria-label="Go to next period"
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </div>
               <h2 className="text-lg font-semibold">{getViewTitle()}</h2>
@@ -345,8 +347,9 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
               </div>
               <Button 
                 onClick={() => setShowCreateDialog(true)}
+                aria-label="Create new calendar event"
               >
-                <Plus className="mr-2 h-4 w-4" />
+                <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
                 Add event
               </Button>
             </div>
@@ -360,13 +363,19 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
               <div className="flex h-full items-center justify-center">
                 <CalendarIcon className="h-8 w-8 animate-pulse text-muted-foreground" />
               </div>
-            ) : events.length === 0 ? (
+            ) : getFilteredEvents().length === 0 ? (
               <div className="flex h-full items-center justify-center">
                 <div className="text-center max-w-md px-6">
                   <CalendarIcon className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No events scheduled</h3>
+                  <h3 className="text-lg font-semibold mb-2">
+                    {searchQuery
+                      ? `No events found for “${searchQuery}”`
+                      : 'No events scheduled'}
+                  </h3>
                   <p className="text-sm text-muted-foreground mb-6">
-                    Your calendar is empty. Create your first event to get started, or connect a calendar account to sync existing events.
+                    {searchQuery
+                      ? 'Try a different keyword or clear the search to see all events.'
+                      : 'Your calendar is empty. Create your first event to get started, or connect a calendar account to sync existing events.'}
                   </p>
                   <Button onClick={() => setShowCreateDialog(true)}>
                     <Plus className="mr-2 h-4 w-4" />
@@ -484,6 +493,9 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Search Events</DialogTitle>
+            <DialogDescription>
+              Find events by title, description, or location
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <Input
@@ -491,7 +503,17 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               autoFocus
+              aria-label="Search events"
             />
+            {searchQuery && (
+              <div className="text-sm text-muted-foreground">
+                {getFilteredEvents().length === 0 ? (
+                  <p>No events found for &quot;{searchQuery}&quot;</p>
+                ) : (
+                  <p>Found {getFilteredEvents().length} event{getFilteredEvents().length !== 1 ? 's' : ''}</p>
+                )}
+              </div>
+            )}
             <div className="flex justify-end gap-2">
               <Button 
                 variant="outline"
@@ -503,7 +525,7 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
                 Clear
               </Button>
               <Button onClick={() => setShowSearchDialog(false)}>
-                Search
+                Close
               </Button>
             </div>
           </div>
@@ -516,14 +538,15 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
           <DialogHeader>
             <DialogTitle>Filter Events</DialogTitle>
             <DialogDescription>
-              Filter events by calendar and category
+              Filter events by calendar and category. Advanced filtering coming soon.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <h3 className="text-sm font-semibold mb-2">Filter by Calendar</h3>
-              <div className="text-sm text-muted-foreground p-4 bg-muted rounded-lg">
-                Calendar filtering will be available once you connect calendar accounts.
+              <div className="text-sm text-muted-foreground p-4 bg-muted rounded-lg border border-border">
+                <p className="mb-2">Calendar filtering will be available once you connect calendar accounts.</p>
+                <p className="text-xs">Connect your Google Calendar or Outlook calendar to enable filtering by calendar source.</p>
               </div>
             </div>
             <div className="flex justify-end gap-2">

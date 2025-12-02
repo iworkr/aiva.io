@@ -5,6 +5,25 @@ import { Marquee } from "../magicui/marquee";
 import TitleBlock from "../title-block";
 
 export default function Testimonials() {
+  // If we have real testimonials, show them; otherwise show a simplified "coming soon" message
+  if (reviews.length === 0 || (reviews.length === 1 && reviews[0].name === "Customer Stories")) {
+    return (
+      <section className="bg-muted/40 py-24 px-6 ">
+        <div className="max-w-6xl mx-auto space-y-8">
+          <TitleBlock
+            title="Customer Stories"
+            subtitle="Real testimonials from Aiva users coming soon"
+          />
+          <div className="text-center py-12">
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              We're collecting feedback from our early users. Customer testimonials and success stories will be featured here soon.
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   const firstRow = reviews.slice(0, 3);
   const secondRow = reviews.slice(3, 6);
 
@@ -21,11 +40,13 @@ export default function Testimonials() {
               <ReviewCard key={review.username} {...review} />
             ))}
           </Marquee>
-          <Marquee reverse pauseOnHover className="[--duration:20s]">
-            {secondRow.map((review) => (
-              <ReviewCard key={review.username} {...review} />
-            ))}
-          </Marquee>
+          {secondRow.length > 0 && (
+            <Marquee reverse pauseOnHover className="[--duration:20s]">
+              {secondRow.map((review) => (
+                <ReviewCard key={review.username} {...review} />
+              ))}
+            </Marquee>
+          )}
           <div className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-linear-to-r from-muted/40 "></div>
           <div className="pointer-events-none absolute inset-y-0 right-0 w-1/3 bg-linear-to-l from-muted/40 "></div>
         </div>
@@ -57,7 +78,7 @@ const ReviewCard = ({
           className="rounded-full"
           width="32"
           height="32"
-          alt=""
+          alt={`${name} avatar`}
           src={img}
         />
         <div className="flex flex-col">

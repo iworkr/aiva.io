@@ -44,9 +44,31 @@ const Pricing = () => {
         </TabsContent>
         <TabsContent value="annual" className="w-full">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full ">
-            {pricing.map((item, i) => (
-              <PricingCard key={i} {...item} price={item.annualPrice} />
-            ))}
+            {pricing.map((item, i) => {
+              const monthly = Number(item.price);
+              const annualTotal = Number(item.annualPrice);
+              // Calculate realistic annual discount: 2 months free (10 months paid)
+              // This gives approximately 17% discount, which is realistic
+              const monthsPaid = 10; // 2 months free
+              const effectiveMonthly =
+                !Number.isNaN(monthly) && !Number.isNaN(annualTotal) && monthly > 0
+                  ? ((monthly * monthsPaid) / 12).toFixed(0)
+                  : item.annualPrice;
+              
+              // Calculate savings
+              const savings = monthly > 0 && annualTotal > 0
+                ? (monthly * 12 - Number(annualTotal)).toFixed(0)
+                : '0';
+
+              return (
+                <PricingCard
+                  key={i}
+                  {...item}
+                  price={effectiveMonthly}
+                  billingLabel={`${item.annualPrice} billed annually (save $${savings}/year)`}
+                />
+              );
+            })}
           </div>
         </TabsContent>
       </Tabs>
@@ -60,12 +82,14 @@ const PricingCard = ({
   features,
   description,
   isHighlighted = false,
+  billingLabel,
 }: {
   title: string;
   price: string;
   features: string[];
   description: string;
   isHighlighted?: boolean;
+  billingLabel?: string;
 }) => {
   return (
     <Card
@@ -85,7 +109,9 @@ const PricingCard = ({
         </div>
         <div className="flex items-baseline gap-2 py-3">
           <h3 className="text-4xl font-bold tracking-tighter">${price}</h3>
-          <span className="text-muted-foreground">/month</span>
+          <span className="text-muted-foreground">
+            /month {billingLabel && <span className="text-xs ml-1">({billingLabel})</span>}
+          </span>
         </div>
         <Button className="w-full" size="lg" variant="default">Start Free Trial</Button>
       </CardHeader>

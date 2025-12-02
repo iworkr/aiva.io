@@ -11,9 +11,22 @@ const fadeIn = {
 
 export default function DocsPage() {
   return (
-    <div className="max-w-4xl mx-auto px-4 py-12 max-w-3xl">
-      <motion.h1 className="text-4xl font-bold mb-6" {...fadeIn}>
-        Documentation
+    <div className="max-w-4xl mx-auto px-4 py-12 max-w-3xl space-y-6">
+      <motion.div
+        className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm"
+        {...fadeIn}
+      >
+        <p className="font-medium">
+          Aiva.io is built on top of the Nextbase Ultimate framework.
+        </p>
+        <p className="text-muted-foreground">
+          These docs currently describe the underlying Nextbase/Fumadocs system that powers Aiva.io.
+          Aiva-specific documentation will be added here as we expand the product.
+        </p>
+      </motion.div>
+
+      <motion.h1 className="text-4xl font-bold mb-2" {...fadeIn}>
+        Aiva.io Documentation (powered by Nextbase)
       </motion.h1>
 
       <motion.p
@@ -21,9 +34,9 @@ export default function DocsPage() {
         {...fadeIn}
         transition={{ delay: 0.1 }}
       >
-        Nextbase Ultimate ships with Fumadocs. Fumadocs is a powerful
-        documentation framework integrated into Nextbase Ultimate, designed to
-        make creating beautiful and functional documentation a breeze.
+        Aiva.io uses the Nextbase Ultimate + Fumadocs documentation system under the hood.
+        Fumadocs is a powerful documentation framework that makes it easy to create beautiful,
+        searchable docs for the platform and the product.
       </motion.p>
 
       <motion.section className="mb-8" {...fadeIn} transition={{ delay: 0.2 }}>

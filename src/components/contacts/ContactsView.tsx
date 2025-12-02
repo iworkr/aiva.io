@@ -171,12 +171,13 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
           <div className="flex items-center gap-3">
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <Input
                 placeholder="Search contacts..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-64 pl-9"
+                aria-label="Search contacts by name, email, or company"
               />
             </div>
             
@@ -185,17 +186,22 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
               variant={showFavoritesOnly ? 'default' : 'outline'}
               size="sm"
               onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+              aria-label={showFavoritesOnly ? 'Show all contacts' : 'Show only favorite contacts'}
+              aria-pressed={showFavoritesOnly}
             >
-              <Star className={cn('h-4 w-4 mr-2', showFavoritesOnly && 'fill-current')} />
+              <Star className={cn('h-4 w-4 mr-2', showFavoritesOnly && 'fill-current')} aria-hidden="true" />
               Favorites
             </Button>
 
             {/* Add Contact */}
-            <Button onClick={() => {
-              setSelectedContact(null);
-              setShowCreateDialog(true);
-            }}>
-              <Plus className="h-4 w-4 mr-2" />
+            <Button 
+              onClick={() => {
+                setSelectedContact(null);
+                setShowCreateDialog(true);
+              }}
+              aria-label="Add new contact"
+            >
+              <Plus className="h-4 w-4 mr-2" aria-hidden="true" />
               Add Contact
             </Button>
           </div>

@@ -60,23 +60,7 @@ export function AIReplyComposer({ messageId, workspaceId, message }: AIReplyComp
 
   // Send reply
   const handleSend = async () => {
-    if (!replyBody.trim()) {
-      toast.error('Please write a reply');
-      return;
-    }
-
-    setSending(true);
-    try {
-      // TODO: Implement send via provider
-      // For now, just show success
-      toast.success('Reply sent!');
-      setReplyBody('');
-    } catch (error) {
-      toast.error('Failed to send reply');
-      console.error(error);
-    } finally {
-      setSending(false);
-    }
+    toast.info('Full reply sending from this view is coming soon. You can use Quick Reply in the inbox list today.');
   };
 
   return (
@@ -152,7 +136,11 @@ export function AIReplyComposer({ messageId, workspaceId, message }: AIReplyComp
             <div className="text-xs text-muted-foreground">
               {replyBody.length} characters
             </div>
-            <Button onClick={handleSend} disabled={sending || !replyBody.trim()}>
+            <Button
+              onClick={handleSend}
+              disabled
+              title="Coming soon – use Quick Reply in the inbox list for now"
+            >
               {sending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

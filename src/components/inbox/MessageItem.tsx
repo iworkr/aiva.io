@@ -34,6 +34,7 @@ import {
   markMessageAsUnreadAction,
   starMessageAction,
   archiveMessageAction,
+  unarchiveMessageAction,
 } from '@/data/user/messages';
 import { toast } from 'sonner';
 import { useAction } from 'next-safe-action/hooks';
@@ -90,8 +91,26 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
   // Archive action
   const { execute: archive } = useAction(archiveMessageAction, {
     onSuccess: () => {
-      toast.success('Archived');
+      // Show toast with undo option
+      toast.success('Conversation archived', {
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            unarchive({ id: message.id, workspaceId });
+          },
+        },
+      });
       onUpdate();
+    },
+    onError: ({ error }) => {
+      toast.error(error.serverError || 'Failed to archive conversation');
+    },
+  });
+
+  // Unarchive action used by toast "Undo"
+  const { execute: unarchive } = useAction(unarchiveMessageAction, {
+    onError: ({ error }) => {
+      toast.error(error.serverError || 'Failed to undo archive');
     },
   });
 
@@ -165,7 +184,7 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
     return names[provider.toLowerCase()] || provider;
   };
 
-  const timestamp = message.timestamp ? new Date(message.timestamp) : new Date();
+  const timestamp = message.timestamp ? new Date(message.timestamp) : new Date(message.created_at || new Date());
   const isToday = new Date().toDateString() === timestamp.toDateString();
   const timeString = isToday
     ? format(timestamp, 'h:mm a')
@@ -184,12 +203,17 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
       ? ((message as any).sender_avatar_url as string)
       : undefined;
 
+  const stripHtml = (input: string | null | undefined) =>
+    input ? input.replace(/<[^>]+>/g, '').trim() : '';
+
   return (
     <div
       onClick={handleClick}
       className={cn(
-        'group relative cursor-pointer px-6 py-4 transition-colors hover:bg-muted/50 border-b',
-        !message.is_read && 'bg-muted/20'
+        'group relative cursor-pointer px-6 py-4 transition-colors border-b',
+        !message.is_read
+          ? 'bg-primary/5 hover:bg-primary/10 border-l-2 border-l-primary'
+          : 'hover:bg-muted/40'
       )}
     >
       <div className="flex items-start gap-4">
@@ -239,6 +263,7 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
                     variant="ghost"
                     size="sm"
                     className="h-6 w-6 p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                    aria-label="More message actions"
                   >
                     <MoreVertical className="h-4 w-4" />
                   </Button>
@@ -268,7 +293,7 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
           <div
             className={cn(
               'mt-1 truncate text-sm',
-              !message.is_read ? 'font-medium' : 'text-muted-foreground'
+              !message.is_read ? 'font-semibold' : 'text-muted-foreground'
             )}
           >
             {message.subject || '(no subject)'}
@@ -276,7 +301,7 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
 
           {/* Snippet */}
           <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">
-            {message.snippet || message.body?.substring(0, 200) || 'No preview available'}
+            {message.snippet || stripHtml(message.body)?.substring(0, 200) || 'No preview available'}
           </p>
 
           {/* AI Classifications */}
@@ -284,7 +309,7 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
             <div className="mt-2 flex flex-wrap items-center gap-2">
               {message.ai_summary && (
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Sparkles className="h-3 w-3" />
+                  <Sparkles className="h-3 w-3" aria-hidden="true" />
                   <span>AI analyzed</span>
                 </div>
               )}
@@ -297,13 +322,13 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
               {message.sentiment && <SentimentBadge sentiment={message.sentiment} />}
               {message.actionability === 'requires_urgent_action' && (
                 <Badge variant="destructive" className="text-xs">
-                  <AlertCircle className="mr-1 h-3 w-3" />
+                  <AlertCircle className="mr-1 h-3 w-3" aria-hidden="true" />
                   Urgent Action
                 </Badge>
               )}
               {message.actionability === 'requires_action' && (
                 <Badge variant="secondary" className="text-xs">
-                  <Clock className="mr-1 h-3 w-3" />
+                  <Clock className="mr-1 h-3 w-3" aria-hidden="true" />
                   Action Needed
                 </Badge>
               )}

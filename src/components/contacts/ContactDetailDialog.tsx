@@ -216,6 +216,7 @@ export function ContactDetailDialog({
                 variant="ghost"
                 size="icon"
                 onClick={() => toggleFavorite({ id: contact.id, workspaceId })}
+                aria-label={contact.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
               >
                 <Star
                   className={cn(
@@ -224,14 +225,20 @@ export function ContactDetailDialog({
                       ? 'fill-yellow-500 text-yellow-500'
                       : 'text-muted-foreground'
                   )}
+                  aria-hidden="true"
                 />
               </Button>
-              <Button variant="outline" size="sm" onClick={onEdit}>
-                <Edit className="h-4 w-4 mr-2" />
+              <Button variant="outline" size="sm" onClick={onEdit} aria-label="Edit contact">
+                <Edit className="h-4 w-4 mr-2" aria-hidden="true" />
                 Edit
               </Button>
-              <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
-                <X className="h-5 w-5" />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => onOpenChange(false)}
+                aria-label="Close contact details"
+              >
+                <X className="h-5 w-5" aria-hidden="true" />
               </Button>
             </div>
           </div>
@@ -439,8 +446,9 @@ export function ContactDetailDialog({
                           deleteChannel({ id: channel.id, workspaceId });
                         }
                       }}
+                      aria-label={`Remove ${channel.channel_type} channel`}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
                     </Button>
                   </div>
                 ))}
@@ -453,9 +461,11 @@ export function ContactDetailDialog({
           </div>
 
           {/* Tags */}
-          {contact.tags && contact.tags.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold">Tags</h3>
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Tags
+            </h3>
+            {contact.tags && contact.tags.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {contact.tags.map((tag: string, idx: number) => (
                   <Badge key={idx} variant="secondary">
@@ -463,30 +473,57 @@ export function ContactDetailDialog({
                   </Badge>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                No tags added yet. Click Edit to add tags for better organization.
+              </p>
+            )}
+          </div>
 
           {/* Notes */}
-          {contact.notes && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold">Notes</h3>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Notes
+            </h3>
+            {contact.notes ? (
+              <p className="text-base text-foreground whitespace-pre-wrap leading-relaxed">
                 {contact.notes}
               </p>
-            </div>
-          )}
-
-          {/* Metadata */}
-          <div className="pt-4 border-t border-border text-xs text-muted-foreground space-y-1">
-            {contact.interaction_count > 0 && (
-              <p>Total interactions: {contact.interaction_count}</p>
-            )}
-            {contact.last_interaction_at && (
-              <p>
-                Last interaction:{' '}
-                {new Date(contact.last_interaction_at).toLocaleDateString()}
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                No notes added yet. Click Edit to add notes about this contact.
               </p>
             )}
+          </div>
+
+          {/* Recent Messages / Communication History */}
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Communication History
+            </h3>
+            {contact.interaction_count > 0 ? (
+              <div className="space-y-2 text-sm">
+                <p className="text-foreground">
+                  <span className="font-medium">{contact.interaction_count}</span> total interaction{contact.interaction_count !== 1 ? 's' : ''}
+                </p>
+                {contact.last_interaction_at && (
+                  <p className="text-muted-foreground">
+                    Last interaction: {new Date(contact.last_interaction_at).toLocaleDateString()}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground pt-2 border-t border-border">
+                  View related messages in the Inbox to see full conversation history.
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                No communication history yet. Messages from this contact will appear here once you connect your channels.
+              </p>
+            )}
+          </div>
+
+          {/* Metadata */}
+          <div className="pt-4 border-t border-border text-xs text-muted-foreground">
             <p>Added: {new Date(contact.created_at).toLocaleDateString()}</p>
           </div>
         </div>

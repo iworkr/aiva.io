@@ -167,6 +167,9 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
 
   const timestamp = new Date(message.timestamp);
 
+  const stripHtml = (input: string | null | undefined) =>
+    input ? input.replace(/<[^>]+>/g, '').trim() : '';
+
   return (
     <div className="flex h-full">
       {/* Main content */}
@@ -194,24 +197,27 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
                   variant="ghost"
                   size="icon"
                   onClick={handleToggleStar}
+                  aria-label={message.is_starred ? 'Unstar message' : 'Star message'}
                 >
                   <Star
                     className={message.is_starred ? 'fill-yellow-400 text-yellow-400' : ''}
+                    aria-hidden="true"
                   />
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => archive({ id: messageId, workspaceId })}
+                  aria-label="Archive message"
                 >
-                  <Archive />
+                  <Archive aria-hidden="true" />
                 </Button>
               </div>
             </div>
 
             {/* Sender info */}
             <div className="flex items-center gap-4 rounded-lg bg-muted/50 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10" aria-hidden="true">
                 <User className="h-5 w-5" />
               </div>
               <div className="flex-1">
@@ -230,28 +236,30 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="mb-4">
-              <TabsTrigger value="message">
-                <Mail className="mr-2 h-4 w-4" />
-                Message
-              </TabsTrigger>
-              {message.ai_summary && (
-                <TabsTrigger value="ai-insights">
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  AI Insights
+              <TabsList className="mb-4" aria-label="Message view tabs">
+                <TabsTrigger value="message" aria-label="View message content">
+                  <Mail className="mr-2 h-4 w-4" aria-hidden="true" />
+                  Message
                 </TabsTrigger>
-              )}
-              <TabsTrigger value="reply">
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Reply
-              </TabsTrigger>
-            </TabsList>
+                {message.ai_summary && (
+                  <TabsTrigger value="ai-insights" aria-label="View AI insights">
+                    <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
+                    AI Insights
+                  </TabsTrigger>
+                )}
+                <TabsTrigger value="reply" aria-label="Reply to message">
+                  <MessageSquare className="mr-2 h-4 w-4" aria-hidden="true" />
+                  Reply
+                </TabsTrigger>
+              </TabsList>
 
             {/* Message content */}
             <TabsContent value="message">
               <Card>
                 <CardContent className="prose prose-sm max-w-none p-6 dark:prose-invert">
-                  <div className="whitespace-pre-wrap text-foreground">{message.body || ''}</div>
+                  <div className="whitespace-pre-wrap text-foreground">
+                    {stripHtml(message.body || message.body_html || '')}
+                  </div>
                 </CardContent>
               </Card>
 

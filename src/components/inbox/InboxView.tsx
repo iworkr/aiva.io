@@ -28,6 +28,7 @@ import { toast } from 'sonner';
 import { ChannelSidebar } from './ChannelSidebar';
 import { MessageList } from './MessageList';
 import { InboxSkeleton } from './InboxSkeleton';
+import { InboxFilters } from './InboxFilters';
 import type { MessagePriority, MessageCategory } from '@/utils/zod-schemas/aiva-schemas';
 
 interface InboxViewProps {
@@ -64,10 +65,22 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
   // Debounce search for better performance
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
 
+  // Local status filter (Unread/All) for quick toggling
+  const [statusFilter, setStatusFilter] = useState<string | undefined>(filters?.status);
+  
+  // Pagination state
+  const [currentOffset, setCurrentOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [totalMessages, setTotalMessages] = useState(0);
+  const MESSAGES_PER_PAGE = 50;
+
   // Create cache key
   const cacheKey = useMemo(
-    () => `inbox-cache-${workspaceId}-${selectedChannel || 'all'}-${filters?.priority || 'all'}-${filters?.category || 'all'}-${filters?.status || 'all'}`,
-    [workspaceId, selectedChannel, filters?.priority, filters?.category, filters?.status]
+    () =>
+      `inbox-cache-${workspaceId}-${selectedChannel || 'all'}-${
+        filters?.priority || 'all'
+      }-${filters?.category || 'all'}-${statusFilter || 'all'}`,
+    [workspaceId, selectedChannel, filters?.priority, filters?.category, statusFilter]
   );
 
   // Load from cache on mount
@@ -97,7 +110,27 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
         
         // Batch update to prevent individual UI refreshes
         startTransition(() => {
-          setMessages(messagesArray);
+          // If offset is 0, replace messages; otherwise append for pagination
+          if (currentOffset === 0) {
+            setMessages(messagesArray);
+          } else {
+            setMessages((prev) => {
+              // Merge and deduplicate
+              const existingIds = new Set(prev.map((m) => m.id));
+              const newMessages = messagesArray.filter((m) => !existingIds.has(m.id));
+              return [...prev, ...newMessages];
+            });
+          }
+          
+          setHasMore(data.hasMore ?? false);
+          setTotalMessages(data.total ?? messagesArray.length);
+          
+          // Update offset for next load
+          if (currentOffset === 0) {
+            setCurrentOffset(messagesArray.length);
+          } else {
+            setCurrentOffset((prev) => prev + messagesArray.length);
+          }
 
           // Calculate message counts per channel
           const counts: Record<string, number> = {};
@@ -148,6 +181,23 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
       fetchingRef.current = false;
     },
   });
+  
+  // Load more messages (pagination)
+  const loadMoreMessages = useCallback(() => {
+    if (!hasMore || fetchingRef.current) return;
+    const nextOffset = currentOffset + MESSAGES_PER_PAGE;
+    setCurrentOffset(nextOffset);
+    fetchMessages({
+      workspaceId,
+      channelConnectionId: selectedChannel || undefined,
+      priority: filters?.priority,
+      category: filters?.category,
+      isRead: statusFilter === 'unread' ? false : undefined,
+      isStarred: statusFilter === 'starred' ? true : undefined,
+      limit: MESSAGES_PER_PAGE,
+      offset: nextOffset,
+    });
+  }, [hasMore, currentOffset, fetchMessages, workspaceId, selectedChannel, filters, statusFilter]);
 
   // Fetch only new messages (for seamless background sync)
   const { execute: fetchNewMessages } = useAction(getNewMessagesAction, {
@@ -321,9 +371,10 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
         channelConnectionId: selectedChannel || undefined,
         priority: filters?.priority,
         category: filters?.category,
-        isRead: filters?.status === 'unread' ? false : undefined,
-        limit: 100,
-        offset: 0,
+        isRead: statusFilter === 'unread' ? false : undefined,
+        isStarred: statusFilter === 'starred' ? true : undefined,
+        limit: MESSAGES_PER_PAGE,
+        offset: currentOffset,
       });
     }
   }, [
@@ -381,25 +432,32 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
         <div className="border-b bg-background px-6 py-3">
           <div className="flex items-center gap-3">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <Input
                 placeholder="Start typing to ask or search Aiva"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
+                aria-label="Search messages or ask Aiva"
+                aria-describedby="search-description"
               />
+              <span id="search-description" className="sr-only">
+                Search across message subjects, senders, and content. Results update as you type.
+              </span>
             </div>
             <Button
               variant="outline"
               size="sm"
               onClick={handleSync}
               disabled={syncing || syncStatus === 'executing'}
+              aria-label={syncing || syncStatus === 'executing' ? 'Syncing messages, please wait' : 'Sync messages from all connected channels'}
             >
               <RefreshCw
                 className={cn(
                   'h-4 w-4',
                   (syncing || syncStatus === 'executing') && 'animate-spin'
                 )}
+                aria-hidden="true"
               />
             </Button>
           </div>
@@ -471,6 +529,9 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
             <MessageList
               messages={filteredMessages}
               workspaceId={workspaceId}
+              hasMore={hasMore}
+              onLoadMore={loadMoreMessages}
+              loadingMore={fetchStatus === 'executing' && currentOffset > 0}
               onMessageUpdate={() => {
                 // Invalidate cache and refresh messages after update
                 try {
@@ -480,13 +541,15 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
                 }
                 fetchingRef.current = false;
                 lastFetchRef.current = 0; // Force refresh
+                setCurrentOffset(0);
                 fetchMessages({
                   workspaceId,
                   channelConnectionId: selectedChannel || undefined,
                   priority: filters?.priority,
                   category: filters?.category,
-                  isRead: filters?.status === 'unread' ? false : undefined,
-                  limit: 100,
+                  isRead: statusFilter === 'unread' ? false : statusFilter === 'starred' ? undefined : undefined,
+                  isStarred: statusFilter === 'starred' ? true : undefined,
+                  limit: MESSAGES_PER_PAGE,
                   offset: 0,
                 });
               }}

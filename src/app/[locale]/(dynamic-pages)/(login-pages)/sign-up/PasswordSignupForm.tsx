@@ -98,6 +98,7 @@ export function PasswordSignupForm({
           className="w-full"
           type="submit"
           disabled={signUpStatus === "executing"}
+          aria-label={signUpStatus === "executing" ? "Creating account, please wait" : "Create your Aiva.io account"}
         >
           {signUpStatus === "executing" ? "Signing up..." : "Sign up"}
         </Button>

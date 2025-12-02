@@ -29,6 +29,7 @@ import {
   Mailbox,
   Calendar,
   Bell,
+  Star,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -97,6 +98,23 @@ export function InboxFilters({ currentFilters, onFilterChange }: InboxFiltersPro
             label="All"
             filterKey="status"
             filterValue="all"
+          />
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Starred */}
+      <div>
+        <h3 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+          Starred
+        </h3>
+        <div className="space-y-1">
+          <FilterButton
+            icon={Star}
+            label="Starred"
+            filterKey="status"
+            filterValue="starred"
           />
         </div>
       </div>

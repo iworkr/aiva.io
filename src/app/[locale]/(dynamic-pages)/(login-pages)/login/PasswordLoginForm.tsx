@@ -97,6 +97,7 @@ export function PasswordLoginForm({
           type="submit"
           disabled={passwordStatus === "executing"}
           data-testid="password-login-button"
+          aria-label={passwordStatus === "executing" ? "Logging in, please wait" : "Log in to your account"}
         >
           {passwordStatus === "executing" ? "Logging in..." : "Log in"}
         </Button>

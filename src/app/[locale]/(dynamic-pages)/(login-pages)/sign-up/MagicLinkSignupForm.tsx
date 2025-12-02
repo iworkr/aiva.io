@@ -94,6 +94,7 @@ export function MagicLinkSignupForm({
           className="w-full"
           type="submit"
           disabled={magicLinkStatus === "executing"}
+          aria-label={magicLinkStatus === "executing" ? "Sending magic link, please wait" : "Sign up with magic link sent to your email"}
         >
           {magicLinkStatus === "executing"
             ? "Sending..."

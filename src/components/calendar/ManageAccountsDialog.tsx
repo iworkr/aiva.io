@@ -260,12 +260,20 @@ export function ManageAccountsDialog({
           {/* Add New Account */}
           <div className="border-t border-border pt-4">
             <h3 className="text-sm font-semibold mb-3">Add New Account</h3>
+            <div className="mb-3 p-3 bg-muted/50 rounded-lg border border-border">
+              <p className="text-xs text-muted-foreground">
+                Calendar integrations are in active development. Google Calendar and Outlook Calendar sync will be available soon. 
+                For now, you can create events directly in Aiva.
+              </p>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <button
-                className="group flex flex-col items-center gap-3 p-6 border border-border rounded-lg hover:bg-primary/5 hover:border-primary/30 transition-all"
+                className="group flex flex-col items-center gap-3 p-6 border border-border rounded-lg hover:bg-primary/5 hover:border-primary/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => {
-                  toast.info('Google Calendar integration coming soon');
+                  toast.info('Google Calendar integration coming soon. You can create events directly in Aiva for now.');
                 }}
+                disabled
+                aria-label="Connect Google Calendar (coming soon)"
               >
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-muted group-hover:bg-background transition-colors">
                   <Image
@@ -277,12 +285,15 @@ export function ManageAccountsDialog({
                   />
                 </div>
                 <span className="text-sm font-medium">Connect Google Calendar</span>
+                <span className="text-xs text-muted-foreground">Coming soon</span>
               </button>
               <button
-                className="group flex flex-col items-center gap-3 p-6 border border-border rounded-lg hover:bg-primary/5 hover:border-primary/30 transition-all"
+                className="group flex flex-col items-center gap-3 p-6 border border-border rounded-lg hover:bg-primary/5 hover:border-primary/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => {
-                  toast.info('Outlook integration coming soon');
+                  toast.info('Outlook Calendar integration coming soon. You can create events directly in Aiva for now.');
                 }}
+                disabled
+                aria-label="Connect Outlook Calendar (coming soon)"
               >
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-muted group-hover:bg-background transition-colors">
                   <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 48 48">
@@ -307,6 +318,7 @@ export function ManageAccountsDialog({
                   </svg>
                 </div>
                 <span className="text-sm font-medium">Connect Outlook Calendar</span>
+                <span className="text-xs text-muted-foreground">Coming soon</span>
               </button>
             </div>
           </div>

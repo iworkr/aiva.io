@@ -11,9 +11,9 @@ export default async function Page() {
   return (
     <div className="space-y-6 py-6 max-w-4xl">
       <FeedbackPageHeading
-        title="Roadmap"
+        title="Aiva.io Roadmap"
         titleClassName="text-2xl font-semibold tracking-normal"
-        subTitle="This is where you see where the application is going"
+        subTitle="See what’s shipping next for Aiva.io across the unified inbox, AI, and integrations."
       />
 
       {userRoleType === userRoles.ADMIN ? (
