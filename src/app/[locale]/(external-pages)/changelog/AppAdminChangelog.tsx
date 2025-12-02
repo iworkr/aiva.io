@@ -4,7 +4,7 @@ import { Separator } from "@/components/ui/separator";
 import type { Tables } from "@/lib/database.types";
 import { AspectRatio } from "@radix-ui/react-aspect-ratio";
 import { formatDistance } from "date-fns";
-import { CalendarDaysIcon } from "lucide-react";
+import { CalendarDaysIcon, Sparkles } from "lucide-react";
 import Image from "next/image";
 
 type Props = {
@@ -12,6 +12,21 @@ type Props = {
 };
 
 export const ChangelogPosts = ({ changelogs }: Props) => {
+  // Show empty state if no changelog entries
+  if (!changelogs || changelogs.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
+          <Sparkles className="h-8 w-8 text-primary" />
+        </div>
+        <h3 className="text-lg font-semibold mb-2">Changelog Coming Soon</h3>
+        <p className="text-sm text-muted-foreground">
+          We're building something exciting! Check back soon for updates on new features, improvements, and releases.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <>
       {changelogs.map((changelog, index) => (

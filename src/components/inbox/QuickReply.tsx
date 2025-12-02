@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ChevronDown, ChevronUp, Send, Sparkles, Loader2 } from 'lucide-react';
@@ -38,6 +38,9 @@ export function QuickReply({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [confidenceScore, setConfidenceScore] = useState<number | null>(null);
+  
+  // Track toast ID to dismiss it when cancelling
+  const draftToastIdRef = useRef<string | number | undefined>(undefined);
 
   const { execute: sendReply } = useAction(sendReplyAction, {
     onSuccess: () => {
@@ -63,7 +66,8 @@ export function QuickReply({
       if (body) {
         setReplyText(body);
         setConfidenceScore(confidence || null);
-        toast.success('AI draft generated! Review and edit before sending.');
+        // Store the toast ID so we can dismiss it when cancelling
+        draftToastIdRef.current = toast.success('AI draft generated! Review and edit before sending.');
       } else {
         // Draft generated but empty - show placeholder
         setReplyText('');
@@ -79,6 +83,14 @@ export function QuickReply({
       setConfidenceScore(null);
     },
   });
+  
+  // Dismiss the "AI draft generated" toast when the component collapses (cancel)
+  useEffect(() => {
+    if (!isExpanded && draftToastIdRef.current) {
+      toast.dismiss(draftToastIdRef.current);
+      draftToastIdRef.current = undefined;
+    }
+  }, [isExpanded]);
 
   const handleToggle = () => {
     if (!isExpanded && !replyText) {
@@ -163,8 +175,15 @@ export function QuickReply({
                   variant="outline"
                   size="default"
                   onClick={() => {
+                    // Dismiss the AI draft toast if it exists
+                    if (draftToastIdRef.current) {
+                      toast.dismiss(draftToastIdRef.current);
+                      draftToastIdRef.current = undefined;
+                    }
                     setIsExpanded(false);
-                    toast.info('Reply cancelled');
+                    // Clear the reply text if user cancels
+                    setReplyText('');
+                    setConfidenceScore(null);
                   }}
                   className="h-9 px-4"
                 >

@@ -90,7 +90,15 @@ export function PublicBlogList({
           })}
         </div>
       ) : (
-        <T.Subtle className="text-center">No blog posts yet.</T.Subtle>
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
+            <CalendarDays className="h-8 w-8 text-primary" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">Blog Coming Soon</h3>
+          <p className="text-sm text-muted-foreground max-w-md">
+            We're working on sharing our insights about AI-powered communication, productivity tips, and product updates. Check back soon!
+          </p>
+        </div>
       )}
     </Fragment>
   );

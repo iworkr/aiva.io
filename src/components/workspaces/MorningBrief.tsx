@@ -7,7 +7,14 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   ChevronRight,
+  FileText,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -148,8 +155,9 @@ export async function MorningBrief() {
   const newMessages = unreadCount || 0;
   const activeConversations = allCount || 0;
 
-  // Build briefing items
+  // Build briefing items (using Set to track unique IDs and prevent duplicates)
   const briefingItems: BriefingItem[] = [];
+  const seenIds = new Set<string>(); // Track unique IDs to prevent duplicates
 
   // Utility: strip basic HTML tags from message bodies for cleaner snippets
   const stripHtml = (input: string | null | undefined) =>
@@ -171,9 +179,14 @@ export async function MorningBrief() {
     return maskedText;
   };
 
-  // Add urgent messages
+  // Add urgent messages (with deduplication)
   if (urgentMessages) {
     urgentMessages.forEach((msg: any) => {
+      // Skip if we've already seen this message ID
+      const uniqueKey = `message-${msg.id}`;
+      if (seenIds.has(uniqueKey)) return;
+      seenIds.add(uniqueKey);
+      
       const cleanBody = stripHtml(msg.body)?.substring(0, 140) || '';
       const safeDescription = maskSensitiveContent(cleanBody);
       
@@ -190,9 +203,14 @@ export async function MorningBrief() {
     });
   }
 
-  // Add upcoming events
+  // Add upcoming events (with deduplication)
   if (upcomingEvents) {
     upcomingEvents.forEach((event: any) => {
+      // Skip if we've already seen this event ID
+      const uniqueKey = `event-${event.id}`;
+      if (seenIds.has(uniqueKey)) return;
+      seenIds.add(uniqueKey);
+      
       const startTime = new Date(event.start_time);
       const isToday = startTime.toDateString() === new Date().toDateString();
       
@@ -238,17 +256,31 @@ export async function MorningBrief() {
       {/* Today's Briefing Button - Only show if there are briefing items */}
       {briefingItems.length > 0 && (
         <div className="flex justify-center">
-          <Button
-            variant="outline"
-            size="default"
-            className="group"
-            asChild
-          >
-            <Link href="#briefing">
-              <span>Today's briefing</span>
-              <ChevronRight className="ml-2 h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
-            </Link>
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="default"
+                  className="group"
+                  asChild
+                  aria-label={`View today's briefing with ${briefingItems.length} items that need your attention`}
+                >
+                  <Link href="#briefing">
+                    <FileText className="mr-2 h-4 w-4" />
+                    <span>Today's briefing</span>
+                    <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                      {briefingItems.length}
+                    </span>
+                    <ChevronRight className="ml-2 h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                  </Link>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Jump to your {briefingItems.length} priority items: urgent messages and upcoming events</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       )}
 

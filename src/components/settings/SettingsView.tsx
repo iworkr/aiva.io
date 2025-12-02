@@ -52,6 +52,62 @@ interface SettingsViewProps {
   billingContent?: ReactNode;
 }
 
+// Comprehensive timezone list grouped by region
+const TIMEZONE_OPTIONS = [
+  // Australia
+  { value: 'Australia/Brisbane', label: 'Australia/Brisbane (AEST)', region: 'Australia' },
+  { value: 'Australia/Sydney', label: 'Australia/Sydney (AEST/AEDT)', region: 'Australia' },
+  { value: 'Australia/Melbourne', label: 'Australia/Melbourne (AEST/AEDT)', region: 'Australia' },
+  { value: 'Australia/Perth', label: 'Australia/Perth (AWST)', region: 'Australia' },
+  { value: 'Australia/Adelaide', label: 'Australia/Adelaide (ACST/ACDT)', region: 'Australia' },
+  // Americas
+  { value: 'America/New_York', label: 'America/New York (EST/EDT)', region: 'Americas' },
+  { value: 'America/Chicago', label: 'America/Chicago (CST/CDT)', region: 'Americas' },
+  { value: 'America/Denver', label: 'America/Denver (MST/MDT)', region: 'Americas' },
+  { value: 'America/Los_Angeles', label: 'America/Los Angeles (PST/PDT)', region: 'Americas' },
+  { value: 'America/Toronto', label: 'America/Toronto (EST/EDT)', region: 'Americas' },
+  { value: 'America/Vancouver', label: 'America/Vancouver (PST/PDT)', region: 'Americas' },
+  { value: 'America/Sao_Paulo', label: 'America/São Paulo (BRT)', region: 'Americas' },
+  // Europe
+  { value: 'Europe/London', label: 'Europe/London (GMT/BST)', region: 'Europe' },
+  { value: 'Europe/Paris', label: 'Europe/Paris (CET/CEST)', region: 'Europe' },
+  { value: 'Europe/Berlin', label: 'Europe/Berlin (CET/CEST)', region: 'Europe' },
+  { value: 'Europe/Amsterdam', label: 'Europe/Amsterdam (CET/CEST)', region: 'Europe' },
+  { value: 'Europe/Zurich', label: 'Europe/Zurich (CET/CEST)', region: 'Europe' },
+  // Asia
+  { value: 'Asia/Tokyo', label: 'Asia/Tokyo (JST)', region: 'Asia' },
+  { value: 'Asia/Shanghai', label: 'Asia/Shanghai (CST)', region: 'Asia' },
+  { value: 'Asia/Hong_Kong', label: 'Asia/Hong Kong (HKT)', region: 'Asia' },
+  { value: 'Asia/Singapore', label: 'Asia/Singapore (SGT)', region: 'Asia' },
+  { value: 'Asia/Seoul', label: 'Asia/Seoul (KST)', region: 'Asia' },
+  { value: 'Asia/Dubai', label: 'Asia/Dubai (GST)', region: 'Asia' },
+  { value: 'Asia/Kolkata', label: 'Asia/Kolkata (IST)', region: 'Asia' },
+  // Pacific
+  { value: 'Pacific/Auckland', label: 'Pacific/Auckland (NZST/NZDT)', region: 'Pacific' },
+  { value: 'Pacific/Fiji', label: 'Pacific/Fiji (FJT)', region: 'Pacific' },
+  { value: 'Pacific/Honolulu', label: 'Pacific/Honolulu (HST)', region: 'Pacific' },
+  // Other
+  { value: 'UTC', label: 'UTC (Coordinated Universal Time)', region: 'Other' },
+];
+
+// Get display label for a timezone value
+function getTimezoneLabel(value: string): string {
+  const tz = TIMEZONE_OPTIONS.find(t => t.value === value);
+  return tz?.label || value;
+}
+
+// Detect user's browser timezone
+function detectUserTimezone(): string {
+  try {
+    const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    // Check if it's in our list, otherwise return UTC
+    const exists = TIMEZONE_OPTIONS.some(t => t.value === detected);
+    return exists ? detected : 'UTC';
+  } catch {
+    return 'UTC';
+  }
+}
+
 export function SettingsView({ workspaceId, userId, user, billingContent }: SettingsViewProps) {
   const router = useRouter();
   const [autoClassify, setAutoClassify] = useState(true);
@@ -61,9 +117,10 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
   const [displayName, setDisplayName] = useState(user?.user_metadata?.full_name || '');
-  const [timezone, setTimezone] = useState('utc');
+  const [timezone, setTimezone] = useState(() => detectUserTimezone()); // Auto-detect on init
   const [syncFrequency, setSyncFrequency] = useState('15');
   const [loading, setLoading] = useState(true);
+  const [detectedTimezone] = useState(() => detectUserTimezone()); // Store detected timezone
   
   // Check Pro subscription status
   const { hasPro, loading: loadingPro } = useProSubscription(workspaceId);
@@ -113,6 +170,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
         }
 
         // Set sync settings (timezone, sync frequency)
+        // Use saved timezone if exists, otherwise keep auto-detected value
         if (settings?.timezone) {
           setTimezone(settings.timezone);
         }
@@ -528,7 +586,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
               <CardHeader>
                 <CardTitle>Preferences</CardTitle>
                 <CardDescription>
-                  Configure your timezone and sync preferences
+                  Configure your timezone and sync preferences. Your timezone affects calendar events and message timestamps.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -537,27 +595,34 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                   <Select value={timezone} onValueChange={setTimezone}>
                     <SelectTrigger id="timezone">
                       <SelectValue placeholder="Select timezone">
-                        {timezone === 'utc' ? 'UTC' : 
-                         timezone === 'america-new_york' ? 'America/New York' :
-                         timezone === 'america-los_angeles' ? 'America/Los Angeles' :
-                         timezone === 'europe-london' ? 'Europe/London' :
-                         timezone === 'asia-tokyo' ? 'Asia/Tokyo' : 'UTC'}
+                        {getTimezoneLabel(timezone)}
                       </SelectValue>
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="utc">UTC</SelectItem>
-                      <SelectItem value="america-new_york">America/New York</SelectItem>
-                      <SelectItem value="america-los_angeles">America/Los Angeles</SelectItem>
-                      <SelectItem value="europe-london">Europe/London</SelectItem>
-                      <SelectItem value="asia-tokyo">Asia/Tokyo</SelectItem>
+                    <SelectContent className="max-h-[300px]">
+                      {/* Group by region */}
+                      {['Australia', 'Americas', 'Europe', 'Asia', 'Pacific', 'Other'].map((region) => (
+                        <div key={region}>
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50">
+                            {region}
+                          </div>
+                          {TIMEZONE_OPTIONS
+                            .filter(tz => tz.region === region)
+                            .map(tz => (
+                              <SelectItem key={tz.value} value={tz.value}>
+                                {tz.label}
+                              </SelectItem>
+                            ))
+                          }
+                        </div>
+                      ))}
                     </SelectContent>
                   </Select>
                   <p className="text-sm text-muted-foreground">
-                    Current timezone: {timezone === 'utc' ? 'UTC' : 
-                     timezone === 'america-new_york' ? 'America/New York' :
-                     timezone === 'america-los_angeles' ? 'America/Los Angeles' :
-                     timezone === 'europe-london' ? 'Europe/London' :
-                     timezone === 'asia-tokyo' ? 'Asia/Tokyo' : 'UTC'}
+                    {timezone === detectedTimezone ? (
+                      <>Auto-detected: {getTimezoneLabel(timezone)}</>
+                    ) : (
+                      <>Selected: {getTimezoneLabel(timezone)} (Detected: {getTimezoneLabel(detectedTimezone)})</>
+                    )}
                   </p>
                 </div>
 

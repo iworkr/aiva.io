@@ -43,9 +43,12 @@ interface ContactsViewProps {
   userId: string;
 }
 
+const CONTACTS_PER_PAGE = 12; // Show 12 contacts per page (4x3 grid)
+
 export const ContactsView = memo(function ContactsView({ workspaceId, userId }: ContactsViewProps) {
   const [allContacts, setAllContacts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showFavoritesOnly, setShowFavoritesOnly] = useLocalStorage(
     `contacts-favorites-filter-${workspaceId}`,
@@ -55,18 +58,31 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
   const [selectedContact, setSelectedContact] = useState<any>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [isPending, startTransition] = useTransition();
+  
+  // Pagination state
+  const [currentOffset, setCurrentOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
 
   // Debounce search query for better performance
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
 
-  // Fetch all contacts (server handles favorites filter)
-  const fetchContacts = useCallback(async () => {
-    setLoading(true);
+  // Fetch initial contacts (with pagination)
+  const fetchContacts = useCallback(async (reset = true) => {
+    if (reset) {
+      setLoading(true);
+      setCurrentOffset(0);
+    }
     try {
       const data = await getContacts(workspaceId, userId, {
         isFavorite: showFavoritesOnly || undefined,
+        limit: CONTACTS_PER_PAGE,
+        offset: 0,
       });
-      setAllContacts(data || []);
+      const contactsList = data || [];
+      setAllContacts(contactsList);
+      setHasMore(contactsList.length === CONTACTS_PER_PAGE);
+      setTotalCount(contactsList.length);
     } catch (error) {
       toast.error('Failed to load contacts');
       console.error(error);
@@ -75,9 +91,38 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
     }
   }, [workspaceId, userId, showFavoritesOnly]);
 
+  // Load more contacts
+  const loadMoreContacts = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    
+    setLoadingMore(true);
+    try {
+      const nextOffset = currentOffset + CONTACTS_PER_PAGE;
+      const data = await getContacts(workspaceId, userId, {
+        isFavorite: showFavoritesOnly || undefined,
+        limit: CONTACTS_PER_PAGE,
+        offset: nextOffset,
+      });
+      const newContacts = data || [];
+      
+      if (newContacts.length > 0) {
+        setAllContacts((prev) => [...prev, ...newContacts]);
+        setCurrentOffset(nextOffset);
+        setTotalCount((prev) => prev + newContacts.length);
+      }
+      
+      setHasMore(newContacts.length === CONTACTS_PER_PAGE);
+    } catch (error) {
+      toast.error('Failed to load more contacts');
+      console.error(error);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [workspaceId, userId, showFavoritesOnly, currentOffset, loadingMore, hasMore]);
+
   useEffect(() => {
     startTransition(() => {
-      fetchContacts();
+      fetchContacts(true);
     });
   }, [fetchContacts]);
 
@@ -269,20 +314,50 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {contacts.map((contact) => (
-              <ContactTile
-                key={contact.id}
-                contact={contact}
-                onClick={() => handleContactClick(contact)}
-                onToggleFavorite={(e) => {
-                  e.stopPropagation();
-                  handleToggleFavorite(contact);
-                }}
-                onEdit={(e) => handleEditContact(contact, e)}
-                onDelete={(e) => handleDeleteContact(contact, e)}
-              />
-            ))}
+          <div className="space-y-6">
+            {/* Contacts Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {contacts.map((contact) => (
+                <ContactTile
+                  key={contact.id}
+                  contact={contact}
+                  onClick={() => handleContactClick(contact)}
+                  onToggleFavorite={(e) => {
+                    e.stopPropagation();
+                    handleToggleFavorite(contact);
+                  }}
+                  onEdit={(e) => handleEditContact(contact, e)}
+                  onDelete={(e) => handleDeleteContact(contact, e)}
+                />
+              ))}
+            </div>
+            
+            {/* Pagination Footer */}
+            <div className="flex flex-col items-center gap-3 pt-4 border-t">
+              <p className="text-sm text-muted-foreground">
+                Showing {contacts.length} contact{contacts.length !== 1 ? 's' : ''}
+                {hasMore && ' • More available'}
+              </p>
+              
+              {/* Load More Button */}
+              {hasMore && !debouncedSearchQuery && (
+                <Button
+                  variant="outline"
+                  onClick={loadMoreContacts}
+                  disabled={loadingMore}
+                  className="min-w-[140px]"
+                >
+                  {loadingMore ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    'Load More'
+                  )}
+                </Button>
+              )}
+            </div>
           </div>
         )}
       </div>

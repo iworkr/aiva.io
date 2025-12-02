@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -21,9 +21,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Globe } from 'lucide-react';
 import { createEventAction } from '@/data/user/calendar';
+import { getWorkspaceSettings } from '@/data/user/settings';
 import { useAction } from 'next-safe-action/hooks';
 import { toast } from 'sonner';
+
+// Get user's timezone (from settings or auto-detect)
+function getUserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return 'UTC';
+  }
+}
 
 const createEventFormSchema = z.object({
   title: z.string().min(1, 'Title is required'),
@@ -49,6 +61,7 @@ interface CreateEventDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   workspaceId: string;
+  userId?: string;
   onSuccess?: () => void;
 }
 
@@ -56,8 +69,30 @@ export function CreateEventDialog({
   open,
   onOpenChange,
   workspaceId,
+  userId,
   onSuccess,
 }: CreateEventDialogProps) {
+  const [userTimezone, setUserTimezone] = useState(() => getUserTimezone());
+  
+  // Load user's saved timezone from settings
+  useEffect(() => {
+    if (!userId || !workspaceId) return;
+    
+    const loadTimezone = async () => {
+      try {
+        const settings = await getWorkspaceSettings(workspaceId, userId) as { timezone?: string };
+        if (settings?.timezone) {
+          setUserTimezone(settings.timezone);
+        }
+      } catch (error) {
+        // Keep auto-detected timezone if settings fail to load
+        console.error('Failed to load timezone settings:', error);
+      }
+    };
+    
+    loadTimezone();
+  }, [workspaceId, userId]);
+  
   const {
     register,
     handleSubmit,
@@ -99,7 +134,7 @@ export function CreateEventDialog({
       location: data.location,
       startTime,
       endTime,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timezone: userTimezone, // Use user's saved or auto-detected timezone
       isAllDay: data.isAllDay,
       status: 'confirmed',
     });
@@ -171,6 +206,15 @@ export function CreateEventDialog({
                 {...register('location')}
                 placeholder="Enter event location (optional)"
               />
+            </div>
+            
+            {/* Timezone indicator */}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Globe className="h-4 w-4" />
+              <span>Timezone: {userTimezone}</span>
+              <Badge variant="outline" className="text-xs">
+                {userTimezone === getUserTimezone() ? 'Auto-detected' : 'From settings'}
+              </Badge>
             </div>
           </div>
           <DialogFooter>
