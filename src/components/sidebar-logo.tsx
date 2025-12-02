@@ -12,24 +12,14 @@ export function SidebarLogo() {
   const isCollapsed = state === "collapsed";
 
   if (isCollapsed) {
-    // Show icon mark when collapsed
+    // Show blue icon mark when collapsed (same for both themes)
     return (
       <div className="flex items-center justify-center px-1 py-1">
-        {/* Dark theme: light mark on dark background */}
         <Image
-          src="/logos/aiva-mark-light.svg"
+          src="/aiva-logo/2x/Asset 8@2x.png"
           width={32}
           height={32}
           alt="Aiva"
-          className="hidden dark:block"
-        />
-        {/* Light theme: dark mark on light background */}
-        <Image
-          src="/logos/aiva-mark-dark.svg"
-          width={32}
-          height={32}
-          alt="Aiva"
-          className="block dark:hidden"
         />
       </div>
     );
