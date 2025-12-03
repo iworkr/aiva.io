@@ -15,46 +15,43 @@ import { renewAllExpiringOutlookWebhooks } from '@/lib/outlook/webhooks';
 /**
  * Verify the request is from a legitimate cron job
  * 
- * Vercel cron jobs are authenticated in several ways:
- * 1. CRON_SECRET env var (recommended for Pro/Enterprise)
- * 2. Vercel's internal cron header (automatic for vercel.json crons)
- * 3. In development or Hobby plan, allow Vercel internal requests
+ * Vercel automatically sends Authorization: Bearer <CRON_SECRET> when CRON_SECRET env var is set.
+ * This works on all Vercel plans (Hobby, Pro, Enterprise).
  */
 function verifyCronRequest(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
-
-  // Method 1: Check CRON_SECRET if configured
-  if (cronSecret && cronSecret !== 'your-cron-secret-here') {
-    if (authHeader === `Bearer ${cronSecret}`) {
-      return true;
-    }
-  }
-
-  // Method 2: Check for Vercel's internal cron header
   const vercelCron = request.headers.get('x-vercel-cron');
-  if (vercelCron) {
-    return true;
-  }
-
-  // Method 3: Check for Vercel deployment (internal request)
-  const host = request.headers.get('host') || '';
-  const isVercelInternal = host.includes('.vercel.app') || host.includes('vercel.app');
-  const userAgent = request.headers.get('user-agent') || '';
-  const isVercelCronAgent = userAgent.includes('vercel-cron');
-
-  if (isVercelInternal && isVercelCronAgent) {
-    return true;
-  }
-
-  // Method 4: Allow in development or from Vercel without secret
-  if (!cronSecret || cronSecret === 'your-cron-secret-here') {
-    const isProduction = process.env.NODE_ENV === 'production';
-    if (!isProduction || isVercelInternal) {
+  
+  // Debug logging (will show in Vercel logs)
+  console.log('🔐 Webhook renewal cron auth check:', {
+    hasAuthHeader: !!authHeader,
+    hasCronSecret: !!cronSecret,
+    hasVercelCronHeader: !!vercelCron,
+  });
+  
+  // Method 1: Check CRON_SECRET Bearer token (Vercel sends this automatically)
+  if (cronSecret && authHeader) {
+    const expectedAuth = `Bearer ${cronSecret}`;
+    if (authHeader === expectedAuth) {
+      console.log('✅ Cron auth: Valid CRON_SECRET');
       return true;
     }
   }
-
+  
+  // Method 2: Check for Vercel's internal cron header
+  if (vercelCron === '1') {
+    console.log('✅ Cron auth: Valid x-vercel-cron header');
+    return true;
+  }
+  
+  // Method 3: In development, allow without auth
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('✅ Cron auth: Development mode');
+    return true;
+  }
+  
+  console.log('❌ Cron auth failed');
   return false;
 }
 
@@ -115,4 +112,5 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   return GET(request);
 }
+
 
