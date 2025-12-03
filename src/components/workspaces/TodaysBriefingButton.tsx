@@ -5,9 +5,8 @@
 
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import {
   Tooltip,
   TooltipContent,
@@ -19,11 +18,7 @@ import {
   ChevronUp,
   FileText,
   Loader2,
-  Sparkles,
-  X,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import Image from 'next/image';
 
 interface TodaysBriefingButtonProps {
   itemCount: number;
@@ -42,7 +37,6 @@ export function TodaysBriefingButton({ itemCount, briefingData }: TodaysBriefing
   const [briefingText, setBriefingText] = useState('');
   const [displayedText, setDisplayedText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   // Generate the briefing when opened
   const generateBriefing = async () => {
@@ -119,7 +113,12 @@ Please provide a brief, friendly overview of my day in 3-4 sentences. Be encoura
 
   // Typewriter effect
   useEffect(() => {
-    if (!briefingText || isGenerating) {
+    if (!briefingText) {
+      setDisplayedText('');
+      return;
+    }
+    
+    if (isGenerating) {
       setDisplayedText(briefingText);
       return;
     }
@@ -156,13 +155,6 @@ Please provide a brief, friendly overview of my day in 3-4 sentences. Be encoura
     }
   };
 
-  // Scroll to bottom of briefing as it types
-  useEffect(() => {
-    if (containerRef.current && isTyping) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
-    }
-  }, [displayedText, isTyping]);
-
   return (
     <div className="flex flex-col items-center gap-4">
       <TooltipProvider>
@@ -193,81 +185,23 @@ Please provide a brief, friendly overview of my day in 3-4 sentences. Be encoura
         </Tooltip>
       </TooltipProvider>
 
-      {/* AI Briefing Card */}
+      {/* AI Briefing Text - No container, just text */}
       {isOpen && (
-        <Card className="w-full max-w-2xl mx-auto animate-in slide-in-from-top-2 duration-300 border-primary/20 shadow-lg">
-          <CardContent className="p-0">
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-gradient-to-r from-primary/5 to-accent/5 rounded-t-lg">
-              <div className="flex items-center gap-3">
-                <div className="relative h-8 w-8">
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-primary/25 blur-sm" />
-                  <div className="relative h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center shadow-sm shadow-primary/20">
-                    <Image
-                      src="/logos/aiva-mark.svg"
-                      alt="Aiva"
-                      width={18}
-                      height={18}
-                      className="object-contain"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <span className="font-semibold text-sm">Aiva's Daily Briefing</span>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Sparkles className="h-3 w-3 text-primary" />
-                    AI-generated summary
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsOpen(false);
-                  setBriefingText('');
-                  setDisplayedText('');
-                }}
-                className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-skeleton transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
+        <div className="w-full max-w-xl mx-auto text-center animate-in fade-in-0 duration-300">
+          {isGenerating && !displayedText ? (
+            <div className="flex items-center justify-center gap-2 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              <span className="text-sm">Generating your briefing...</span>
             </div>
-
-            {/* Briefing Content */}
-            <div
-              ref={containerRef}
-              className="p-4 min-h-[100px] max-h-[300px] overflow-y-auto"
-            >
-              {isGenerating && !displayedText ? (
-                <div className="flex items-center gap-3 text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                  <span className="text-sm">Generating your personalized briefing...</span>
-                </div>
-              ) : (
-                <div className="text-sm leading-relaxed">
-                  {displayedText}
-                  {(isTyping || isGenerating) && (
-                    <span className="inline-block w-2 h-4 bg-primary ml-0.5 animate-pulse" />
-                  )}
-                </div>
+          ) : (
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {displayedText}
+              {isTyping && (
+                <span className="inline-block w-0.5 h-4 bg-primary ml-0.5 animate-pulse align-middle" />
               )}
-            </div>
-
-            {/* Footer with regenerate option */}
-            {!isGenerating && briefingText && !isTyping && (
-              <div className="px-4 py-3 border-t border-border/50 bg-muted/30 rounded-b-lg">
-                <button
-                  type="button"
-                  onClick={generateBriefing}
-                  className="text-xs text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
-                >
-                  <Sparkles className="h-3 w-3" />
-                  Regenerate briefing
-                </button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
