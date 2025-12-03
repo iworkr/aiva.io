@@ -147,9 +147,9 @@ export function FloatingAssistant() {
             <div className="flex-shrink-0 border-b border-border/50 bg-gradient-to-r from-primary/5 via-background to-accent/5 rounded-t-2xl">
               <div className="flex items-center justify-between px-4 py-4">
                 <div className="flex items-center gap-3">
-                  {/* Logo with gradient ring and blue glow */}
-                  <div className="relative">
-                    <div className="absolute inset-0 rounded-full bg-primary/40 blur-md" />
+                  {/* Logo with gradient ring and contained blue glow */}
+                  <div className="relative h-11 w-11">
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-primary/30 blur-md" />
                     <div className="relative h-11 w-11 rounded-full bg-gradient-to-br from-primary to-accent p-[2px] shadow-lg shadow-primary/30">
                       <div className="h-full w-full rounded-full bg-card flex items-center justify-center">
                         <Image
@@ -192,9 +192,9 @@ export function FloatingAssistant() {
                 {messages.length === 0 ? (
                   /* Empty State / Welcome Screen */
                   <div className="h-full flex flex-col items-center justify-center py-8">
-                    {/* Welcome illustration with blue glow */}
-                    <div className="relative mb-6">
-                      <div className="absolute inset-0 rounded-full bg-primary/30 blur-xl" />
+                    {/* Welcome illustration with contained blue glow */}
+                    <div className="relative mb-6 h-20 w-20">
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-16 w-16 rounded-full bg-primary/25 blur-lg" />
                       <div className="relative h-20 w-20 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center shadow-lg shadow-primary/20">
                         <Image
                           src="/logos/aiva-mark.svg"
@@ -274,10 +274,10 @@ export function FloatingAssistant() {
                           message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
                         )}
                       >
-                        {/* Avatar with blue glow */}
+                        {/* Avatar with contained blue glow */}
                         {message.role === 'assistant' && (
-                          <div className="flex-shrink-0 relative">
-                            <div className="absolute inset-0 rounded-full bg-primary/30 blur-sm" />
+                          <div className="flex-shrink-0 relative h-8 w-8">
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-primary/25 blur-sm" />
                             <div className="relative h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center shadow-sm shadow-primary/20">
                               <Image
                                 src="/logos/aiva-mark.svg"
@@ -293,27 +293,25 @@ export function FloatingAssistant() {
                         {/* Message bubble */}
                         <div
                           className={cn(
-                            'max-w-[80%] rounded-2xl px-4 py-3 text-sm',
+                            'max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-normal',
                             message.role === 'user'
                               ? 'bg-primary text-primary-foreground rounded-br-md'
                               : 'bg-muted rounded-bl-md'
                           )}
                         >
-                          <div className="whitespace-pre-wrap leading-relaxed prose prose-sm dark:prose-invert max-w-none [&>p]:m-0 [&>ul]:my-1 [&>ol]:my-1 [&>p:not(:last-child)]:mb-2">
-                            <ReactMarkdown
-                              components={{
-                                p: ({ children }) => <p>{children}</p>,
-                                strong: ({ children }) => <strong className="font-bold">{children}</strong>,
-                                em: ({ children }) => <em className="italic">{children}</em>,
-                                ul: ({ children }) => <ul className="list-disc pl-4 space-y-1">{children}</ul>,
-                                ol: ({ children }) => <ol className="list-decimal pl-4 space-y-1">{children}</ol>,
-                                li: ({ children }) => <li>{children}</li>,
-                                code: ({ children }) => <code className="bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded text-xs">{children}</code>,
-                              }}
-                            >
-                              {message.content}
-                            </ReactMarkdown>
-                          </div>
+                          <ReactMarkdown
+                            components={{
+                              p: ({ children }) => <span className="block">{children}</span>,
+                              strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                              em: ({ children }) => <em className="italic">{children}</em>,
+                              ul: ({ children }) => <ul className="list-disc pl-4 mt-1 space-y-0.5">{children}</ul>,
+                              ol: ({ children }) => <ol className="list-decimal pl-4 mt-1 space-y-0.5">{children}</ol>,
+                              li: ({ children }) => <li className="leading-tight">{children}</li>,
+                              code: ({ children }) => <code className="bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+                            }}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
                         </div>
                       </div>
                     ))}
@@ -321,8 +319,8 @@ export function FloatingAssistant() {
                     {/* Loading indicator */}
                     {isLoading && (
                       <div className="flex gap-3">
-                        <div className="flex-shrink-0 relative">
-                          <div className="absolute inset-0 rounded-full bg-primary/30 blur-sm" />
+                        <div className="flex-shrink-0 relative h-8 w-8">
+                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-primary/25 blur-sm" />
                           <div className="relative h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center shadow-sm shadow-primary/20">
                             <Image
                               src="/logos/aiva-mark.svg"
@@ -355,40 +353,42 @@ export function FloatingAssistant() {
 
             {/* ===== STATIC FOOTER ===== */}
             <div className="flex-shrink-0 border-t border-border/50 bg-muted/30 rounded-b-2xl">
-              {/* Quick suggestions - always visible */}
-              <div className="px-3 pt-3 pb-2 flex gap-2 overflow-x-auto scrollbar-hide">
-                <button
-                  type="button"
-                  onClick={() => handleQuickAction("Summarize my inbox")}
-                  className="flex-shrink-0 px-3 py-1.5 text-xs rounded-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors"
-                >
-                  📬 Summarize inbox
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickAction("What urgent messages do I have?")}
-                  className="flex-shrink-0 px-3 py-1.5 text-xs rounded-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors"
-                >
-                  🔥 Urgent messages
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickAction("What's on my calendar today?")}
-                  className="flex-shrink-0 px-3 py-1.5 text-xs rounded-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors"
-                >
-                  📅 Today&apos;s schedule
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickAction("Help me draft a reply")}
-                  className="flex-shrink-0 px-3 py-1.5 text-xs rounded-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors"
-                >
-                  ✍️ Draft reply
-                </button>
-              </div>
+              {/* Quick suggestions - 2x2 grid, hidden when typing or loading */}
+              {!isLoading && !input.trim() && (
+                <div className="px-3 pt-3 pb-2 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleQuickAction("Summarize my inbox")}
+                    className="px-3 py-2 text-xs rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors text-left"
+                  >
+                    📬 Summarize inbox
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickAction("What urgent messages do I have?")}
+                    className="px-3 py-2 text-xs rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors text-left"
+                  >
+                    🔥 Urgent messages
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickAction("What's on my calendar today?")}
+                    className="px-3 py-2 text-xs rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors text-left"
+                  >
+                    📅 Today&apos;s schedule
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickAction("Help me draft a reply")}
+                    className="px-3 py-2 text-xs rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors text-left"
+                  >
+                    ✍️ Draft reply
+                  </button>
+                </div>
+              )}
               
               {/* Input area */}
-              <div className="px-3 pb-3">
+              <div className="px-3 pb-3 pt-2">
                 <form onSubmit={handleSubmit} className="flex gap-3">
                   <div className="flex-1 relative">
                     <Input
