@@ -1,19 +1,20 @@
 /**
  * Aiva Chat Input Component
- * Functional AI chat/search input for the Morning Brief
+ * Minimal AI chat input - matches FloatingAssistant styling
  */
 
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useChat } from 'ai/react';
+import Image from 'next/image';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Sparkles, Send, X, Loader2 } from 'lucide-react';
+import { Send, X, Loader2, ThumbsUp, ThumbsDown, Flag } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
+import ReactMarkdown from 'react-markdown';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface AivaChatInputProps {
   className?: string;
@@ -21,14 +22,13 @@ interface AivaChatInputProps {
 
 export function AivaChatInput({ className }: AivaChatInputProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [manualClose, setManualClose] = useState(false);
-  const [chatId] = useState(() => `brief-${Date.now()}`);
+  const [chatId] = useState(() => `dashboard-${Date.now()}`);
+  const [ratings, setRatings] = useState<Record<string, 'up' | 'down' | null>>({});
+  const [reported, setReported] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const panelInputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const isClosingRef = useRef(false);
-  const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // useChat hook
   const { messages, append, isLoading, input, setInput, stop } = useChat({
@@ -36,7 +36,7 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
     api: '/api/chat',
     onFinish: () => {
       setTimeout(() => {
-        scrollRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
     },
     onError: (error) => {
@@ -50,48 +50,31 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
     },
   });
 
-  // Close panel handler - properly handles focus
+  // Close panel
   const closePanel = useCallback(() => {
-    // Set flags to prevent re-opening
-    isClosingRef.current = true;
-    setManualClose(true);
-    
-    // Stop any ongoing AI request
     stop?.();
-    
-    // Blur the main input first (this is critical)
-    inputRef.current?.blur();
-    panelInputRef.current?.blur();
-    
-    // Blur any other focused element
+    setIsOpen(false);
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
-    
-    // Close the panel
-    setIsOpen(false);
-    
-    // Clear any existing timeout
-    if (closeTimeoutRef.current) {
-      clearTimeout(closeTimeoutRef.current);
-    }
-    
-    // Reset flags after delay to allow re-opening
-    closeTimeoutRef.current = setTimeout(() => {
-      isClosingRef.current = false;
-      setManualClose(false);
-    }, 300);
   }, [stop]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
+    // Open panel if not already open
+    if (!isOpen) setIsOpen(true);
+
     await append({
       role: 'user',
       content: input,
     });
     setInput('');
+    
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -105,32 +88,36 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
     }
   };
 
-  // Handle focus on input - only open if not manually closed
-  const handleInputFocus = useCallback(() => {
-    // Don't re-open if user manually closed or we're in closing state
-    if (!isClosingRef.current && !manualClose) {
-      setIsOpen(true);
+  // Quick action handler
+  const handleQuickAction = (prompt: string) => {
+    setInput(prompt);
+    inputRef.current?.focus();
+  };
+
+  // Rating handler
+  const handleRating = (messageId: string, rating: 'up' | 'down') => {
+    setRatings(prev => ({
+      ...prev,
+      [messageId]: prev[messageId] === rating ? null : rating
+    }));
+    if (rating === 'up') {
+      toast.success('Thanks for the feedback!', { duration: 2000 });
+    } else {
+      toast.info('Thanks for letting us know. We\'ll improve!', { duration: 2000 });
     }
-  }, [manualClose]);
+  };
 
-  // Click outside handler
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (!isOpen) return;
-      
-      const target = e.target as Node;
-      const panel = panelRef.current;
-      const input = inputRef.current;
-      
-      // Check if click is outside both panel and input
-      if (panel && !panel.contains(target) && input && !input.contains(target)) {
-        closePanel();
-      }
-    };
+  // Report handler
+  const handleReport = (messageId: string) => {
+    if (reported.has(messageId)) return;
+    setReported(prev => new Set(prev).add(messageId));
+    toast.success('Response reported. Thank you for helping us improve!', { duration: 3000 });
+  };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen, closePanel]);
+  // Format timestamp
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
 
   // Global ESC key handler
   useEffect(() => {
@@ -144,112 +131,116 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
     return () => document.removeEventListener('keydown', handleGlobalEsc);
   }, [isOpen, closePanel]);
 
-  // Cleanup timeout on unmount
+  // Focus input when panel opens
   useEffect(() => {
-    return () => {
-      if (closeTimeoutRef.current) {
-        clearTimeout(closeTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Auto-open when user starts typing (but not if closing)
-  useEffect(() => {
-    if (input.trim() && !isOpen && !isClosingRef.current) {
-      setIsOpen(true);
+    if (isOpen && inputRef.current) {
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
     }
-  }, [input, isOpen]);
+  }, [isOpen]);
+
+  // Auto-scroll when new messages arrive
+  useEffect(() => {
+    if (messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
 
   return (
-    <div className={cn('relative', isOpen ? 'mb-[350px]' : '', className)}>
-      {/* Search Input with Animated Gradient Border - Highly prominent on all screens */}
-      <div className="relative aiva-input-wrapper shadow-md hover:shadow-lg transition-all duration-300 rounded-lg bg-muted/20">
-        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 z-10">
-          <Sparkles className="h-4 w-4 text-primary" />
-        </div>
-        <Input
-          ref={inputRef}
-          type="text"
-          placeholder="Try: 'Summarise my inbox', 'Find emails from John', 'Schedule a meeting with Dan tomorrow'"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onFocus={handleInputFocus}
-          className="pl-11 h-11 text-base bg-background/80 backdrop-blur-sm border-2 border-primary/30 hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/30 focus-visible:ring-2 focus-visible:ring-primary/30 relative z-10 placeholder:text-muted-foreground/50 rounded-lg"
-        />
-        {isLoading && (
-          <div className="absolute right-3.5 top-1/2 -translate-y-1/2 z-10">
-            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+    <div className={cn('relative', className)}>
+      {/* Simple Input Bar */}
+      <div className="relative">
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <div className="flex-1 relative">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
+              <Image
+                src="/logos/aiva-mark.svg"
+                alt="Aiva"
+                width={16}
+                height={16}
+                className="object-contain opacity-60"
+              />
+            </div>
+            <Input
+              ref={inputRef}
+              type="text"
+              placeholder="Ask Aiva anything..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => !isOpen && messages.length > 0 && setIsOpen(true)}
+              className="pl-10 h-10 text-sm bg-background border-2 border-border/50 hover:border-primary/30 focus:border-primary/50 rounded-xl"
+            />
           </div>
-        )}
+          <Button 
+            type="submit" 
+            disabled={isLoading || !input.trim()} 
+            className={cn(
+              "h-10 w-10 rounded-xl p-0 transition-all",
+              "bg-primary hover:bg-primary/90",
+              input.trim() && !isLoading && "shadow-md shadow-primary/20"
+            )}
+          >
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+          </Button>
+        </form>
       </div>
 
-      {/* Chat Panel Overlay - Floats above content, doesn't push layout */}
-      {isOpen && (
+      {/* Chat Panel - Only shows when there are messages */}
+      {isOpen && messages.length > 0 && (
         <>
-          {/* Backdrop overlay for click-outside detection */}
+          {/* Backdrop */}
           <div 
-            className="fixed inset-0 z-40" 
+            className="fixed inset-0 z-40 bg-black/10" 
             onClick={closePanel}
             aria-hidden="true"
           />
-          <Card 
+          
+          {/* Chat Window */}
+          <div 
             ref={panelRef}
-            className="animated-border animated-border-active absolute top-full left-0 right-0 mt-2 z-50 shadow-2xl flex flex-col overflow-hidden bg-card/95 backdrop-blur-md border-2 border-border/50" 
-            style={{ maxHeight: 'min(calc(100vh - 200px), 450px)' }}
+            className="absolute top-full left-0 right-0 mt-2 z-50 bg-card border-2 border-border/50 shadow-xl rounded-xl overflow-hidden"
+            style={{ maxHeight: '400px' }}
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0 bg-muted/30">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-muted/30">
               <div className="flex items-center gap-2">
-                <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Sparkles className="h-3.5 w-3.5 text-primary" />
+                <div className="relative h-7 w-7">
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-primary/25 blur-sm" />
+                  <div className="relative h-7 w-7 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+                    <Image
+                      src="/logos/aiva-mark.svg"
+                      alt="Aiva"
+                      width={14}
+                      height={14}
+                      className="object-contain"
+                    />
+                  </div>
                 </div>
-                <span className="font-semibold text-sm">Aiva Assistant</span>
+                <span className="font-medium text-sm">Aiva Assistant</span>
               </div>
               <button
                 type="button"
-                onMouseDown={(e) => {
-                  // Prevent focus shift before we can close
-                  e.preventDefault();
-                  e.stopPropagation();
-                  closePanel();
-                }}
-                className="h-7 w-7 p-0 rounded-full flex items-center justify-center hover:bg-destructive/10 hover:text-destructive focus:outline-none focus:ring-2 focus:ring-destructive/20 transition-colors cursor-pointer"
-                aria-label="Close Aiva Assistant"
+                onClick={closePanel}
+                className="h-7 w-7 rounded-full flex items-center justify-center hover:bg-skeleton transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <ScrollArea className="flex-1 p-4" style={{ maxHeight: '300px' }}>
-              {messages.length === 0 ? (
-                <div className="text-sm text-muted-foreground space-y-3">
-                  <p>Ask me anything about your messages, tasks, or schedule.</p>
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-medium text-foreground">Try asking:</p>
-                    <ul className="text-xs space-y-1 ml-1">
-                      <li className="flex items-center gap-2">
-                        <span className="h-1 w-1 rounded-full bg-primary"></span>
-                        &quot;What urgent messages do I have?&quot;
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="h-1 w-1 rounded-full bg-primary"></span>
-                        &quot;Show me tasks due today&quot;
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="h-1 w-1 rounded-full bg-primary"></span>
-                        &quot;Summarize my unread messages&quot;
-                      </li>
-                    </ul>
-                  </div>
-                  <p className="text-xs pt-1 text-muted-foreground/80">
-                    Tip: Connect your channels for richer answers.{" "}
-                    <a href="/inbox" className="underline text-primary hover:text-primary/80">
-                      Go to channels →
-                    </a>
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
+            {/* Messages */}
+            <div 
+              ref={scrollRef}
+              className="overflow-y-auto p-4"
+              style={{ maxHeight: '280px' }}
+            >
+              <TooltipProvider delayDuration={300}>
+                <div className="space-y-4">
                   {messages.map((message) => (
                     <div
                       key={message.id}
@@ -260,43 +251,207 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
                     >
                       <div
                         className={cn(
-                          'rounded-lg px-3 py-2 max-w-[85%] text-sm',
-                          message.role === 'user'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted'
+                          'flex gap-2',
+                          message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
                         )}
                       >
-                        <p className="whitespace-pre-wrap">{message.content}</p>
+                        {/* Avatar */}
+                        {message.role === 'assistant' && (
+                          <div className="flex-shrink-0 relative h-6 w-6">
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-primary/25 blur-sm" />
+                            <div className="relative h-6 w-6 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+                              <Image
+                                src="/logos/aiva-mark.svg"
+                                alt="Aiva"
+                                width={12}
+                                height={12}
+                                className="object-contain"
+                              />
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Message bubble */}
+                        <div
+                          className={cn(
+                            'max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-normal',
+                            message.role === 'user'
+                              ? 'bg-primary text-primary-foreground rounded-br-md'
+                              : 'bg-muted rounded-bl-md'
+                          )}
+                        >
+                          <ReactMarkdown
+                            components={{
+                              p: ({ children }) => <span className="block">{children}</span>,
+                              strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                              em: ({ children }) => <em className="italic">{children}</em>,
+                              ul: ({ children }) => <ul className="list-disc pl-4 mt-1 space-y-0.5">{children}</ul>,
+                              ol: ({ children }) => <ol className="list-decimal pl-4 mt-1 space-y-0.5">{children}</ol>,
+                              li: ({ children }) => <li className="leading-tight">{children}</li>,
+                              code: ({ children }) => <code className="bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+                            }}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
+                        </div>
+                      </div>
+                      
+                      {/* Timestamp and actions */}
+                      <div
+                        className={cn(
+                          'flex items-center gap-2 px-1',
+                          message.role === 'user' ? 'flex-row-reverse' : 'flex-row ml-8'
+                        )}
+                      >
+                        <span className="text-[10px] text-muted-foreground">
+                          {formatTime(message.createdAt || new Date())}
+                        </span>
+                        
+                        {message.role === 'assistant' && (
+                          <div className="flex items-center gap-1">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRating(message.id, 'up')}
+                                  className={cn(
+                                    'p-1 rounded-md transition-colors',
+                                    ratings[message.id] === 'up'
+                                      ? 'text-green-500 bg-green-500/10'
+                                      : 'text-muted-foreground hover:text-green-500 hover:bg-green-500/10'
+                                  )}
+                                >
+                                  <ThumbsUp className="h-3 w-3" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs">Good response</TooltipContent>
+                            </Tooltip>
+                            
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRating(message.id, 'down')}
+                                  className={cn(
+                                    'p-1 rounded-md transition-colors',
+                                    ratings[message.id] === 'down'
+                                      ? 'text-red-500 bg-red-500/10'
+                                      : 'text-muted-foreground hover:text-red-500 hover:bg-red-500/10'
+                                  )}
+                                >
+                                  <ThumbsDown className="h-3 w-3" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs">Poor response</TooltipContent>
+                            </Tooltip>
+                            
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  onClick={() => handleReport(message.id)}
+                                  disabled={reported.has(message.id)}
+                                  className={cn(
+                                    'p-1 rounded-md transition-colors',
+                                    reported.has(message.id)
+                                      ? 'text-amber-500 bg-amber-500/10 cursor-not-allowed'
+                                      : 'text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10'
+                                  )}
+                                >
+                                  <Flag className="h-3 w-3" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs">
+                                {reported.has(message.id) ? 'Reported' : 'Report response'}
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
+                  
+                  {/* Loading indicator */}
                   {isLoading && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground p-2.5 bg-primary/5 rounded-lg border border-primary/20">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                      <span className="text-xs font-medium">Aiva is thinking...</span>
+                    <div className="flex gap-2">
+                      <div className="flex-shrink-0 relative h-6 w-6">
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-primary/25 blur-sm" />
+                        <div className="relative h-6 w-6 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+                          <Image
+                            src="/logos/aiva-mark.svg"
+                            alt="Aiva"
+                            width={12}
+                            height={12}
+                            className="object-contain"
+                          />
+                        </div>
+                      </div>
+                      <div className="bg-muted rounded-2xl rounded-bl-md px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <div className="flex gap-1">
+                            <span className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.3s]" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.15s]" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce" />
+                          </div>
+                          <span className="text-xs text-muted-foreground">Thinking...</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Quick suggestions at bottom */}
+                  {!isLoading && !input.trim() && (
+                    <div className="pt-2 grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleQuickAction("Summarize my inbox")}
+                        className="px-3 py-2 text-xs rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors text-left"
+                      >
+                        📬 Summarize inbox
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickAction("What urgent messages do I have?")}
+                        className="px-3 py-2 text-xs rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors text-left"
+                      >
+                        🔥 Urgent messages
+                      </button>
                     </div>
                   )}
                 </div>
-              )}
-              <div ref={scrollRef} />
-            </ScrollArea>
+              </TooltipProvider>
+              
+              <div ref={messagesEndRef} />
+            </div>
 
-            <div className="border-t px-3 py-2.5 flex-shrink-0 bg-muted/20">
+            {/* Footer */}
+            <div className="border-t border-border/50 p-3 bg-muted/30">
               <form onSubmit={handleSubmit} className="flex gap-2">
                 <Input
-                  ref={panelInputRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Type your question..."
-                  className="flex-1 h-9 text-sm"
+                  onKeyDown={handleKeyDown}
+                  placeholder="Type your message..."
+                  className="flex-1 h-9 text-sm rounded-xl border-2 border-border/50 focus:border-primary/50"
                   disabled={isLoading}
                 />
-                <Button type="submit" disabled={isLoading || !input.trim()} className="h-9 px-3">
-                  <Send className="h-4 w-4" />
+                <Button 
+                  type="submit" 
+                  disabled={isLoading || !input.trim()} 
+                  className="h-9 w-9 rounded-xl p-0"
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
                 </Button>
               </form>
+              <p className="text-[10px] text-muted-foreground text-center mt-2">
+                Press Enter to send • Esc to close
+              </p>
             </div>
-          </Card>
+          </div>
         </>
       )}
     </div>
