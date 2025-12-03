@@ -11,16 +11,15 @@ import { useChat } from 'ai/react';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Send, X, Loader2, Minimize2 } from 'lucide-react';
+import { Send, X, Loader2, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 
 export function FloatingAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [chatId] = useState(() => `assistant-${Date.now()}`);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -30,7 +29,7 @@ export function FloatingAssistant() {
     api: '/api/chat',
     onFinish: () => {
       setTimeout(() => {
-        scrollRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
     },
     onError: (error) => {
@@ -67,6 +66,11 @@ export function FloatingAssistant() {
       content: input,
     });
     setInput('');
+    
+    // Scroll to bottom after sending
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -78,6 +82,12 @@ export function FloatingAssistant() {
       e.preventDefault();
       closePanel();
     }
+  };
+
+  // Quick action handler
+  const handleQuickAction = (prompt: string) => {
+    setInput(prompt);
+    inputRef.current?.focus();
   };
 
   // Global ESC key handler
@@ -101,6 +111,13 @@ export function FloatingAssistant() {
     }
   }, [isOpen]);
 
+  // Auto-scroll when new messages arrive
+  useEffect(() => {
+    if (messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
   return (
     <>
       {/* Chat Panel */}
@@ -108,166 +125,251 @@ export function FloatingAssistant() {
         <>
           {/* Backdrop for mobile */}
           <div 
-            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[60] md:hidden"
+            className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[60] md:hidden"
             onClick={closePanel}
           />
-          <Card 
+          
+          {/* Chat Window */}
+          <div 
             ref={panelRef}
             className={cn(
-              "fixed z-[70] shadow-2xl flex flex-col overflow-hidden",
-              "bg-card/98 backdrop-blur-xl border-2 border-primary/20",
+              "fixed z-[70] flex flex-col",
+              "bg-card border-2 border-border/50 shadow-2xl",
               "transition-all duration-300 ease-out",
               // Mobile: full screen with margins
-              "inset-4 md:inset-auto",
+              "inset-3 rounded-2xl md:inset-auto",
               // Desktop: positioned above the bubble
-              "md:bottom-24 md:right-6 md:w-[400px] md:max-h-[500px] md:rounded-2xl"
+              "md:bottom-24 md:right-6 md:w-[420px] md:h-[560px] md:rounded-2xl"
             )}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 flex-shrink-0 bg-gradient-to-r from-primary/5 to-accent/5">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 p-0.5 ring-2 ring-primary/30">
-                  <div className="h-full w-full rounded-full bg-card flex items-center justify-center overflow-hidden">
-                    <Image
-                      src="/logos/aiva-mark.svg"
-                      alt="Aiva"
-                      width={24}
-                      height={24}
-                      className="object-contain"
-                    />
+            {/* ===== STATIC HEADER ===== */}
+            <div className="flex-shrink-0 border-b border-border/50 bg-gradient-to-r from-primary/5 via-background to-accent/5 rounded-t-2xl">
+              <div className="flex items-center justify-between px-4 py-4">
+                <div className="flex items-center gap-3">
+                  {/* Logo with gradient ring */}
+                  <div className="relative">
+                    <div className="h-11 w-11 rounded-full bg-gradient-to-br from-primary to-accent p-[2px]">
+                      <div className="h-full w-full rounded-full bg-card flex items-center justify-center">
+                        <Image
+                          src="/logos/aiva-mark.svg"
+                          alt="Aiva"
+                          width={26}
+                          height={26}
+                          className="object-contain"
+                        />
+                      </div>
+                    </div>
+                    {/* Online indicator */}
+                    <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-card" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-base">Aiva Assistant</h3>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                      Online • Ready to help
+                    </p>
                   </div>
                 </div>
-                <div>
-                  <span className="font-semibold text-sm block">Aiva Assistant</span>
-                  <span className="text-xs text-muted-foreground">Always here to help</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-1">
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={closePanel}
-                  className="h-8 w-8 rounded-full hover:bg-muted"
+                  className="h-9 w-9 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
                 >
-                  <Minimize2 className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={closePanel}
-                  className="h-8 w-8 rounded-full hover:bg-destructive/10 hover:text-destructive"
-                >
-                  <X className="h-4 w-4" />
+                  <X className="h-5 w-5" />
                 </Button>
               </div>
             </div>
 
-            {/* Messages */}
-            <ScrollArea className="flex-1 p-4">
-              {messages.length === 0 ? (
-                <div className="text-sm text-muted-foreground space-y-4">
-                  <div className="text-center py-6">
-                    <div className="h-16 w-16 mx-auto rounded-full bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center mb-4">
-                      <Image
-                        src="/logos/aiva-mark.svg"
-                        alt="Aiva"
-                        width={40}
-                        height={40}
-                        className="object-contain"
-                      />
+            {/* ===== SCROLLABLE MESSAGE AREA ===== */}
+            <div 
+              ref={scrollRef}
+              className="flex-1 overflow-y-auto overflow-x-hidden min-h-0"
+            >
+              <div className="p-4 space-y-4">
+                {messages.length === 0 ? (
+                  /* Empty State / Welcome Screen */
+                  <div className="h-full flex flex-col items-center justify-center py-8">
+                    {/* Welcome illustration */}
+                    <div className="relative mb-6">
+                      <div className="h-20 w-20 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+                        <Image
+                          src="/logos/aiva-mark.svg"
+                          alt="Aiva"
+                          width={48}
+                          height={48}
+                          className="object-contain"
+                        />
+                      </div>
+                      <Sparkles className="absolute -top-1 -right-1 h-6 w-6 text-primary animate-pulse" />
                     </div>
-                    <p className="font-medium text-foreground">Hi! I&apos;m Aiva</p>
-                    <p className="text-xs mt-1">Your AI communication assistant</p>
+                    
+                    <h4 className="text-lg font-semibold text-foreground mb-1">Hi! I&apos;m Aiva</h4>
+                    <p className="text-sm text-muted-foreground mb-6 text-center px-4">
+                      Your AI communication assistant. How can I help you today?
+                    </p>
+
+                    {/* Quick action suggestions */}
+                    <div className="w-full space-y-2 px-2">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide px-2 mb-3">
+                        Quick Actions
+                      </p>
+                      <button
+                        onClick={() => handleQuickAction("What urgent messages do I have?")}
+                        className="w-full text-left p-3 rounded-xl bg-muted/50 hover:bg-muted border border-transparent hover:border-primary/20 transition-all group"
+                      >
+                        <span className="text-sm font-medium group-hover:text-primary transition-colors">
+                          🔥 Find urgent messages
+                        </span>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Across all your channels
+                        </p>
+                      </button>
+                      <button
+                        onClick={() => handleQuickAction("Summarize my unread messages")}
+                        className="w-full text-left p-3 rounded-xl bg-muted/50 hover:bg-muted border border-transparent hover:border-primary/20 transition-all group"
+                      >
+                        <span className="text-sm font-medium group-hover:text-primary transition-colors">
+                          📬 Summarize my inbox
+                        </span>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Get a quick overview
+                        </p>
+                      </button>
+                      <button
+                        onClick={() => handleQuickAction("What meetings do I have today?")}
+                        className="w-full text-left p-3 rounded-xl bg-muted/50 hover:bg-muted border border-transparent hover:border-primary/20 transition-all group"
+                      >
+                        <span className="text-sm font-medium group-hover:text-primary transition-colors">
+                          📅 Check today&apos;s schedule
+                        </span>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Meetings and events
+                        </p>
+                      </button>
+                      <button
+                        onClick={() => handleQuickAction("Help me draft a professional reply")}
+                        className="w-full text-left p-3 rounded-xl bg-muted/50 hover:bg-muted border border-transparent hover:border-primary/20 transition-all group"
+                      >
+                        <span className="text-sm font-medium group-hover:text-primary transition-colors">
+                          ✍️ Draft a reply
+                        </span>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Professional and polished
+                        </p>
+                      </button>
+                    </div>
                   </div>
-                  <div className="space-y-2 px-2">
-                    <p className="text-xs font-medium text-foreground">I can help you:</p>
-                    <ul className="text-xs space-y-2">
-                      <li className="flex items-start gap-2 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
-                          onClick={() => setInput("What urgent messages do I have?")}>
-                        <span className="h-1.5 w-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0"></span>
-                        <span>Find urgent messages across channels</span>
-                      </li>
-                      <li className="flex items-start gap-2 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
-                          onClick={() => setInput("Summarize my unread messages")}>
-                        <span className="h-1.5 w-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0"></span>
-                        <span>Summarize your inbox</span>
-                      </li>
-                      <li className="flex items-start gap-2 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
-                          onClick={() => setInput("What meetings do I have today?")}>
-                        <span className="h-1.5 w-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0"></span>
-                        <span>Check your calendar & schedule</span>
-                      </li>
-                      <li className="flex items-start gap-2 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
-                          onClick={() => setInput("Draft a reply to the last urgent email")}>
-                        <span className="h-1.5 w-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0"></span>
-                        <span>Draft replies & messages</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={cn(
-                        'flex flex-col gap-1',
-                        message.role === 'user' ? 'items-end' : 'items-start'
-                      )}
-                    >
+                ) : (
+                  /* Chat Messages */
+                  <div className="space-y-4">
+                    {messages.map((message) => (
                       <div
+                        key={message.id}
                         className={cn(
-                          'rounded-2xl px-4 py-2.5 max-w-[85%] text-sm',
-                          message.role === 'user'
-                            ? 'bg-primary text-primary-foreground rounded-br-md'
-                            : 'bg-muted rounded-bl-md'
+                          'flex gap-3',
+                          message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
                         )}
                       >
-                        <p className="whitespace-pre-wrap">{message.content}</p>
+                        {/* Avatar */}
+                        {message.role === 'assistant' && (
+                          <div className="flex-shrink-0">
+                            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+                              <Image
+                                src="/logos/aiva-mark.svg"
+                                alt="Aiva"
+                                width={18}
+                                height={18}
+                                className="object-contain"
+                              />
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Message bubble */}
+                        <div
+                          className={cn(
+                            'max-w-[80%] rounded-2xl px-4 py-3 text-sm',
+                            message.role === 'user'
+                              ? 'bg-primary text-primary-foreground rounded-br-md'
+                              : 'bg-muted rounded-bl-md'
+                          )}
+                        >
+                          <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                  {isLoading && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground p-3 bg-gradient-to-r from-primary/5 to-accent/5 rounded-2xl rounded-bl-md border border-primary/10">
-                      <div className="flex gap-1">
-                        <span className="h-2 w-2 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]"></span>
-                        <span className="h-2 w-2 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]"></span>
-                        <span className="h-2 w-2 rounded-full bg-primary animate-bounce"></span>
+                    ))}
+                    
+                    {/* Loading indicator */}
+                    {isLoading && (
+                      <div className="flex gap-3">
+                        <div className="flex-shrink-0">
+                          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+                            <Image
+                              src="/logos/aiva-mark.svg"
+                              alt="Aiva"
+                              width={18}
+                              height={18}
+                              className="object-contain"
+                            />
+                          </div>
+                        </div>
+                        <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="flex gap-1">
+                              <span className="h-2 w-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.3s]" />
+                              <span className="h-2 w-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.15s]" />
+                              <span className="h-2 w-2 rounded-full bg-primary/60 animate-bounce" />
+                            </div>
+                            <span className="text-xs text-muted-foreground">Thinking...</span>
+                          </div>
+                        </div>
                       </div>
-                      <span className="text-xs font-medium">Aiva is thinking...</span>
-                    </div>
-                  )}
-                </div>
-              )}
-              <div ref={scrollRef} />
-            </ScrollArea>
+                    )}
+                  </div>
+                )}
+                
+                {/* Scroll anchor */}
+                <div ref={messagesEndRef} />
+              </div>
+            </div>
 
-            {/* Input */}
-            <div className="border-t border-border/50 p-3 flex-shrink-0 bg-muted/30">
-              <form onSubmit={handleSubmit} className="flex gap-2">
-                <Input
-                  ref={inputRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Ask Aiva anything..."
-                  className="flex-1 h-10 text-sm rounded-full px-4 border-2 border-border/50 focus:border-primary/50"
-                  disabled={isLoading}
-                />
+            {/* ===== STATIC FOOTER ===== */}
+            <div className="flex-shrink-0 border-t border-border/50 bg-muted/30 p-4 rounded-b-2xl">
+              <form onSubmit={handleSubmit} className="flex gap-3">
+                <div className="flex-1 relative">
+                  <Input
+                    ref={inputRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Type your message..."
+                    className="h-11 text-sm rounded-xl pl-4 pr-4 border-2 border-border/50 focus:border-primary/50 bg-background"
+                    disabled={isLoading}
+                  />
+                </div>
                 <Button 
                   type="submit" 
                   disabled={isLoading || !input.trim()} 
-                  className="h-10 w-10 rounded-full p-0 bg-primary hover:bg-primary/90"
+                  className={cn(
+                    "h-11 w-11 rounded-xl p-0 transition-all",
+                    "bg-primary hover:bg-primary/90",
+                    "disabled:opacity-50 disabled:cursor-not-allowed",
+                    input.trim() && !isLoading && "shadow-lg shadow-primary/25"
+                  )}
                 >
                   {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-5 w-5 animate-spin" />
                   ) : (
-                    <Send className="h-4 w-4" />
+                    <Send className="h-5 w-5" />
                   )}
                 </Button>
               </form>
+              <p className="text-[10px] text-muted-foreground text-center mt-2">
+                Press Enter to send • Esc to close
+              </p>
             </div>
-          </Card>
+          </div>
         </>
       )}
 
