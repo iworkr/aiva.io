@@ -49,7 +49,7 @@ export default async function SettingsPage() {
   return (
     <div className="flex h-full flex-col">
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-auto">
         <Suspense fallback={<SettingsSkeleton />}>
           <SettingsView 
             workspaceId={workspace.id} 

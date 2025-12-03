@@ -10,6 +10,8 @@ import { createSupabaseUserServerActionClient } from '@/supabase-clients/user/cr
 import { authActionClient } from '@/lib/safe-action';
 import { z } from 'zod';
 import { isWorkspaceMember } from './workspaces';
+import { getWorkspacePlanType } from '@/rsc-data/user/subscriptions';
+import { getEffectiveSyncFrequency, PLAN_SYNC_LIMITS } from '@/utils/subscriptions';
 
 // ============================================================================
 // SCHEMAS
@@ -257,10 +259,26 @@ export const updateSyncSettingsAction = authActionClient
 
       const currentSettings = (existing?.workspace_settings || {}) as Record<string, any>;
 
+      // Validate and enforce sync frequency based on plan
+      let effectiveSyncFrequency = currentSettings.syncFrequency;
+      if (syncFrequency !== undefined) {
+        // Get workspace plan type to enforce sync limits
+        const planType = await getWorkspacePlanType(workspaceId);
+        const planLimits = PLAN_SYNC_LIMITS[planType];
+        
+        // Enforce minimum sync frequency for the plan
+        effectiveSyncFrequency = getEffectiveSyncFrequency(planType, syncFrequency);
+        
+        // If user tried to set a faster frequency than allowed, inform them
+        if (syncFrequency < planLimits.minSyncIntervalMinutes) {
+          console.log(`Sync frequency ${syncFrequency} mins adjusted to ${effectiveSyncFrequency} mins for ${planType} plan`);
+        }
+      }
+
       const updatedSettings = {
         ...currentSettings,
         timezone: timezone !== undefined ? timezone : currentSettings.timezone,
-        syncFrequency: syncFrequency !== undefined ? syncFrequency : currentSettings.syncFrequency,
+        syncFrequency: effectiveSyncFrequency,
       };
 
       const { error: settingsError } = await supabase

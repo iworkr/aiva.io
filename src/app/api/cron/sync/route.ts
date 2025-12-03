@@ -2,15 +2,20 @@
  * Cron Job: Automatic Message Sync
  * Runs periodically to sync all active channel connections
  * 
- * Vercel Cron Configuration:
- * - Schedule: Every 5 minutes
- * - Route: /api/cron/sync
+ * Vercel Cron Configuration (tiered by plan):
+ * - Pro/Enterprise: Every 5 minutes  (/api/cron/sync?tier=pro)
+ * - Basic: Every 30 minutes          (/api/cron/sync?tier=basic)
+ * - Free: Every hour                 (/api/cron/sync?tier=free)
  * 
- * This ensures messages are synced automatically even when users aren't logged in
+ * This ensures messages are synced automatically based on subscription tier
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { syncAllWorkspacesInBackground } from '@/lib/workers/background-sync';
+import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
+import { syncWorkspaceInBackground, BackgroundSyncResult } from '@/lib/workers/background-sync';
+import { getPlanType, PlanType, PLAN_SYNC_LIMITS } from '@/utils/subscriptions';
+
+type SyncTier = 'free' | 'basic' | 'pro' | 'all';
 
 /**
  * Verify the request is from Vercel Cron
@@ -29,6 +34,130 @@ function verifyCronRequest(request: NextRequest): boolean {
   return cronHeader === '1';
 }
 
+/**
+ * Map plan types to sync tiers
+ */
+function getPlanTier(planType: PlanType): SyncTier {
+  switch (planType) {
+    case 'enterprise':
+    case 'pro':
+      return 'pro';
+    case 'basic':
+      return 'basic';
+    case 'free':
+    default:
+      return 'free';
+  }
+}
+
+/**
+ * Get workspaces that should be synced for a given tier
+ */
+async function getWorkspacesForTier(tier: SyncTier): Promise<Array<{ id: string; planType: PlanType }>> {
+  const supabase = supabaseAdminClient;
+
+  // Get all active workspaces with their subscriptions
+  const { data: workspaces, error: workspacesError } = await supabase
+    .from('workspaces')
+    .select(`
+      id,
+      billing_subscriptions (
+        billing_products (
+          name,
+          active
+        )
+      )
+    `)
+    .eq('is_active', true);
+
+  if (workspacesError || !workspaces) {
+    console.error('Failed to fetch workspaces:', workspacesError);
+    return [];
+  }
+
+  // Filter workspaces by tier
+  const workspacesWithPlan = workspaces.map(workspace => {
+    // @ts-expect-error - Supabase typing for nested joins
+    const subscriptions = workspace.billing_subscriptions || [];
+    const planType = getPlanType(subscriptions);
+    const workspaceTier = getPlanTier(planType);
+    
+    return {
+      id: workspace.id,
+      planType,
+      tier: workspaceTier,
+    };
+  });
+
+  // If tier is 'all', return all workspaces
+  if (tier === 'all') {
+    return workspacesWithPlan.map(w => ({ id: w.id, planType: w.planType }));
+  }
+
+  // Filter by requested tier
+  return workspacesWithPlan
+    .filter(w => w.tier === tier)
+    .map(w => ({ id: w.id, planType: w.planType }));
+}
+
+/**
+ * Check if a workspace should be synced based on last sync time
+ */
+async function shouldSyncWorkspace(workspaceId: string, planType: PlanType): Promise<boolean> {
+  const supabase = supabaseAdminClient;
+  const limits = PLAN_SYNC_LIMITS[planType];
+  
+  // Get workspace settings to check last sync time
+  const { data: settings } = await supabase
+    .from('workspace_settings')
+    .select('workspace_settings')
+    .eq('workspace_id', workspaceId)
+    .single();
+
+  const workspaceSettings = (settings?.workspace_settings || {}) as Record<string, unknown>;
+  const lastSyncAt = workspaceSettings.lastSyncAt as string | undefined;
+  const syncFrequency = (workspaceSettings.syncFrequency as number) || limits.minSyncIntervalMinutes;
+  
+  // Use the maximum of configured frequency and plan minimum
+  const effectiveFrequency = Math.max(syncFrequency, limits.minSyncIntervalMinutes);
+  
+  if (!lastSyncAt) {
+    return true; // Never synced, should sync
+  }
+  
+  const lastSync = new Date(lastSyncAt);
+  const now = new Date();
+  const minutesSinceLastSync = (now.getTime() - lastSync.getTime()) / (1000 * 60);
+  
+  return minutesSinceLastSync >= effectiveFrequency;
+}
+
+/**
+ * Update last sync time for a workspace
+ */
+async function updateLastSyncTime(workspaceId: string): Promise<void> {
+  const supabase = supabaseAdminClient;
+  
+  // Get existing settings
+  const { data: existing } = await supabase
+    .from('workspace_settings')
+    .select('workspace_settings')
+    .eq('workspace_id', workspaceId)
+    .single();
+
+  const currentSettings = (existing?.workspace_settings || {}) as Record<string, unknown>;
+
+  await supabase
+    .from('workspace_settings')
+    .upsert({
+      workspace_id: workspaceId,
+      workspace_settings: {
+        ...currentSettings,
+        lastSyncAt: new Date().toISOString(),
+      },
+    });
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Verify this is a legitimate cron request
@@ -40,32 +169,84 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('🔄 Automatic sync cron job started');
+    // Get tier from query params (defaults to 'all' for backward compatibility)
+    const { searchParams } = new URL(request.url);
+    const tier = (searchParams.get('tier') as SyncTier) || 'all';
 
-    // Use the background worker to sync all workspaces
-    const result = await syncAllWorkspacesInBackground({
-      maxMessages: 50,
-      autoClassify: true,
-    });
+    console.log(`🔄 Automatic sync cron job started for tier: ${tier}`);
 
-    if (!result.success) {
-      console.error('❌ Cron job failed:', result.error);
-      return NextResponse.json(
-        { error: result.error },
-        { status: 500 }
-      );
+    // Get workspaces for this tier
+    const workspaces = await getWorkspacesForTier(tier);
+    
+    if (workspaces.length === 0) {
+      console.log(`No workspaces found for tier: ${tier}`);
+      return NextResponse.json({
+        success: true,
+        timestamp: new Date().toISOString(),
+        tier,
+        workspacesProcessed: 0,
+        message: 'No workspaces to sync',
+      });
     }
 
-    console.log('🔄 Automatic sync cron job completed', {
-      workspacesProcessed: result.workspacesProcessed,
-      connectionsProcessed: result.connectionsProcessed,
-      totalNewMessages: result.totalNewMessages,
-      totalErrors: result.totalErrors,
+    let totalConnections = 0;
+    let totalNewMessages = 0;
+    let totalErrors = 0;
+    let workspacesSynced = 0;
+    let workspacesSkipped = 0;
+
+    // Sync each workspace
+    for (const workspace of workspaces) {
+      try {
+        // Check if workspace should be synced based on frequency settings
+        const shouldSync = await shouldSyncWorkspace(workspace.id, workspace.planType);
+        
+        if (!shouldSync) {
+          workspacesSkipped++;
+          continue;
+        }
+
+        const result: BackgroundSyncResult = await syncWorkspaceInBackground(workspace.id, {
+          maxMessages: 50,
+          autoClassify: true,
+        });
+
+        if (result.success) {
+          totalConnections += result.connectionsProcessed || 0;
+          totalNewMessages += result.totalNewMessages || 0;
+          workspacesSynced++;
+          
+          // Update last sync time
+          await updateLastSyncTime(workspace.id);
+        } else {
+          totalErrors++;
+          console.error(`Failed to sync workspace ${workspace.id}:`, result.error);
+        }
+      } catch (error) {
+        console.error(`Error syncing workspace ${workspace.id}:`, error);
+        totalErrors++;
+      }
+    }
+
+    console.log(`🔄 Automatic sync cron job completed for tier: ${tier}`, {
+      workspacesEligible: workspaces.length,
+      workspacesSynced,
+      workspacesSkipped,
+      totalConnections,
+      totalNewMessages,
+      totalErrors,
     });
 
     return NextResponse.json({
+      success: true,
       timestamp: new Date().toISOString(),
-      ...result,
+      tier,
+      workspacesEligible: workspaces.length,
+      workspacesProcessed: workspacesSynced,
+      workspacesSkipped,
+      connectionsProcessed: totalConnections,
+      totalNewMessages,
+      totalErrors,
     });
   } catch (error) {
     console.error('❌ Cron job error:', error);
@@ -83,4 +264,3 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   return GET(request);
 }
-

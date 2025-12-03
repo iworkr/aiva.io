@@ -46,7 +46,7 @@ export default function Loading() {
               </CardContent>
             </Card>
           ))}
-        </div>
+          </div>
         
         {/* Main content area */}
         <div className="space-y-6">

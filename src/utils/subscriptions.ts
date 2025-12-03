@@ -150,3 +150,76 @@ export function getPlanDisplayName(planType: PlanType): string {
   return displayNames[planType];
 }
 
+/**
+ * Plan-based sync frequency limits
+ * Controls how often workspaces can sync based on their subscription tier
+ */
+export const PLAN_SYNC_LIMITS = {
+  free: {
+    minSyncIntervalMinutes: 60,  // Once per hour
+    maxSyncIntervalMinutes: 60,
+    webhooksEnabled: false,
+    description: "Hourly sync",
+  },
+  basic: {
+    minSyncIntervalMinutes: 30,  // Every 30 mins minimum
+    maxSyncIntervalMinutes: 60,
+    webhooksEnabled: false,
+    description: "Every 30 minutes",
+  },
+  pro: {
+    minSyncIntervalMinutes: 5,   // Every 5 mins minimum
+    maxSyncIntervalMinutes: 60,
+    webhooksEnabled: true,       // Real-time webhooks
+    description: "Every 5 minutes + real-time",
+  },
+  enterprise: {
+    minSyncIntervalMinutes: 1,   // Every 1 min minimum
+    maxSyncIntervalMinutes: 60,
+    webhooksEnabled: true,
+    description: "Real-time",
+  },
+} as const;
+
+/**
+ * Get sync limits for a plan type
+ */
+export function getPlanSyncLimits(planType: PlanType) {
+  return PLAN_SYNC_LIMITS[planType];
+}
+
+/**
+ * Get available sync frequency options for a plan
+ * Returns array of { value, label } for select dropdown
+ */
+export function getSyncFrequencyOptions(planType: PlanType): Array<{ value: string; label: string; disabled?: boolean }> {
+  const limits = PLAN_SYNC_LIMITS[planType];
+  const allOptions = [
+    { value: "5", label: "Every 5 minutes" },
+    { value: "15", label: "Every 15 minutes" },
+    { value: "30", label: "Every 30 minutes" },
+    { value: "60", label: "Every hour" },
+  ];
+  
+  return allOptions.map(option => ({
+    ...option,
+    disabled: parseInt(option.value) < limits.minSyncIntervalMinutes,
+  }));
+}
+
+/**
+ * Validate if a sync frequency is allowed for a plan
+ */
+export function isValidSyncFrequency(planType: PlanType, frequencyMinutes: number): boolean {
+  const limits = PLAN_SYNC_LIMITS[planType];
+  return frequencyMinutes >= limits.minSyncIntervalMinutes && frequencyMinutes <= limits.maxSyncIntervalMinutes;
+}
+
+/**
+ * Get the effective sync frequency for a plan (enforces minimum)
+ */
+export function getEffectiveSyncFrequency(planType: PlanType, requestedFrequency: number): number {
+  const limits = PLAN_SYNC_LIMITS[planType];
+  return Math.max(requestedFrequency, limits.minSyncIntervalMinutes);
+}
+

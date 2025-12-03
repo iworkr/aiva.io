@@ -28,8 +28,24 @@
   ],
   "crons": [
     {
-      "path": "/api/cron/sync",
+      "path": "/api/cron/sync?tier=pro",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/sync?tier=basic",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/sync?tier=free",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/sync?tier=enterprise",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/renew-webhooks",
+      "schedule": "0 0 * * *"
     }
   ]
 }

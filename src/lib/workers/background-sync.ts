@@ -10,12 +10,16 @@ import { syncAllWorkspaceConnections } from '@/lib/sync/orchestrator';
 import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
 import { syncGmailMessages } from '@/lib/gmail/sync';
 import { syncOutlookMessages } from '@/lib/outlook/sync';
+import { getWorkspacePlanType, PLAN_SYNC_LIMITS } from '@/utils/subscriptions';
+
+export type PlanTier = 'free' | 'basic' | 'pro' | 'enterprise';
 
 export interface BackgroundSyncOptions {
   workspaceId?: string; // If provided, only sync this workspace
   connectionId?: string; // If provided, only sync this connection
   maxMessages?: number;
   autoClassify?: boolean;
+  tier?: string; // For tiered cron jobs: 'free', 'basic', 'pro', 'enterprise'
 }
 
 export interface BackgroundSyncResult {
@@ -125,6 +129,85 @@ export async function syncWorkspaceInBackground(
 }
 
 /**
+ * Get workspace plan type from subscription data
+ */
+async function getWorkspacePlan(workspaceId: string): Promise<PlanTier> {
+  const supabase = supabaseAdminClient;
+
+  const { data } = await supabase
+    .from('workspaces')
+    .select('billing_subscriptions(billing_products(name, active))')
+    .eq('id', workspaceId)
+    .single();
+
+  // Use the existing helper function
+  return getWorkspacePlanType(data?.billing_subscriptions || []) as PlanTier;
+}
+
+/**
+ * Check if workspace should be synced based on its plan and last sync time
+ */
+async function shouldSyncWorkspace(workspaceId: string, tier?: string): Promise<boolean> {
+  const supabase = supabaseAdminClient;
+  const planType = await getWorkspacePlan(workspaceId);
+
+  // If a tier filter is provided, only sync workspaces on that tier
+  if (tier && planType !== tier) {
+    return false;
+  }
+
+  // Get workspace settings to check last sync time
+  const { data: settings } = await supabase
+    .from('workspace_settings')
+    .select('workspace_settings, sync_frequency_minutes')
+    .eq('workspace_id', workspaceId)
+    .single();
+
+  const syncFrequency = settings?.sync_frequency_minutes || PLAN_SYNC_LIMITS[planType].minSyncIntervalMinutes;
+
+  // Get the most recent sync time from connections
+  const { data: connections } = await supabase
+    .from('channel_connections')
+    .select('last_sync_at')
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'active')
+    .order('last_sync_at', { ascending: false, nullsFirst: false })
+    .limit(1);
+
+  if (!connections || connections.length === 0) {
+    // No connections, nothing to sync
+    return false;
+  }
+
+  const lastSyncAt = connections[0].last_sync_at;
+  if (!lastSyncAt) {
+    // Never synced before, should sync
+    return true;
+  }
+
+  // Check if enough time has passed since last sync
+  const lastSync = new Date(lastSyncAt);
+  const now = new Date();
+  const minutesSinceLastSync = (now.getTime() - lastSync.getTime()) / (1000 * 60);
+
+  return minutesSinceLastSync >= syncFrequency;
+}
+
+/**
+ * Update last sync time for a connection
+ */
+async function updateConnectionSyncTime(connectionId: string): Promise<void> {
+  const supabase = supabaseAdminClient;
+  await supabase
+    .from('channel_connections')
+    .update({
+      last_sync_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', connectionId);
+}
+
+/**
  * Sync all active workspaces in the background
  * This is the main function called by cron jobs
  */
@@ -158,12 +241,20 @@ export async function syncAllWorkspacesInBackground(
     let totalConnections = 0;
     let totalNewMessages = 0;
     let totalErrors = 0;
+    let workspacesProcessed = 0;
 
     // Sync each workspace
     for (const workspace of workspaces) {
       try {
+        // Check if this workspace should be synced based on tier and sync frequency
+        const shouldSync = await shouldSyncWorkspace(workspace.id, options.tier);
+        if (!shouldSync) {
+          continue;
+        }
+
         const result = await syncWorkspaceInBackground(workspace.id, options);
         if (result.success) {
+          workspacesProcessed++;
           totalConnections += result.connectionsProcessed || 0;
           totalNewMessages += result.totalNewMessages || 0;
           totalErrors += result.totalErrors || 0;
@@ -178,11 +269,11 @@ export async function syncAllWorkspacesInBackground(
 
     return {
       success: true,
-      workspacesProcessed: workspaces.length,
+      workspacesProcessed,
       connectionsProcessed: totalConnections,
       totalNewMessages,
       totalErrors,
-      message: `Synced ${workspaces.length} workspaces: ${totalConnections} connections, ${totalNewMessages} new messages`,
+      message: `Synced ${workspacesProcessed}/${workspaces.length} workspaces: ${totalConnections} connections, ${totalNewMessages} new messages`,
     };
   } catch (error) {
     console.error('Background sync error:', error);
@@ -192,4 +283,6 @@ export async function syncAllWorkspacesInBackground(
     };
   }
 }
+
+export { updateConnectionSyncTime };
 

@@ -68,7 +68,7 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
   // Fetch initial contacts (with pagination)
   const fetchContacts = useCallback(async (reset = true) => {
     if (reset) {
-      setLoading(true);
+    setLoading(true);
       setCurrentOffset(0);
     }
     try {
@@ -328,20 +328,20 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
                 ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3' 
                 : 'flex flex-col gap-1'
             )}>
-              {contacts.map((contact) => (
-                <ContactTile
-                  key={contact.id}
-                  contact={contact}
+            {contacts.map((contact) => (
+              <ContactTile
+                key={contact.id}
+                contact={contact}
                   variant={viewMode}
-                  onClick={() => handleContactClick(contact)}
-                  onToggleFavorite={(e) => {
-                    e.stopPropagation();
-                    handleToggleFavorite(contact);
-                  }}
-                  onEdit={(e) => handleEditContact(contact, e)}
-                  onDelete={(e) => handleDeleteContact(contact, e)}
-                />
-              ))}
+                onClick={() => handleContactClick(contact)}
+                onToggleFavorite={(e) => {
+                  e.stopPropagation();
+                  handleToggleFavorite(contact);
+                }}
+                onEdit={(e) => handleEditContact(contact, e)}
+                onDelete={(e) => handleDeleteContact(contact, e)}
+              />
+            ))}
             </div>
             
             {/* Pagination Footer */}
