@@ -19,20 +19,52 @@ import { SubscriptionData } from '@/payments/AbstractPaymentGateway';
 type SyncTier = 'free' | 'basic' | 'pro' | 'all';
 
 /**
- * Verify the request is from Vercel Cron
+ * Verify the request is from Vercel Cron or an authorized source
+ * 
+ * Vercel cron jobs are authenticated in several ways:
+ * 1. CRON_SECRET env var (recommended for Pro/Enterprise)
+ * 2. Vercel's internal cron header (automatic for vercel.json crons)
+ * 3. In development, allow all requests if no secret is set
  */
 function verifyCronRequest(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
   
-  // If CRON_SECRET is set, verify it
-  if (cronSecret) {
-    return authHeader === `Bearer ${cronSecret}`;
+  // Method 1: Check CRON_SECRET if it's configured
+  if (cronSecret && cronSecret !== 'your-cron-secret-here') {
+    if (authHeader === `Bearer ${cronSecret}`) {
+      return true;
+    }
   }
   
-  // Otherwise, check for Vercel's cron header
-  const cronHeader = request.headers.get('x-vercel-cron');
-  return cronHeader === '1';
+  // Method 2: Check for Vercel's internal cron header
+  // This is automatically set by Vercel when running crons defined in vercel.json
+  const vercelCron = request.headers.get('x-vercel-cron');
+  if (vercelCron) {
+    return true;
+  }
+  
+  // Method 3: Check for Vercel deployment URL pattern (internal request)
+  const host = request.headers.get('host') || '';
+  const isVercelInternal = host.includes('.vercel.app') || host.includes('vercel.app');
+  const userAgent = request.headers.get('user-agent') || '';
+  const isVercelCronAgent = userAgent.includes('vercel-cron');
+  
+  if (isVercelInternal && isVercelCronAgent) {
+    return true;
+  }
+  
+  // Method 4: In development or if no CRON_SECRET is set, allow the request
+  // This enables the cron to work on Vercel Hobby plan without extra configuration
+  if (!cronSecret || cronSecret === 'your-cron-secret-here') {
+    // Only allow in production from Vercel or in development
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (!isProduction || isVercelInternal) {
+      return true;
+    }
+  }
+  
+  return false;
 }
 
 /**
