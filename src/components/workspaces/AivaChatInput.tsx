@@ -204,8 +204,8 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
           {/* Chat Window */}
           <div 
             ref={panelRef}
-            className="absolute top-full left-0 right-0 mt-2 z-50 bg-card border-2 border-border/50 shadow-xl rounded-xl overflow-hidden"
-            style={{ maxHeight: '400px' }}
+            className="absolute bottom-full left-0 right-0 mb-2 z-50 bg-card border-2 border-border/50 shadow-xl rounded-xl overflow-hidden"
+            style={{ maxHeight: '450px' }}
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-muted/30">
@@ -237,7 +237,7 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
             <div 
               ref={scrollRef}
               className="overflow-y-auto p-4"
-              style={{ maxHeight: '280px' }}
+              style={{ maxHeight: '320px' }}
             >
               <TooltipProvider delayDuration={300}>
                 <div className="space-y-4">
@@ -415,6 +415,20 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
                         className="px-3 py-2 text-xs rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors text-left"
                       >
                         🔥 Urgent messages
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickAction("What's on my calendar today?")}
+                        className="px-3 py-2 text-xs rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors text-left"
+                      >
+                        📅 Today&apos;s schedule
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickAction("Help me draft a reply")}
+                        className="px-3 py-2 text-xs rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors text-left"
+                      >
+                        ✍️ Draft reply
                       </button>
                     </div>
                   )}
