@@ -200,14 +200,13 @@ export function FloatingAssistant() {
                     </p>
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
+                <button
+                  type="button"
                   onClick={closePanel}
-                  className="h-9 w-9 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
+                  className="h-9 w-9 rounded-full flex items-center justify-center hover:bg-skeleton transition-colors"
                 >
                   <X className="h-5 w-5" />
-                </Button>
+                </button>
               </div>
             </div>
 
@@ -458,6 +457,40 @@ export function FloatingAssistant() {
                           </div>
                         </div>
                       )}
+                      
+                      {/* Quick suggestions - shown at bottom of chat when not typing/loading */}
+                      {!isLoading && !input.trim() && (
+                        <div className="pt-4 grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleQuickAction("Summarize my inbox")}
+                            className="px-3 py-2 text-xs rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors text-left"
+                          >
+                            📬 Summarize inbox
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickAction("What urgent messages do I have?")}
+                            className="px-3 py-2 text-xs rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors text-left"
+                          >
+                            🔥 Urgent messages
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickAction("What's on my calendar today?")}
+                            className="px-3 py-2 text-xs rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors text-left"
+                          >
+                            📅 Today&apos;s schedule
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickAction("Help me draft a reply")}
+                            className="px-3 py-2 text-xs rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors text-left"
+                          >
+                            ✍️ Draft reply
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </TooltipProvider>
                 )}
@@ -468,76 +501,39 @@ export function FloatingAssistant() {
             </div>
 
             {/* ===== STATIC FOOTER ===== */}
-            <div className="flex-shrink-0 border-t border-border/50 bg-muted/30 rounded-b-2xl">
-              {/* Quick suggestions - 2x2 grid, hidden when typing or loading */}
-              {!isLoading && !input.trim() && (
-                <div className="px-3 pt-3 pb-2 grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickAction("Summarize my inbox")}
-                    className="px-3 py-2 text-xs rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors text-left"
-                  >
-                    📬 Summarize inbox
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickAction("What urgent messages do I have?")}
-                    className="px-3 py-2 text-xs rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors text-left"
-                  >
-                    🔥 Urgent messages
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickAction("What's on my calendar today?")}
-                    className="px-3 py-2 text-xs rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors text-left"
-                  >
-                    📅 Today&apos;s schedule
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickAction("Help me draft a reply")}
-                    className="px-3 py-2 text-xs rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors text-left"
-                  >
-                    ✍️ Draft reply
-                  </button>
+            <div className="flex-shrink-0 border-t border-border/50 bg-muted/30 rounded-b-2xl p-3">
+              <form onSubmit={handleSubmit} className="flex gap-3">
+                <div className="flex-1 relative">
+                  <Input
+                    ref={inputRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Type your message..."
+                    className="h-11 text-sm rounded-xl pl-4 pr-4 border-2 border-border/50 focus:border-primary/50 bg-background"
+                    disabled={isLoading}
+                  />
                 </div>
-              )}
-              
-              {/* Input area */}
-              <div className="px-3 pb-3 pt-2">
-                <form onSubmit={handleSubmit} className="flex gap-3">
-                  <div className="flex-1 relative">
-                    <Input
-                      ref={inputRef}
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder="Type your message..."
-                      className="h-11 text-sm rounded-xl pl-4 pr-4 border-2 border-border/50 focus:border-primary/50 bg-background"
-                      disabled={isLoading}
-                    />
-                  </div>
-                  <Button 
-                    type="submit" 
-                    disabled={isLoading || !input.trim()} 
-                    className={cn(
-                      "h-11 w-11 rounded-xl p-0 transition-all",
-                      "bg-primary hover:bg-primary/90",
-                      "disabled:opacity-50 disabled:cursor-not-allowed",
-                      input.trim() && !isLoading && "shadow-lg shadow-primary/25"
-                    )}
-                  >
-                    {isLoading ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <Send className="h-5 w-5" />
-                    )}
-                  </Button>
-                </form>
-                <p className="text-[10px] text-muted-foreground text-center mt-2">
-                  Press Enter to send • Esc to close
-                </p>
-              </div>
+                <Button 
+                  type="submit" 
+                  disabled={isLoading || !input.trim()} 
+                  className={cn(
+                    "h-11 w-11 rounded-xl p-0 transition-all",
+                    "bg-primary hover:bg-primary/90",
+                    "disabled:opacity-50 disabled:cursor-not-allowed",
+                    input.trim() && !isLoading && "shadow-lg shadow-primary/25"
+                  )}
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <Send className="h-5 w-5" />
+                  )}
+                </Button>
+              </form>
+              <p className="text-[10px] text-muted-foreground text-center mt-2">
+                Press Enter to send • Esc to close
+              </p>
             </div>
           </div>
         </>
