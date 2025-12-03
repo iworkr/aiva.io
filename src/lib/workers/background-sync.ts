@@ -10,8 +10,7 @@ import { syncAllWorkspaceConnections } from '@/lib/sync/orchestrator';
 import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
 import { syncGmailMessages } from '@/lib/gmail/sync';
 import { syncOutlookMessages } from '@/lib/outlook/sync';
-import { getPlanType, PLAN_SYNC_LIMITS, PlanType } from '@/utils/subscriptions';
-import { SubscriptionData } from '@/payments/AbstractPaymentGateway';
+import { PLAN_SYNC_LIMITS } from '@/utils/subscriptions';
 
 export type PlanTier = 'free' | 'basic' | 'pro' | 'enterprise';
 
@@ -131,22 +130,15 @@ export async function syncWorkspaceInBackground(
 
 /**
  * Get workspace plan type from subscription data
+ * 
+ * Note: Currently returns 'free' for all workspaces since billing is not yet set up.
+ * When billing is enabled, this will query through billing_customers to get subscription data.
  */
 async function getWorkspacePlan(workspaceId: string): Promise<PlanTier> {
-  const supabase = supabaseAdminClient;
-
-  const { data } = await supabase
-    .from('workspaces')
-    .select('billing_subscriptions(billing_products(name, active))')
-    .eq('id', workspaceId)
-    .single();
-
-  // Use the existing helper function (cast to handle Supabase nested join typing)
-  const workspaceData = data as unknown as { 
-    billing_subscriptions: SubscriptionData[] | null 
-  } | null;
-  const subscriptions = workspaceData?.billing_subscriptions || [];
-  return getPlanType(subscriptions) as PlanTier;
+  // TODO: When billing is set up, query billing_customers -> billing_subscriptions
+  // For now, return 'free' for all workspaces
+  console.log(`📊 Getting plan for workspace ${workspaceId}: free (billing not configured)`);
+  return 'free';
 }
 
 /**

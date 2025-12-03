@@ -13,8 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
 import { syncWorkspaceInBackground, BackgroundSyncResult } from '@/lib/workers/background-sync';
-import { getPlanType, PlanType, PLAN_SYNC_LIMITS } from '@/utils/subscriptions';
-import { SubscriptionData } from '@/payments/AbstractPaymentGateway';
+import { PlanType, PLAN_SYNC_LIMITS } from '@/utils/subscriptions';
 
 type SyncTier = 'free' | 'basic' | 'pro' | 'all';
 
@@ -80,22 +79,18 @@ function getPlanTier(planType: PlanType): SyncTier {
 
 /**
  * Get workspaces that should be synced for a given tier
+ * 
+ * Note: Currently treats all workspaces as 'free' tier since billing is not yet set up.
+ * When billing is enabled, this will query through billing_customers to get subscription data.
  */
 async function getWorkspacesForTier(tier: SyncTier): Promise<Array<{ id: string; planType: PlanType }>> {
   const supabase = supabaseAdminClient;
 
-  // Get all active workspaces with their subscriptions
+  // Get all active workspaces
+  // Note: Billing integration not yet set up, so we just get workspaces directly
   const { data: workspaces, error: workspacesError } = await supabase
     .from('workspaces')
-    .select(`
-      id,
-      billing_subscriptions (
-        billing_products (
-          name,
-          active
-        )
-      )
-    `)
+    .select('id')
     .eq('is_active', true);
 
   if (workspacesError || !workspaces) {
@@ -103,30 +98,22 @@ async function getWorkspacesForTier(tier: SyncTier): Promise<Array<{ id: string;
     return [];
   }
 
-  // Filter workspaces by tier
-  const workspacesWithPlan = workspaces.map(workspace => {
-    // Cast to handle Supabase nested join typing
-    const workspaceData = workspace as unknown as { 
-      id: string; 
-      billing_subscriptions: SubscriptionData[] | null 
-    };
-    const subscriptions = workspaceData.billing_subscriptions || [];
-    const planType = getPlanType(subscriptions);
-    const workspaceTier = getPlanTier(planType);
-    
-    return {
-      id: workspaceData.id,
-      planType,
-      tier: workspaceTier,
-    };
-  });
+  console.log(`📊 Found ${workspaces.length} active workspaces`);
+
+  // For now, treat all workspaces as free tier (billing not yet configured)
+  // TODO: When billing is set up, query billing_customers -> billing_subscriptions
+  const workspacesWithPlan = workspaces.map(workspace => ({
+    id: workspace.id,
+    planType: 'free' as PlanType,
+    tier: 'free' as SyncTier,
+  }));
 
   // If tier is 'all', return all workspaces
   if (tier === 'all') {
     return workspacesWithPlan.map(w => ({ id: w.id, planType: w.planType }));
   }
 
-  // Filter by requested tier
+  // Filter by requested tier (currently all are 'free')
   return workspacesWithPlan
     .filter(w => w.tier === tier)
     .map(w => ({ id: w.id, planType: w.planType }));
