@@ -15,6 +15,8 @@ import {
   Search,
   Star,
   Loader2,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAction } from 'next-safe-action/hooks';
@@ -45,6 +47,10 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
   const [showFavoritesOnly, setShowFavoritesOnly] = useLocalStorage(
     `contacts-favorites-filter-${workspaceId}`,
     false
+  );
+  const [viewMode, setViewMode] = useLocalStorage<'grid' | 'list'>(
+    `contacts-view-mode-${workspaceId}`,
+    'grid'
   );
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedContact, setSelectedContact] = useState<any>(null);
@@ -219,6 +225,32 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
               />
             </div>
             
+            {/* View Toggle */}
+            <div className="flex items-center rounded-lg border border-border/50 p-0.5">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={cn(
+                  'p-1.5 rounded-md transition-colors',
+                  viewMode === 'grid' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'
+                )}
+                aria-label="Grid view"
+                aria-pressed={viewMode === 'grid'}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={cn(
+                  'p-1.5 rounded-md transition-colors',
+                  viewMode === 'list' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'
+                )}
+                aria-label="List view"
+                aria-pressed={viewMode === 'list'}
+              >
+                <List className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            
             {/* Favorites Filter - Icon only */}
             <Button
               variant="ghost"
@@ -290,12 +322,17 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Contacts Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {/* Contacts - Grid or List */}
+            <div className={cn(
+              viewMode === 'grid' 
+                ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3' 
+                : 'flex flex-col gap-1'
+            )}>
               {contacts.map((contact) => (
                 <ContactTile
                   key={contact.id}
                   contact={contact}
+                  variant={viewMode}
                   onClick={() => handleContactClick(contact)}
                   onToggleFavorite={(e) => {
                     e.stopPropagation();
@@ -307,25 +344,31 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
               ))}
             </div>
             
-            {/* Minimal Pagination Footer */}
-            {hasMore && !debouncedSearchQuery && (
-              <div className="flex justify-center pt-2">
+            {/* Pagination Footer */}
+            <div className="flex items-center justify-between pt-3 border-t border-border/50">
+              <p className="text-xs text-muted-foreground">
+                Showing {contacts.length} of {totalCount}{hasMore ? '+' : ''} contacts
+              </p>
+              {hasMore && !debouncedSearchQuery && (
                 <button
                   onClick={loadMoreContacts}
                   disabled={loadingMore}
-                  className="text-sm text-primary hover:underline flex items-center gap-1.5 disabled:opacity-50"
+                  className="text-xs text-primary hover:text-primary/80 flex items-center gap-1.5 disabled:opacity-50 transition-colors"
                 >
                   {loadingMore ? (
                     <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <Loader2 className="h-3 w-3 animate-spin" />
                       Loading...
                     </>
                   ) : (
-                    `+${CONTACTS_PER_PAGE} more`
+                    <>
+                      Load more
+                      <span className="text-muted-foreground">({CONTACTS_PER_PAGE})</span>
+                    </>
                   )}
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
       </div>

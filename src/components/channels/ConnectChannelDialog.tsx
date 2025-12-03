@@ -1,6 +1,7 @@
 /**
- * ConnectChannelDialog Component
- * Dialog for connecting new communication channels
+ * ConnectChannelDialog Component - Minimal Design
+ * Clean, simple dialog for connecting communication channels
+ * Uses grouped list instead of tabs, no heavy cards
  */
 
 'use client';
@@ -12,16 +13,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ExternalLink } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IntegrationLogo } from '@/components/integrations/IntegrationLogo';
 import {
-  allIntegrations,
-  getIntegrationsByType,
+  emailIntegrations,
+  messagingIntegrations,
+  socialIntegrations,
+  calendarIntegrations,
   type Integration,
 } from '@/lib/integrations/config';
 
@@ -60,119 +59,69 @@ export function ConnectChannelDialog({
     }
   };
 
-  const emailIntegrations = getIntegrationsByType('email');
-  const messagingIntegrations = getIntegrationsByType('messaging');
-  const socialIntegrations = getIntegrationsByType('social');
-  const calendarIntegrations = getIntegrationsByType('calendar');
-
-  const renderIntegrationCard = (integration: Integration) => {
+  // Integration row component - minimal design
+  const IntegrationRow = ({ integration }: { integration: Integration }) => {
     const isAvailable = integration.status === 'available';
-    const isBeta = integration.status === 'beta';
     
     return (
-      <Card
-        key={integration.id}
-        className={cn(
-          'cursor-pointer transition-all hover:shadow-md',
-          !isAvailable && 'opacity-60 cursor-not-allowed'
-        )}
+      <button
         onClick={() => isAvailable && handleConnect(integration)}
+        disabled={!isAvailable}
+        className={cn(
+          'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left',
+          isAvailable 
+            ? 'hover:bg-muted/50 cursor-pointer group' 
+            : 'opacity-60 cursor-not-allowed'
+        )}
       >
-        <CardContent className="p-4">
-          <div className="flex items-start gap-4">
-            <IntegrationLogo integration={integration} size="md" />
-
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-semibold">{integration.name}</h3>
-                {!isAvailable && (
-                  <Badge variant="secondary" className="text-xs">
-                    Coming Soon
-                  </Badge>
-                )}
-                {isBeta && (
-                  <Badge variant="outline" className="text-xs">
-                    Beta
-                  </Badge>
-                )}
-              </div>
-              <p className="text-sm text-muted-foreground mb-2">
-                {integration.description}
-              </p>
-              <div className="flex flex-wrap gap-1 mb-3">
-                {integration.features.slice(0, 2).map((feature, idx) => (
-                  <Badge key={idx} variant="outline" className="text-xs">
-                    {feature}
-                  </Badge>
-                ))}
-              </div>
-              <Button
-                size="sm"
-                variant={isAvailable ? 'default' : 'outline'}
-                className="w-full"
-                disabled={!isAvailable}
-                title={isAvailable ? 'Click to connect this channel' : 'This integration is coming soon'}
-              >
-                {isAvailable ? (
-                  <>
-                    Connect
-                    <ExternalLink className="ml-2 h-3 w-3" />
-                  </>
-                ) : (
-                  'Coming Soon'
-                )}
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        <IntegrationLogo integration={integration} size="sm" />
+        <span className="flex-1 text-sm font-medium">{integration.name}</span>
+        {isAvailable ? (
+          <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+        ) : (
+          <span className="text-xs text-muted-foreground">Soon</span>
+        )}
+      </button>
     );
   };
 
+  // Category section component
+  const CategorySection = ({ 
+    title, 
+    integrations 
+  }: { 
+    title: string; 
+    integrations: Integration[] 
+  }) => (
+    <div className="space-y-1">
+      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-3 py-2">
+        {title}
+      </h3>
+      <div>
+        {integrations.map((integration) => (
+          <IntegrationRow key={integration.id} integration={integration} />
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Connect a Channel</DialogTitle>
-          <DialogDescription>
-            Choose a communication or calendar service to connect to your workspace
+      <DialogContent className="max-w-md max-h-[80vh] overflow-hidden p-0">
+        <DialogHeader className="px-6 pt-6 pb-4">
+          <DialogTitle className="text-lg">Connect a Channel</DialogTitle>
+          <DialogDescription className="text-sm">
+            Connect a service to sync messages with your workspace
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="email" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="email">Email</TabsTrigger>
-            <TabsTrigger value="messaging">Messaging</TabsTrigger>
-            <TabsTrigger value="social">Social</TabsTrigger>
-            <TabsTrigger value="calendar">Calendar</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="email" className="mt-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              {emailIntegrations.map(renderIntegrationCard)}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="messaging" className="mt-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              {messagingIntegrations.map(renderIntegrationCard)}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="social" className="mt-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              {socialIntegrations.map(renderIntegrationCard)}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="calendar" className="mt-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              {calendarIntegrations.map(renderIntegrationCard)}
-            </div>
-          </TabsContent>
-        </Tabs>
+        <div className="overflow-y-auto px-3 pb-6 space-y-4 max-h-[60vh]">
+          <CategorySection title="Email" integrations={emailIntegrations} />
+          <CategorySection title="Messaging" integrations={messagingIntegrations} />
+          <CategorySection title="Social" integrations={socialIntegrations} />
+          <CategorySection title="Calendar" integrations={calendarIntegrations} />
+        </div>
       </DialogContent>
     </Dialog>
   );
 }
-
