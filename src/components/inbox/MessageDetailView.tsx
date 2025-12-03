@@ -154,6 +154,31 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
     },
   });
 
+  // Strip HTML utility
+  const stripHtml = (input: string | null | undefined) =>
+    input ? input.replace(/<[^>]+>/g, '').trim() : '';
+
+  // Determine if message has HTML content - MUST be before early returns
+  const hasHtmlContent = useMemo(() => {
+    if (!message) return false;
+    const body = message?.body_html || message?.body || '';
+    return /<[a-z][\s\S]*>/i.test(body);
+  }, [message]);
+
+  // Get sanitized HTML content - MUST be before early returns
+  const sanitizedHtmlContent = useMemo(() => {
+    if (!message) return '';
+    const body = message?.body_html || message?.body || '';
+    return sanitizeHtml(body);
+  }, [message]);
+
+  // Get plain text content - MUST be before early returns
+  const plainTextContent = useMemo(() => {
+    if (!message) return '';
+    const body = message?.body || message?.body_html || '';
+    return stripHtml(body);
+  }, [message]);
+
   // Toggle star handler
   const handleToggleStar = () => {
     if (message?.is_starred) {
@@ -204,27 +229,6 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
   }
 
   const timestamp = new Date(message.timestamp);
-
-  const stripHtml = (input: string | null | undefined) =>
-    input ? input.replace(/<[^>]+>/g, '').trim() : '';
-
-  // Determine if message has HTML content
-  const hasHtmlContent = useMemo(() => {
-    const body = message?.body_html || message?.body || '';
-    return /<[a-z][\s\S]*>/i.test(body);
-  }, [message]);
-
-  // Get sanitized HTML content
-  const sanitizedHtmlContent = useMemo(() => {
-    const body = message?.body_html || message?.body || '';
-    return sanitizeHtml(body);
-  }, [message]);
-
-  // Get plain text content
-  const plainTextContent = useMemo(() => {
-    const body = message?.body || message?.body_html || '';
-    return stripHtml(body);
-  }, [message]);
 
   return (
     <div className="flex h-full">
