@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   icons: {
-    icon: "/images/logo-black-main.ico",
+    icon: "/images/favicon.ico",
   },
   title: "Aiva.io – Unified AI Inbox & Communication Hub",
   description: "Aiva.io unifies Gmail, Outlook, Slack and more into a single AI-powered inbox.",

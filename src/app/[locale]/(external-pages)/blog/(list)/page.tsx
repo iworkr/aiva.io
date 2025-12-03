@@ -13,7 +13,7 @@ export const metadata = {
   description:
     "Read the latest product updates, ideas, and best practices from the Aiva.io team.",
   icons: {
-    icon: "/images/logo-black-main.ico",
+    icon: "/images/favicon.ico",
   },
 };
 

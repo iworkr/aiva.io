@@ -9,8 +9,7 @@ import { AppProviders } from "./AppProviders";
 
 export const metadata: Metadata = {
   icons: {
-    icon: "/logos/aiva-mark.svg",
-    apple: "/logos/aiva-mark.png",
+    icon: "/images/favicon.ico",
   },
   title: "Aiva.io",
   description: "Aiva.io – Unified AI communication assistant",
