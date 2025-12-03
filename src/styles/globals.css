@@ -208,6 +208,34 @@
   }
 }
 
+/* Floating assistant tooltip animation */
+@keyframes fade-in-delayed {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  10% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+}
+
+.animate-fade-in-delayed {
+  animation: fade-in-delayed 5s ease-in-out forwards;
+}
+
 .animate-marquee {
   animation-name: animate-marquee;
   animation-duration: var(--duration);

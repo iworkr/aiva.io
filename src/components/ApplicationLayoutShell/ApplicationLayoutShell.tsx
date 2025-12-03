@@ -1,6 +1,7 @@
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { FloatingAssistant } from "@/components/assistant/FloatingAssistant";
 
 export async function ApplicationLayoutShell({
   children,
@@ -15,6 +16,8 @@ export async function ApplicationLayoutShell({
       <SidebarInset className={cn("overflow-hidden flex-1 flex flex-col min-h-0")}>
         {children}
       </SidebarInset>
+      {/* Global AI Assistant Bubble */}
+      <FloatingAssistant />
     </SidebarProvider>
   );
 }
