@@ -5,23 +5,18 @@
  */
 
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import {
-  ChevronRight,
-  FileText,
-} from 'lucide-react';
-import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { getUser } from '@/utils/server/serverSessionUtils';
 import { createSupabaseUserServerComponentClient } from '@/supabase-clients/user/createSupabaseUserServerComponentClient';
 import { BriefingSection } from './BriefingSection';
 import { AivaChatInput } from './AivaChatInput';
+import { TodaysBriefingButton } from './TodaysBriefingButton';
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -264,35 +259,18 @@ export async function MorningBrief() {
         </p>
       </div>
 
-      {/* Today's Briefing Button - Only show if there are briefing items */}
+      {/* Today's Briefing Button with AI typing animation */}
       {deduplicatedItems.length > 0 && (
-        <div className="flex justify-center">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="default"
-                  size="default"
-                  className="group h-10 px-5 shadow-md hover:shadow-lg transition-all"
-                  asChild
-                  aria-label={`View today's briefing with ${deduplicatedItems.length} items that need your attention`}
-                >
-                  <Link href="#briefing">
-                    <FileText className="mr-2 h-4 w-4" />
-                    <span className="font-medium">Today's briefing</span>
-                    <span className="ml-2 inline-flex h-5 min-w-5 px-1.5 items-center justify-center rounded-full bg-primary-foreground/20 text-xs font-semibold">
-                      {deduplicatedItems.length}
-                    </span>
-                    <ChevronRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                  </Link>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Jump to your {deduplicatedItems.length} priority items: urgent messages and upcoming events</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
+        <TodaysBriefingButton 
+          itemCount={deduplicatedItems.length}
+          briefingData={{
+            newMessages: newMessages,
+            activeConversations: activeConversations,
+            todayEventsCount: todayEventsCount || 0,
+            upcomingEventsCount: upcomingEvents?.length || 0,
+            urgentItemsCount: deduplicatedItems.filter(item => item.priority === 'urgent' || item.priority === 'high').length,
+          }}
+        />
       )}
 
       {/* Briefing Items */}

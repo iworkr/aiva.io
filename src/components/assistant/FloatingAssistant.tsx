@@ -564,8 +564,8 @@ export function FloatingAssistant() {
             height={28}
             className="object-contain brightness-0 invert group-hover:scale-110 transition-transform"
           />
-          {/* Pulse animation ring */}
-          <span className="absolute inset-0 rounded-full bg-white/20 animate-ping" />
+          {/* Slow pulse animation ring */}
+          <span className="absolute inset-0 rounded-full bg-white/15 animate-[ping_3s_ease-in-out_infinite]" />
         </div>
       </button>
 
