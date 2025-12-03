@@ -130,8 +130,8 @@ Please provide a brief, friendly overview of my day in 3-4 sentences. Be encoura
       if (currentIndex < briefingText.length) {
         setDisplayedText(briefingText.slice(0, currentIndex + 1));
         currentIndex++;
-        // Random delay for natural typing feel
-        const delay = Math.random() * 20 + 10;
+        // Random delay for natural typing feel (slower - 50% increase)
+        const delay = Math.random() * 30 + 15;
         setTimeout(typeNextChar, delay);
       } else {
         setIsTyping(false);
