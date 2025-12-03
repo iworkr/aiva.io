@@ -86,12 +86,11 @@ function getPlanTier(planType: PlanType): SyncTier {
 async function getWorkspacesForTier(tier: SyncTier): Promise<Array<{ id: string; planType: PlanType }>> {
   const supabase = supabaseAdminClient;
 
-  // Get all active workspaces
+  // Get all workspaces
   // Note: Billing integration not yet set up, so we just get workspaces directly
   const { data: workspaces, error: workspacesError } = await supabase
     .from('workspaces')
-    .select('id')
-    .eq('is_active', true);
+    .select('id');
 
   if (workspacesError || !workspaces) {
     console.error('Failed to fetch workspaces:', workspacesError);
