@@ -103,7 +103,7 @@ export const messagingIntegrations: Integration[] = [
     color: "#6264A7",
     bgColor: "bg-indigo-100 dark:bg-indigo-900/20",
     textColor: "text-indigo-600",
-    logoUrl: "https://static.cdnlogo.com/logos/m/77/microsoft-teams-1.svg",
+    logoUrl: "https://static.cdnlogo.com/logos/m/22/microsoft-teams.svg",
     status: "available",
     features: [
       "Chat messages",
@@ -145,7 +145,7 @@ export const messagingIntegrations: Integration[] = [
     color: "#0088CC",
     bgColor: "bg-sky-100 dark:bg-sky-900/20",
     textColor: "text-sky-600",
-    logoUrl: "https://cdn.cdnlogo.com/logos/t/39/telegram.svg",
+    logoUrl: "https://static.cdnlogo.com/logos/t/84/telegram.svg",
     status: "available",
     features: [
       "Private messages",
@@ -191,7 +191,7 @@ export const socialIntegrations: Integration[] = [
     color: "#0084FF",
     bgColor: "bg-blue-100 dark:bg-blue-900/20",
     textColor: "text-blue-600",
-    logoUrl: "https://cdn.cdnlogo.com/logos/f/25/facebook-messenger.svg",
+    logoUrl: "https://static.cdnlogo.com/logos/f/52/facebook-messenger.svg",
     status: "available",
     features: [
       "Page messages",
@@ -212,7 +212,7 @@ export const socialIntegrations: Integration[] = [
     color: "#0A66C2",
     bgColor: "bg-blue-100 dark:bg-blue-900/20",
     textColor: "text-blue-700",
-    logoUrl: "https://cdn.cdnlogo.com/logos/l/66/linkedin-icon.svg",
+    logoUrl: "https://static.cdnlogo.com/logos/l/66/linkedin-icon.svg",
     status: "available",
     features: [
       "InMail messages",
@@ -258,7 +258,7 @@ export const calendarIntegrations: Integration[] = [
     color: "#4285F4",
     bgColor: "bg-blue-100 dark:bg-blue-900/20",
     textColor: "text-blue-600",
-    logoUrl: "https://cdn.cdnlogo.com/logos/g/23/google-calendar.svg",
+    logoUrl: "https://static.cdnlogo.com/logos/g/96/google-calendar.svg",
     status: "available",
     features: [
       "Event sync",
@@ -279,7 +279,7 @@ export const calendarIntegrations: Integration[] = [
     color: "#0078D4",
     bgColor: "bg-blue-100 dark:bg-blue-900/20",
     textColor: "text-blue-600",
-    logoUrl: "https://cdn.cdnlogo.com/logos/m/51/microsoft-outlook.svg",
+    logoUrl: "https://static.cdnlogo.com/logos/o/82/outlook.svg",
     status: "available",
     features: [
       "Event sync",
@@ -300,7 +300,7 @@ export const calendarIntegrations: Integration[] = [
     color: "#000000",
     bgColor: "bg-gray-100 dark:bg-gray-800",
     textColor: "text-gray-900",
-    logoUrl: "https://static.cdnlogo.com/logos/a/19/apple.svg",
+    logoUrl: "https://static.cdnlogo.com/logos/a/12/apple.svg",
     status: "available",
     features: [
       "Event sync",

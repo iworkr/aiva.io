@@ -202,11 +202,11 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
           {/* Chat Window */}
           <div 
             ref={panelRef}
-            className="absolute top-full left-0 right-0 mt-2 z-50 bg-card border-2 border-border/50 shadow-xl rounded-xl overflow-hidden"
+            className="absolute top-full left-0 right-0 mt-2 z-50 bg-card border-2 border-border/50 shadow-xl rounded-xl flex flex-col"
             style={{ maxHeight: '400px' }}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-muted/30">
+            <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-border/50 bg-muted/30">
               <div className="flex items-center gap-2">
                 <div className="relative h-7 w-7">
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-primary/25 blur-sm" />
@@ -234,8 +234,7 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
             {/* Messages */}
             <div 
               ref={scrollRef}
-              className="overflow-y-auto p-4"
-              style={{ maxHeight: '320px' }}
+              className="flex-1 overflow-y-auto p-4 min-h-0"
             >
               <TooltipProvider delayDuration={300}>
                 <div className="space-y-4">
@@ -437,7 +436,7 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
             </div>
 
             {/* Footer */}
-            <div className="border-t border-border/50 p-3 bg-muted/30">
+            <div className="flex-shrink-0 border-t border-border/50 p-3 bg-muted/30">
               <form onSubmit={handleSubmit} className="flex gap-2">
                 <Input
                   value={input}
