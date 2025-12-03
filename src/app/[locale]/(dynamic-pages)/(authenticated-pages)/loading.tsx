@@ -1,44 +1,61 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function Loading() {
   return (
-    <div className="flex flex-col md:flex-row h-screen">
-      <div className="w-64 border-r md:border-r-0">
-        <div className="p-4">
-          <Skeleton className="h-10 w-36 rounded-md" />
-          <div className="mt-6 space-y-4">
-            <Skeleton className="h-8 w-full rounded-md" />
-            <Skeleton className="h-8 w-full rounded-md" />
-            <Skeleton className="h-8 w-full rounded-md" />
-            <Skeleton className="h-8 w-full rounded-md" />
-            <Skeleton className="h-8 w-full rounded-md" />
-            <Skeleton className="h-8 w-full rounded-md" />
+    <div className="flex flex-col md:flex-row h-screen bg-background">
+      {/* Sidebar skeleton */}
+      <div className="w-64 border-r border-border/50 hidden md:block">
+        <div className="p-4 space-y-6">
+          <Skeleton className="h-10 w-36 rounded-lg" />
+          <div className="space-y-2">
+            {[...Array(6)].map((_, i) => (
+              <Skeleton key={i} className="h-9 w-full rounded-lg" />
+            ))}
           </div>
         </div>
       </div>
-      <div className="flex-1 p-8 overflow-auto">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-12 w-48 rounded-md" />
-          <div className="flex space-x-2">
-            <Skeleton className="h-8 w-8 rounded-full" />
-            <Skeleton className="h-8 w-8 rounded-full" />
-            <Skeleton className="h-8 w-8 rounded-full" />
+      
+      {/* Main content */}
+      <div className="flex-1 p-6 md:p-8 overflow-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="space-y-2">
+            <Skeleton className="h-9 w-48 rounded-lg" />
+            <Skeleton className="h-5 w-32 rounded" />
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-9 w-9 rounded-lg" />
+            <Skeleton className="h-9 w-9 rounded-lg" />
+            <Skeleton className="h-9 w-9 rounded-full" />
           </div>
         </div>
-        <div className="mt-6">
-          <Skeleton className="h-10 w-48 rounded-md" />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-            <Skeleton className="h-32 w-full rounded-md" />
-            <Skeleton className="h-32 w-full rounded-md" />
-            <Skeleton className="h-32 w-full rounded-md" />
-            <Skeleton className="h-32 w-full rounded-md" />
-          </div>
+        
+        {/* Stats cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="border border-border/50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-10 w-10 rounded-lg" />
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-3 w-16 rounded" />
+                    <Skeleton className="h-6 w-10 rounded" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
-        <div className="mt-8">
-          <Skeleton className="h-10 w-48 rounded-md" />
-          <div className="mt-4">
-            <Skeleton className="h-72 w-full rounded-md" />
-          </div>
+        
+        {/* Main content area */}
+        <div className="space-y-6">
+          <Skeleton className="h-7 w-40 rounded" />
+          <Card className="border border-border/50">
+            <CardContent className="p-6">
+              <Skeleton className="h-64 w-full rounded-lg" />
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

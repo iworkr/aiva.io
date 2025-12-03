@@ -3,6 +3,6 @@ import { cn } from "@/utils/cn";
 
 export default function LoadingNavbarRoot() {
   return (
-    <Skeleton className={cn("w-16 h-6", "flex items-center justify-center")} />
+    <Skeleton className={cn("w-16 h-6 rounded", "flex items-center justify-center")} />
   );
 }
