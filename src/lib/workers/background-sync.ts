@@ -10,7 +10,8 @@ import { syncAllWorkspaceConnections } from '@/lib/sync/orchestrator';
 import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
 import { syncGmailMessages } from '@/lib/gmail/sync';
 import { syncOutlookMessages } from '@/lib/outlook/sync';
-import { getWorkspacePlanType, PLAN_SYNC_LIMITS } from '@/utils/subscriptions';
+import { getPlanType, PLAN_SYNC_LIMITS, PlanType } from '@/utils/subscriptions';
+import { SubscriptionData } from '@/payments/AbstractPaymentGateway';
 
 export type PlanTier = 'free' | 'basic' | 'pro' | 'enterprise';
 
@@ -140,8 +141,12 @@ async function getWorkspacePlan(workspaceId: string): Promise<PlanTier> {
     .eq('id', workspaceId)
     .single();
 
-  // Use the existing helper function
-  return getWorkspacePlanType(data?.billing_subscriptions || []) as PlanTier;
+  // Use the existing helper function (cast to handle Supabase nested join typing)
+  const workspaceData = data as unknown as { 
+    billing_subscriptions: SubscriptionData[] | null 
+  } | null;
+  const subscriptions = workspaceData?.billing_subscriptions || [];
+  return getPlanType(subscriptions) as PlanTier;
 }
 
 /**
@@ -157,21 +162,29 @@ async function shouldSyncWorkspace(workspaceId: string, tier?: string): Promise<
   }
 
   // Get workspace settings to check last sync time
+  // Note: sync_frequency_minutes may not exist if migration not applied
   const { data: settings } = await supabase
     .from('workspace_settings')
-    .select('workspace_settings, sync_frequency_minutes')
+    .select('workspace_settings')
     .eq('workspace_id', workspaceId)
     .single();
 
-  const syncFrequency = settings?.sync_frequency_minutes || PLAN_SYNC_LIMITS[planType].minSyncIntervalMinutes;
+  // Cast to include optional sync_frequency_minutes (may not exist if migration not applied)
+  type SettingsWithSync = { 
+    workspace_settings: Record<string, unknown>; 
+    sync_frequency_minutes?: number;
+  };
+  const typedSettings = settings as unknown as SettingsWithSync | null;
+  const syncFrequency = typedSettings?.sync_frequency_minutes || PLAN_SYNC_LIMITS[planType].minSyncIntervalMinutes;
 
   // Get the most recent sync time from connections
+  // Note: Using updated_at as fallback if last_sync_at doesn't exist
   const { data: connections } = await supabase
     .from('channel_connections')
-    .select('last_sync_at')
+    .select('updated_at')
     .eq('workspace_id', workspaceId)
     .eq('status', 'active')
-    .order('last_sync_at', { ascending: false, nullsFirst: false })
+    .order('updated_at', { ascending: false, nullsFirst: false })
     .limit(1);
 
   if (!connections || connections.length === 0) {
@@ -179,7 +192,14 @@ async function shouldSyncWorkspace(workspaceId: string, tier?: string): Promise<
     return false;
   }
 
-  const lastSyncAt = connections[0].last_sync_at;
+  // Cast to include optional last_sync_at (may not exist if migration not applied)
+  type ConnectionWithSync = { 
+    updated_at: string; 
+    last_sync_at?: string | null;
+  };
+  const typedConnections = connections as unknown as ConnectionWithSync[];
+  const lastSyncAt = typedConnections[0].last_sync_at || typedConnections[0].updated_at;
+  
   if (!lastSyncAt) {
     // Never synced before, should sync
     return true;

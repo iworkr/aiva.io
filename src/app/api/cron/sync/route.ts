@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
 import { syncWorkspaceInBackground, BackgroundSyncResult } from '@/lib/workers/background-sync';
 import { getPlanType, PlanType, PLAN_SYNC_LIMITS } from '@/utils/subscriptions';
+import { SubscriptionData } from '@/payments/AbstractPaymentGateway';
 
 type SyncTier = 'free' | 'basic' | 'pro' | 'all';
 
@@ -77,13 +78,17 @@ async function getWorkspacesForTier(tier: SyncTier): Promise<Array<{ id: string;
 
   // Filter workspaces by tier
   const workspacesWithPlan = workspaces.map(workspace => {
-    // @ts-expect-error - Supabase typing for nested joins
-    const subscriptions = workspace.billing_subscriptions || [];
+    // Cast to handle Supabase nested join typing
+    const workspaceData = workspace as unknown as { 
+      id: string; 
+      billing_subscriptions: SubscriptionData[] | null 
+    };
+    const subscriptions = workspaceData.billing_subscriptions || [];
     const planType = getPlanType(subscriptions);
     const workspaceTier = getPlanTier(planType);
     
     return {
-      id: workspace.id,
+      id: workspaceData.id,
       planType,
       tier: workspaceTier,
     };

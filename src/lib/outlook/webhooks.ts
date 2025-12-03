@@ -292,10 +292,13 @@ export async function registerOutlookWebhook(connectionId: string): Promise<bool
       .eq('id', connection.workspace_id)
       .single();
 
-    // Only enable webhooks for Pro and Enterprise plans
-    const subscriptions = workspace?.billing_subscriptions || [];
-    const hasActiveSubscription = subscriptions.some((sub: any) =>
-      sub?.billing_products?.some((prod: any) => prod?.active && ['pro', 'enterprise'].includes(prod?.name?.toLowerCase()))
+    // Only enable webhooks for Pro and Enterprise plans (cast to handle Supabase nested join typing)
+    const workspaceData = workspace as unknown as { 
+      billing_subscriptions: Array<{ billing_products: { name: string; active: boolean } | null }> | null 
+    } | null;
+    const subscriptions = workspaceData?.billing_subscriptions || [];
+    const hasActiveSubscription = subscriptions.some((sub) =>
+      sub?.billing_products?.active && ['pro', 'professional', 'enterprise'].includes(sub?.billing_products?.name?.toLowerCase() || '')
     );
 
     if (!hasActiveSubscription) {
@@ -317,18 +320,32 @@ export async function registerOutlookWebhook(connectionId: string): Promise<bool
  * Unregister Outlook webhook for a connection
  * Called when a user disconnects their Outlook account
  * @param connectionId - The channel connection ID
+ * 
+ * Note: This function requires the sync_tracking migration to be applied
+ * which adds webhook_subscription_id column.
  */
 export async function unregisterOutlookWebhook(connectionId: string): Promise<boolean> {
   try {
     const supabase = supabaseAdminClient;
     const { data: connection } = await supabase
       .from('channel_connections')
-      .select('webhook_subscription_id')
+      .select('id')
       .eq('id', connectionId)
       .single();
 
-    if (connection?.webhook_subscription_id) {
-      return await deleteOutlookSubscription(connectionId, connection.webhook_subscription_id);
+    if (!connection) {
+      return true; // Connection doesn't exist, nothing to unregister
+    }
+
+    // Cast to include optional webhook fields (may not exist if migration not applied)
+    type ConnectionWithWebhook = { 
+      id: string;
+      webhook_subscription_id?: string | null;
+    };
+    const typedConnection = connection as unknown as ConnectionWithWebhook;
+
+    if (typedConnection?.webhook_subscription_id) {
+      return await deleteOutlookSubscription(connectionId, typedConnection.webhook_subscription_id);
     }
 
     return true; // No subscription to delete
@@ -341,6 +358,9 @@ export async function unregisterOutlookWebhook(connectionId: string): Promise<bo
 /**
  * Renew all expiring Outlook webhooks
  * Called by a cron job to ensure continuous notifications
+ * 
+ * Note: This function requires the sync_tracking migration to be applied
+ * which adds webhook_enabled, webhook_subscription_id, and webhook_expires_at columns.
  */
 export async function renewAllExpiringOutlookWebhooks(
   renewalThresholdHours: number = 12
@@ -348,41 +368,60 @@ export async function renewAllExpiringOutlookWebhooks(
   const supabase = supabaseAdminClient;
 
   // Find all Outlook connections with webhooks enabled
-  const { data: connections, error } = await supabase
-    .from('channel_connections')
-    .select('id, webhook_subscription_id, webhook_expires_at, workspace_id')
-    .eq('provider', 'outlook')
-    .eq('status', 'active')
-    .eq('webhook_enabled', true)
-    .not('webhook_subscription_id', 'is', null)
-    .not('webhook_expires_at', 'is', null);
+  // Note: Using raw query to handle case where columns don't exist yet
+  try {
+    const { data: connections, error } = await supabase
+      .from('channel_connections')
+      .select('id, workspace_id')
+      .eq('provider', 'outlook')
+      .eq('status', 'active');
 
-  if (error || !connections) {
-    console.error('Failed to fetch Outlook connections:', error);
+    if (error || !connections) {
+      console.error('Failed to fetch Outlook connections:', error);
+      return { renewed: 0, failed: 0 };
+    }
+
+    // Cast to include optional webhook fields (may not exist if migration not applied)
+    type ConnectionWithWebhook = { 
+      id: string; 
+      workspace_id: string;
+      webhook_enabled?: boolean;
+      webhook_subscription_id?: string | null;
+      webhook_expires_at?: string | null;
+    };
+    const typedConnections = connections as unknown as ConnectionWithWebhook[];
+
+    let renewed = 0;
+    let failed = 0;
+
+    for (const connection of typedConnections) {
+      // Skip if webhook not enabled or no subscription (migration not applied or webhook not set up)
+      if (!connection.webhook_enabled || !connection.webhook_subscription_id || !connection.webhook_expires_at) {
+        continue;
+      }
+
+      try {
+        const wasRenewed = await renewOutlookSubscriptionIfNeeded(
+          connection.id,
+          connection.webhook_subscription_id,
+          connection.webhook_expires_at,
+          renewalThresholdHours
+        );
+        if (wasRenewed) {
+          renewed++;
+        }
+      } catch (error) {
+        console.error(`Failed to renew Outlook webhook for ${connection.id}:`, error);
+        failed++;
+      }
+    }
+
+    console.log(`Outlook webhook renewal complete: ${renewed} renewed, ${failed} failed`);
+    return { renewed, failed };
+  } catch (err) {
+    // Handle case where columns don't exist (migration not applied)
+    console.log('Outlook webhook renewal skipped: columns may not exist yet');
     return { renewed: 0, failed: 0 };
   }
-
-  let renewed = 0;
-  let failed = 0;
-
-  for (const connection of connections) {
-    try {
-      const wasRenewed = await renewOutlookSubscriptionIfNeeded(
-        connection.id,
-        connection.webhook_subscription_id,
-        connection.webhook_expires_at,
-        renewalThresholdHours
-      );
-      if (wasRenewed) {
-        renewed++;
-      }
-    } catch (error) {
-      console.error(`Failed to renew Outlook webhook for ${connection.id}:`, error);
-      failed++;
-    }
-  }
-
-  console.log(`Outlook webhook renewal complete: ${renewed} renewed, ${failed} failed`);
-  return { renewed, failed };
 }
 
