@@ -11,14 +11,17 @@ import { useChat } from 'ai/react';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Send, X, Loader2, Sparkles } from 'lucide-react';
+import { Send, X, Loader2, Sparkles, ThumbsUp, ThumbsDown, Flag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export function FloatingAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [chatId] = useState(() => `assistant-${Date.now()}`);
+  const [ratings, setRatings] = useState<Record<string, 'up' | 'down' | null>>({});
+  const [reported, setReported] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -89,6 +92,31 @@ export function FloatingAssistant() {
   const handleQuickAction = (prompt: string) => {
     setInput(prompt);
     inputRef.current?.focus();
+  };
+
+  // Rating handler
+  const handleRating = (messageId: string, rating: 'up' | 'down') => {
+    setRatings(prev => ({
+      ...prev,
+      [messageId]: prev[messageId] === rating ? null : rating
+    }));
+    if (rating === 'up') {
+      toast.success('Thanks for the feedback!', { duration: 2000 });
+    } else {
+      toast.info('Thanks for letting us know. We\'ll improve!', { duration: 2000 });
+    }
+  };
+
+  // Report handler
+  const handleReport = (messageId: string) => {
+    if (reported.has(messageId)) return;
+    setReported(prev => new Set(prev).add(messageId));
+    toast.success('Response reported. Thank you for helping us improve!', { duration: 3000 });
+  };
+
+  // Format timestamp
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   // Global ESC key handler
@@ -265,17 +293,147 @@ export function FloatingAssistant() {
                   </div>
                 ) : (
                   /* Chat Messages */
-                  <div className="space-y-4">
-                    {messages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={cn(
-                          'flex gap-3',
-                          message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
-                        )}
-                      >
-                        {/* Avatar with contained blue glow */}
-                        {message.role === 'assistant' && (
+                  <TooltipProvider delayDuration={300}>
+                    <div className="space-y-4">
+                      {messages.map((message) => (
+                        <div
+                          key={message.id}
+                          className={cn(
+                            'flex flex-col gap-1',
+                            message.role === 'user' ? 'items-end' : 'items-start'
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              'flex gap-3',
+                              message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
+                            )}
+                          >
+                            {/* Avatar with contained blue glow */}
+                            {message.role === 'assistant' && (
+                              <div className="flex-shrink-0 relative h-8 w-8">
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-primary/25 blur-sm" />
+                                <div className="relative h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center shadow-sm shadow-primary/20">
+                                  <Image
+                                    src="/logos/aiva-mark.svg"
+                                    alt="Aiva"
+                                    width={18}
+                                    height={18}
+                                    className="object-contain"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Message bubble */}
+                            <div
+                              className={cn(
+                                'max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-normal',
+                                message.role === 'user'
+                                  ? 'bg-primary text-primary-foreground rounded-br-md'
+                                  : 'bg-muted rounded-bl-md'
+                              )}
+                            >
+                              <ReactMarkdown
+                                components={{
+                                  p: ({ children }) => <span className="block">{children}</span>,
+                                  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                                  em: ({ children }) => <em className="italic">{children}</em>,
+                                  ul: ({ children }) => <ul className="list-disc pl-4 mt-1 space-y-0.5">{children}</ul>,
+                                  ol: ({ children }) => <ol className="list-decimal pl-4 mt-1 space-y-0.5">{children}</ol>,
+                                  li: ({ children }) => <li className="leading-tight">{children}</li>,
+                                  code: ({ children }) => <code className="bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+                                }}
+                              >
+                                {message.content}
+                              </ReactMarkdown>
+                            </div>
+                          </div>
+                          
+                          {/* Timestamp and actions row */}
+                          <div
+                            className={cn(
+                              'flex items-center gap-2 px-1',
+                              message.role === 'user' ? 'flex-row-reverse' : 'flex-row ml-11'
+                            )}
+                          >
+                            {/* Timestamp */}
+                            <span className="text-[10px] text-muted-foreground">
+                              {formatTime(message.createdAt || new Date())}
+                            </span>
+                            
+                            {/* Rating and report buttons (only for AI responses) */}
+                            {message.role === 'assistant' && (
+                              <div className="flex items-center gap-1">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRating(message.id, 'up')}
+                                      className={cn(
+                                        'p-1 rounded-md transition-colors',
+                                        ratings[message.id] === 'up'
+                                          ? 'text-green-500 bg-green-500/10'
+                                          : 'text-muted-foreground hover:text-green-500 hover:bg-green-500/10'
+                                      )}
+                                    >
+                                      <ThumbsUp className="h-3 w-3" />
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="text-xs">
+                                    Good response
+                                  </TooltipContent>
+                                </Tooltip>
+                                
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRating(message.id, 'down')}
+                                      className={cn(
+                                        'p-1 rounded-md transition-colors',
+                                        ratings[message.id] === 'down'
+                                          ? 'text-red-500 bg-red-500/10'
+                                          : 'text-muted-foreground hover:text-red-500 hover:bg-red-500/10'
+                                      )}
+                                    >
+                                      <ThumbsDown className="h-3 w-3" />
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="text-xs">
+                                    Poor response
+                                  </TooltipContent>
+                                </Tooltip>
+                                
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleReport(message.id)}
+                                      disabled={reported.has(message.id)}
+                                      className={cn(
+                                        'p-1 rounded-md transition-colors',
+                                        reported.has(message.id)
+                                          ? 'text-amber-500 bg-amber-500/10 cursor-not-allowed'
+                                          : 'text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10'
+                                      )}
+                                    >
+                                      <Flag className="h-3 w-3" />
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="text-xs">
+                                    {reported.has(message.id) ? 'Reported' : 'Report response'}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    
+                      {/* Loading indicator */}
+                      {isLoading && (
+                        <div className="flex gap-3">
                           <div className="flex-shrink-0 relative h-8 w-8">
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-primary/25 blur-sm" />
                             <div className="relative h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center shadow-sm shadow-primary/20">
@@ -288,62 +446,20 @@ export function FloatingAssistant() {
                               />
                             </div>
                           </div>
-                        )}
-                        
-                        {/* Message bubble */}
-                        <div
-                          className={cn(
-                            'max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-normal',
-                            message.role === 'user'
-                              ? 'bg-primary text-primary-foreground rounded-br-md'
-                              : 'bg-muted rounded-bl-md'
-                          )}
-                        >
-                          <ReactMarkdown
-                            components={{
-                              p: ({ children }) => <span className="block">{children}</span>,
-                              strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                              em: ({ children }) => <em className="italic">{children}</em>,
-                              ul: ({ children }) => <ul className="list-disc pl-4 mt-1 space-y-0.5">{children}</ul>,
-                              ol: ({ children }) => <ol className="list-decimal pl-4 mt-1 space-y-0.5">{children}</ol>,
-                              li: ({ children }) => <li className="leading-tight">{children}</li>,
-                              code: ({ children }) => <code className="bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
-                            }}
-                          >
-                            {message.content}
-                          </ReactMarkdown>
-                        </div>
-                      </div>
-                    ))}
-                    
-                    {/* Loading indicator */}
-                    {isLoading && (
-                      <div className="flex gap-3">
-                        <div className="flex-shrink-0 relative h-8 w-8">
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-primary/25 blur-sm" />
-                          <div className="relative h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center shadow-sm shadow-primary/20">
-                            <Image
-                              src="/logos/aiva-mark.svg"
-                              alt="Aiva"
-                              width={18}
-                              height={18}
-                              className="object-contain"
-                            />
-                          </div>
-                        </div>
-                        <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div className="flex gap-1">
-                              <span className="h-2 w-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.3s]" />
-                              <span className="h-2 w-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.15s]" />
-                              <span className="h-2 w-2 rounded-full bg-primary/60 animate-bounce" />
+                          <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <div className="flex gap-1">
+                                <span className="h-2 w-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.3s]" />
+                                <span className="h-2 w-2 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.15s]" />
+                                <span className="h-2 w-2 rounded-full bg-primary/60 animate-bounce" />
+                              </div>
+                              <span className="text-xs text-muted-foreground">Thinking...</span>
                             </div>
-                            <span className="text-xs text-muted-foreground">Thinking...</span>
                           </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  </TooltipProvider>
                 )}
                 
                 {/* Scroll anchor */}
