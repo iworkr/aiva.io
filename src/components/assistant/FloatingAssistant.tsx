@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Send, X, Loader2, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import ReactMarkdown from 'react-markdown';
 
 export function FloatingAssistant() {
   const [isOpen, setIsOpen] = useState(false);
@@ -138,17 +139,18 @@ export function FloatingAssistant() {
               "transition-all duration-300 ease-out",
               // Mobile: full screen with margins
               "inset-3 rounded-2xl md:inset-auto",
-              // Desktop: positioned above the bubble
-              "md:bottom-24 md:right-6 md:w-[420px] md:h-[560px] md:rounded-2xl"
+              // Desktop: positioned closer to bottom right
+              "md:bottom-6 md:right-6 md:w-[420px] md:h-[560px] md:rounded-2xl"
             )}
           >
             {/* ===== STATIC HEADER ===== */}
             <div className="flex-shrink-0 border-b border-border/50 bg-gradient-to-r from-primary/5 via-background to-accent/5 rounded-t-2xl">
               <div className="flex items-center justify-between px-4 py-4">
                 <div className="flex items-center gap-3">
-                  {/* Logo with gradient ring */}
+                  {/* Logo with gradient ring and blue glow */}
                   <div className="relative">
-                    <div className="h-11 w-11 rounded-full bg-gradient-to-br from-primary to-accent p-[2px]">
+                    <div className="absolute inset-0 rounded-full bg-primary/40 blur-md" />
+                    <div className="relative h-11 w-11 rounded-full bg-gradient-to-br from-primary to-accent p-[2px] shadow-lg shadow-primary/30">
                       <div className="h-full w-full rounded-full bg-card flex items-center justify-center">
                         <Image
                           src="/logos/aiva-mark.svg"
@@ -190,9 +192,10 @@ export function FloatingAssistant() {
                 {messages.length === 0 ? (
                   /* Empty State / Welcome Screen */
                   <div className="h-full flex flex-col items-center justify-center py-8">
-                    {/* Welcome illustration */}
+                    {/* Welcome illustration with blue glow */}
                     <div className="relative mb-6">
-                      <div className="h-20 w-20 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+                      <div className="absolute inset-0 rounded-full bg-primary/30 blur-xl" />
+                      <div className="relative h-20 w-20 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center shadow-lg shadow-primary/20">
                         <Image
                           src="/logos/aiva-mark.svg"
                           alt="Aiva"
@@ -271,10 +274,11 @@ export function FloatingAssistant() {
                           message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
                         )}
                       >
-                        {/* Avatar */}
+                        {/* Avatar with blue glow */}
                         {message.role === 'assistant' && (
-                          <div className="flex-shrink-0">
-                            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+                          <div className="flex-shrink-0 relative">
+                            <div className="absolute inset-0 rounded-full bg-primary/30 blur-sm" />
+                            <div className="relative h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center shadow-sm shadow-primary/20">
                               <Image
                                 src="/logos/aiva-mark.svg"
                                 alt="Aiva"
@@ -295,7 +299,21 @@ export function FloatingAssistant() {
                               : 'bg-muted rounded-bl-md'
                           )}
                         >
-                          <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                          <div className="whitespace-pre-wrap leading-relaxed prose prose-sm dark:prose-invert max-w-none [&>p]:m-0 [&>ul]:my-1 [&>ol]:my-1 [&>p:not(:last-child)]:mb-2">
+                            <ReactMarkdown
+                              components={{
+                                p: ({ children }) => <p>{children}</p>,
+                                strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+                                em: ({ children }) => <em className="italic">{children}</em>,
+                                ul: ({ children }) => <ul className="list-disc pl-4 space-y-1">{children}</ul>,
+                                ol: ({ children }) => <ol className="list-decimal pl-4 space-y-1">{children}</ol>,
+                                li: ({ children }) => <li>{children}</li>,
+                                code: ({ children }) => <code className="bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded text-xs">{children}</code>,
+                              }}
+                            >
+                              {message.content}
+                            </ReactMarkdown>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -303,8 +321,9 @@ export function FloatingAssistant() {
                     {/* Loading indicator */}
                     {isLoading && (
                       <div className="flex gap-3">
-                        <div className="flex-shrink-0">
-                          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+                        <div className="flex-shrink-0 relative">
+                          <div className="absolute inset-0 rounded-full bg-primary/30 blur-sm" />
+                          <div className="relative h-8 w-8 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center shadow-sm shadow-primary/20">
                             <Image
                               src="/logos/aiva-mark.svg"
                               alt="Aiva"
@@ -335,39 +354,74 @@ export function FloatingAssistant() {
             </div>
 
             {/* ===== STATIC FOOTER ===== */}
-            <div className="flex-shrink-0 border-t border-border/50 bg-muted/30 p-4 rounded-b-2xl">
-              <form onSubmit={handleSubmit} className="flex gap-3">
-                <div className="flex-1 relative">
-                  <Input
-                    ref={inputRef}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Type your message..."
-                    className="h-11 text-sm rounded-xl pl-4 pr-4 border-2 border-border/50 focus:border-primary/50 bg-background"
-                    disabled={isLoading}
-                  />
-                </div>
-                <Button 
-                  type="submit" 
-                  disabled={isLoading || !input.trim()} 
-                  className={cn(
-                    "h-11 w-11 rounded-xl p-0 transition-all",
-                    "bg-primary hover:bg-primary/90",
-                    "disabled:opacity-50 disabled:cursor-not-allowed",
-                    input.trim() && !isLoading && "shadow-lg shadow-primary/25"
-                  )}
+            <div className="flex-shrink-0 border-t border-border/50 bg-muted/30 rounded-b-2xl">
+              {/* Quick suggestions - always visible */}
+              <div className="px-3 pt-3 pb-2 flex gap-2 overflow-x-auto scrollbar-hide">
+                <button
+                  type="button"
+                  onClick={() => handleQuickAction("Summarize my inbox")}
+                  className="flex-shrink-0 px-3 py-1.5 text-xs rounded-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors"
                 >
-                  {isLoading ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <Send className="h-5 w-5" />
-                  )}
-                </Button>
-              </form>
-              <p className="text-[10px] text-muted-foreground text-center mt-2">
-                Press Enter to send • Esc to close
-              </p>
+                  📬 Summarize inbox
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickAction("What urgent messages do I have?")}
+                  className="flex-shrink-0 px-3 py-1.5 text-xs rounded-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors"
+                >
+                  🔥 Urgent messages
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickAction("What's on my calendar today?")}
+                  className="flex-shrink-0 px-3 py-1.5 text-xs rounded-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors"
+                >
+                  📅 Today&apos;s schedule
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickAction("Help me draft a reply")}
+                  className="flex-shrink-0 px-3 py-1.5 text-xs rounded-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors"
+                >
+                  ✍️ Draft reply
+                </button>
+              </div>
+              
+              {/* Input area */}
+              <div className="px-3 pb-3">
+                <form onSubmit={handleSubmit} className="flex gap-3">
+                  <div className="flex-1 relative">
+                    <Input
+                      ref={inputRef}
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Type your message..."
+                      className="h-11 text-sm rounded-xl pl-4 pr-4 border-2 border-border/50 focus:border-primary/50 bg-background"
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <Button 
+                    type="submit" 
+                    disabled={isLoading || !input.trim()} 
+                    className={cn(
+                      "h-11 w-11 rounded-xl p-0 transition-all",
+                      "bg-primary hover:bg-primary/90",
+                      "disabled:opacity-50 disabled:cursor-not-allowed",
+                      input.trim() && !isLoading && "shadow-lg shadow-primary/25"
+                    )}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Send className="h-5 w-5" />
+                    )}
+                  </Button>
+                </form>
+                <p className="text-[10px] text-muted-foreground text-center mt-2">
+                  Press Enter to send • Esc to close
+                </p>
+              </div>
             </div>
           </div>
         </>
