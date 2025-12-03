@@ -149,47 +149,45 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
 
   return (
     <div className={cn('relative', className)}>
-      {/* Simple Input Bar */}
-      <div className="relative">
-        <form onSubmit={handleSubmit} className="flex gap-2">
-          <div className="flex-1 relative">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
-              <Image
-                src="/logos/aiva-mark.svg"
-                alt="Aiva"
-                width={16}
-                height={16}
-                className="object-contain opacity-60"
-              />
-            </div>
-            <Input
-              ref={inputRef}
-              type="text"
-              placeholder="Ask Aiva anything..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onFocus={() => !isOpen && messages.length > 0 && setIsOpen(true)}
-              className="pl-10 h-10 text-sm bg-background border-2 border-border/50 hover:border-primary/30 focus:border-primary/50 rounded-xl"
-            />
-          </div>
-          <Button 
-            type="submit" 
-            disabled={isLoading || !input.trim()} 
-            className={cn(
-              "h-10 w-10 rounded-xl p-0 transition-all",
-              "bg-primary hover:bg-primary/90",
-              input.trim() && !isLoading && "shadow-md shadow-primary/20"
-            )}
-          >
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
-        </form>
-      </div>
+      {/* Simple Input Bar with Send Button Inside */}
+      <form onSubmit={handleSubmit} className="relative">
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
+          <Image
+            src="/logos/aiva-mark.svg"
+            alt="Aiva"
+            width={16}
+            height={16}
+            className="object-contain opacity-60"
+          />
+        </div>
+        <Input
+          ref={inputRef}
+          type="text"
+          placeholder="Ask Aiva anything..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onFocus={() => !isOpen && messages.length > 0 && setIsOpen(true)}
+          className="pl-10 pr-12 h-11 text-sm bg-background border-2 border-border/50 hover:border-primary/30 focus:border-primary/50 rounded-xl"
+        />
+        <button 
+          type="submit" 
+          disabled={isLoading || !input.trim()} 
+          className={cn(
+            "absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-8 rounded-lg flex items-center justify-center transition-all",
+            "disabled:opacity-40 disabled:cursor-not-allowed",
+            input.trim() && !isLoading 
+              ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm" 
+              : "bg-muted text-muted-foreground"
+          )}
+        >
+          {isLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
+        </button>
+      </form>
 
       {/* Chat Panel - Only shows when there are messages */}
       {isOpen && messages.length > 0 && (
@@ -204,8 +202,8 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
           {/* Chat Window */}
           <div 
             ref={panelRef}
-            className="absolute bottom-full left-0 right-0 mb-2 z-50 bg-card border-2 border-border/50 shadow-xl rounded-xl overflow-hidden"
-            style={{ maxHeight: '450px' }}
+            className="absolute top-full left-0 right-0 mt-2 z-50 bg-card border-2 border-border/50 shadow-xl rounded-xl overflow-hidden"
+            style={{ maxHeight: '400px' }}
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-muted/30">
