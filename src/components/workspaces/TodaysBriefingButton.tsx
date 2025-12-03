@@ -196,9 +196,6 @@ Please provide a brief, friendly overview of my day in 3-4 sentences. Be encoura
           ) : (
             <p className="text-sm text-muted-foreground leading-relaxed">
               {displayedText}
-              {isTyping && (
-                <span className="inline-block w-0.5 h-4 bg-primary ml-0.5 animate-pulse align-middle" />
-              )}
             </p>
           )}
         </div>

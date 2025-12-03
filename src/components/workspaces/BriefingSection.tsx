@@ -1,26 +1,21 @@
 /**
  * Briefing Section Component
- * Expandable/collapsible briefing items
+ * Minimal, sleek expandable/collapsible briefing items
  */
 
 'use client';
 
 import { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
-  AlertCircle,
-  CheckSquare,
-  Clock,
-  ArrowRight,
   ChevronDown,
   ChevronUp,
   Mail,
   Calendar,
+  ChevronRight,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface BriefingItem {
   id: string;
@@ -49,127 +44,88 @@ export function BriefingSection({ items }: BriefingSectionProps) {
   const getIcon = (type: string) => {
     switch (type) {
       case 'message':
-        return <Mail className="h-4 w-4" />;
-      case 'task':
-        return <CheckSquare className="h-4 w-4" />;
+        return <Mail className="h-3.5 w-3.5" />;
       case 'event':
-        return <Calendar className="h-4 w-4" />;
+        return <Calendar className="h-3.5 w-3.5" />;
       default:
-        return <AlertCircle className="h-4 w-4" />;
+        return <Mail className="h-3.5 w-3.5" />;
     }
   };
 
-  const getPriorityColor = (priority: string) => {
+  const getPriorityDot = (priority: string) => {
     switch (priority) {
       case 'urgent':
-        return 'border-red-500/70 bg-card';
+        return 'bg-red-500';
       case 'high':
-        return 'border-orange-500/70 bg-card';
+        return 'bg-orange-500';
       case 'medium':
-        return 'border-yellow-500/70 bg-card';
+        return 'bg-yellow-500';
       default:
-        return 'border-primary/70 bg-card';
+        return 'bg-primary';
     }
   };
 
   const renderItem = (item: BriefingItem) => {
-    const getHoverBorderColor = () => {
-      switch (item.priority) {
-        case 'urgent':
-          return 'hover:border-l-red-500 hover:border-opacity-100';
-        case 'high':
-          return 'hover:border-l-orange-500 hover:border-opacity-100';
-        case 'medium':
-          return 'hover:border-l-yellow-500 hover:border-opacity-100';
-        default:
-          return 'hover:border-l-primary hover:border-opacity-100';
-      }
-    };
-
     return (
       <Link key={item.id} href={item.href}>
-        <Card className={`group relative transition-all duration-300 hover:shadow-md cursor-pointer border-l-4 overflow-hidden ${getPriorityColor(item.priority)} ${getHoverBorderColor()}`}>
-          {/* Shimmer effect */}
-          <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-transparent via-white/50 to-transparent opacity-0 group-hover:opacity-100 group-hover:animate-shimmer transition-opacity duration-300 pointer-events-none z-10" />
-          <CardContent className="py-1.5 px-3 relative z-10">
-          <div className="flex items-center gap-2.5">
-            <div className="flex-shrink-0">{getIcon(item.type)}</div>
-            <h3 className="font-medium text-sm truncate flex-1 min-w-0">{item.title}</h3>
-            <Badge
-              variant={
-                item.priority === 'urgent'
-                  ? 'destructive'
-                  : item.priority === 'high'
-                  ? 'default'
-                  : 'secondary'
-              }
-              className="text-[10px] px-1.5 py-0 h-4 flex-shrink-0"
-            >
-              {item.priority}
-            </Badge>
-            {(item.metadata || item.timestamp) && (
-              <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-shrink-0">
-                {item.metadata && (
-                  <span className="flex items-center gap-0.5 whitespace-nowrap">
-                    {item.type === 'message' && <Mail className="h-2.5 w-2.5" />}
-                    {item.metadata}
-                  </span>
-                )}
-                {item.timestamp && (
-                  <span className="flex items-center gap-0.5 whitespace-nowrap">
-                    <Clock className="h-2.5 w-2.5" />
-                    {item.type === 'task' && item.metadata?.includes('Due')
-                      ? item.metadata
-                      : formatDistanceToNow(item.timestamp, { addSuffix: true })}
-                  </span>
-                )}
-              </div>
-            )}
-            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
+        <div className="group flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer">
+          {/* Priority dot */}
+          <span className={cn("h-2 w-2 rounded-full flex-shrink-0", getPriorityDot(item.priority))} />
+          
+          {/* Icon */}
+          <span className="text-muted-foreground flex-shrink-0">
+            {getIcon(item.type)}
+          </span>
+          
+          {/* Title */}
+          <span className="text-sm truncate flex-1 min-w-0">{item.title}</span>
+          
+          {/* Timestamp */}
+          {item.timestamp && (
+            <span className="text-xs text-muted-foreground flex-shrink-0 hidden sm:block">
+              {formatDistanceToNow(item.timestamp, { addSuffix: true })}
+            </span>
+          )}
+          
+          {/* Arrow */}
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </div>
+      </Link>
     );
   };
 
   return (
-    <div id="briefing" className="space-y-2.5">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-semibold">What needs your attention</h2>
+    <div id="briefing" className="space-y-1">
+      <div className="flex items-center justify-between px-3 mb-1">
+        <h2 className="text-sm font-medium text-muted-foreground">What needs your attention</h2>
         {items.length > 3 && (
-          <Button
-            variant="outline"
-            size="sm"
+          <button
+            type="button"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="gap-1.5 h-8 text-xs font-medium border-primary/30 hover:bg-primary/10 hover:border-primary/50 transition-all"
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
           >
             {isExpanded ? (
               <>
-                <ChevronUp className="h-3.5 w-3.5" />
-                Show less
+                <ChevronUp className="h-3 w-3" />
+                Less
               </>
             ) : (
               <>
-                <ChevronDown className="h-3.5 w-3.5" />
-                Show {remainingItems.length} more
+                <ChevronDown className="h-3 w-3" />
+                +{remainingItems.length} more
               </>
             )}
-          </Button>
+          </button>
         )}
       </div>
 
-      {/* Always show top 3 items */}
-      <div className="space-y-2">
+      {/* Items list */}
+      <div className="space-y-0.5">
         {topItems.map(renderItem)}
+        
+        {/* Show remaining items when expanded */}
+        {isExpanded && remainingItems.map(renderItem)}
       </div>
-
-      {/* Show remaining items when expanded */}
-      {isExpanded && remainingItems.length > 0 && (
-        <div className="space-y-2 pt-2 border-t">
-          {remainingItems.map(renderItem)}
-        </div>
-      )}
     </div>
   );
 }
