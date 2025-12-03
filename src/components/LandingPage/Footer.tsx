@@ -11,15 +11,22 @@ export function Footer() {
             <div className="flex flex-col w-full gap-6">
               <Link href="/">
                 <div className="relative flex gap-2 items-center">
+                  {/* Dark theme: light logo on dark background */}
                   <Image
-                    src={"/logos/aiva-logo-dark.svg"}
+                    src="/logos/aiva-logo-light.svg"
                     alt="Aiva logo"
                     width={140}
                     height={40}
+                    className="hidden dark:block"
                   />
-                  <span className="font-medium text-2xl text-foreground sm:inline-block">
-                    Aiva.io
-                  </span>
+                  {/* Light theme: dark logo on light background */}
+                  <Image
+                    src="/logos/aiva-logo-dark.svg"
+                    alt="Aiva logo"
+                    width={140}
+                    height={40}
+                    className="block dark:hidden"
+                  />
                 </div>
               </Link>
               <p className="text-muted-foreground max-w-[350px] dark:font-light">

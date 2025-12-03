@@ -12,11 +12,11 @@ export function SidebarLogo() {
   const isCollapsed = state === "collapsed";
 
   if (isCollapsed) {
-    // Show blue icon mark when collapsed (same for both themes)
+    // Show gradient icon mark when collapsed (same for both themes)
     return (
       <div className="flex items-center justify-center px-1 py-1">
         <Image
-          src="/aiva-logo/2x/Asset 8@2x.png"
+          src="/logos/aiva-mark.svg"
           width={32}
           height={32}
           alt="Aiva"
