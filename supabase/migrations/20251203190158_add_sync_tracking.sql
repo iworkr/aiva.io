@@ -17,7 +17,7 @@ ADD COLUMN IF NOT EXISTS sync_frequency_minutes INTEGER DEFAULT 15;
 -- Create index for efficient sync job queries
 CREATE INDEX IF NOT EXISTS idx_channel_connections_sync 
 ON channel_connections (last_sync_at, status) 
-WHERE status = 'connected';
+WHERE status = 'active';
 
 -- Create index for webhook renewal queries
 CREATE INDEX IF NOT EXISTS idx_channel_connections_webhook 
@@ -27,7 +27,7 @@ WHERE webhook_enabled = TRUE;
 -- Update existing connections to have default last_sync_at
 UPDATE channel_connections 
 SET last_sync_at = COALESCE(updated_at, created_at)
-WHERE last_sync_at IS NULL AND status = 'connected';
+WHERE last_sync_at IS NULL AND status = 'active';
 
 -- Comment describing the sync tiers
 COMMENT ON COLUMN channel_connections.last_sync_at IS 'Timestamp of last successful sync. Used by cron jobs to determine if workspace should be synced.';

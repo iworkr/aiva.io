@@ -625,6 +625,7 @@ export type Database = {
           id: string
           last_sync_at: string | null
           metadata: Json | null
+          next_sync_at: string | null
           provider: Database["public"]["Enums"]["channel_provider"]
           provider_account_id: string
           provider_account_name: string | null
@@ -635,6 +636,9 @@ export type Database = {
           token_expires_at: string | null
           updated_at: string
           user_id: string
+          webhook_enabled: boolean | null
+          webhook_expires_at: string | null
+          webhook_subscription_id: string | null
           workspace_id: string
         }
         Insert: {
@@ -643,6 +647,7 @@ export type Database = {
           id?: string
           last_sync_at?: string | null
           metadata?: Json | null
+          next_sync_at?: string | null
           provider: Database["public"]["Enums"]["channel_provider"]
           provider_account_id: string
           provider_account_name?: string | null
@@ -653,6 +658,9 @@ export type Database = {
           token_expires_at?: string | null
           updated_at?: string
           user_id: string
+          webhook_enabled?: boolean | null
+          webhook_expires_at?: string | null
+          webhook_subscription_id?: string | null
           workspace_id: string
         }
         Update: {
@@ -661,6 +669,7 @@ export type Database = {
           id?: string
           last_sync_at?: string | null
           metadata?: Json | null
+          next_sync_at?: string | null
           provider?: Database["public"]["Enums"]["channel_provider"]
           provider_account_id?: string
           provider_account_name?: string | null
@@ -671,6 +680,9 @@ export type Database = {
           token_expires_at?: string | null
           updated_at?: string
           user_id?: string
+          webhook_enabled?: boolean | null
+          webhook_expires_at?: string | null
+          webhook_subscription_id?: string | null
           workspace_id?: string
         }
         Relationships: [
@@ -2380,14 +2392,17 @@ export type Database = {
       }
       workspace_settings: {
         Row: {
+          sync_frequency_minutes: number | null
           workspace_id: string
           workspace_settings: Json
         }
         Insert: {
+          sync_frequency_minutes?: number | null
           workspace_id: string
           workspace_settings?: Json
         }
         Update: {
+          sync_frequency_minutes?: number | null
           workspace_id?: string
           workspace_settings?: Json
         }
