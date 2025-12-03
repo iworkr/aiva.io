@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, UserCircle } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAction } from 'next-safe-action/hooks';
 import { useForm } from 'react-hook-form';
@@ -135,157 +135,158 @@ export function CreateEditContactDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <UserCircle className="h-5 w-5" />
-            {isEditing ? 'Edit Contact' : 'Add New Contact'}
+      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+        <DialogHeader className="pb-4">
+          <DialogTitle className="text-lg font-semibold">
+            {isEditing ? 'Edit Contact' : 'Add Contact'}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm">
             {isEditing
-              ? 'Update contact information and linked channels'
-              : 'Create a new unified contact profile'}
+              ? 'Update contact details'
+              : 'Create a new contact profile'}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Basic Information */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold">Basic Information</h3>
-            
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Name */}
+          <div className="space-y-3">
             <div>
-              <Label htmlFor="fullName">Full Name *</Label>
+              <Label htmlFor="fullName" className="text-xs">Full Name *</Label>
               <Input
                 id="fullName"
                 {...form.register('fullName')}
-                placeholder="e.g., Theo Lewis"
+                placeholder="Full name"
+                className="h-9"
               />
               {form.formState.errors.fullName && (
-                <p className="text-sm text-destructive mt-1">
+                <p className="text-xs text-destructive mt-1">
                   {form.formState.errors.fullName.message}
                 </p>
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="firstName">First Name</Label>
+                <Label htmlFor="firstName" className="text-xs">First</Label>
                 <Input
                   id="firstName"
                   {...form.register('firstName')}
-                  placeholder="Theo"
+                  placeholder="First"
+                  className="h-9"
                 />
               </div>
               <div>
-                <Label htmlFor="lastName">Last Name</Label>
+                <Label htmlFor="lastName" className="text-xs">Last</Label>
                 <Input
                   id="lastName"
                   {...form.register('lastName')}
-                  placeholder="Lewis"
+                  placeholder="Last"
+                  className="h-9"
                 />
               </div>
             </div>
           </div>
 
-          {/* Contact Details */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold">Contact Details</h3>
-            
+          {/* Contact */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-xs">Email</Label>
               <Input
                 id="email"
                 type="email"
                 {...form.register('email')}
-                placeholder="theo@example.com"
+                placeholder="email@example.com"
+                className="h-9"
               />
               {form.formState.errors.email && (
-                <p className="text-sm text-destructive mt-1">
+                <p className="text-xs text-destructive mt-1">
                   {form.formState.errors.email.message}
                 </p>
               )}
             </div>
-
             <div>
-              <Label htmlFor="phone">Phone</Label>
+              <Label htmlFor="phone" className="text-xs">Phone</Label>
               <Input
                 id="phone"
                 {...form.register('phone')}
                 placeholder="+1 234 567 8900"
+                className="h-9"
               />
             </div>
           </div>
 
-          {/* Professional Information */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold">Professional Information</h3>
-            
+          {/* Professional */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="company">Company</Label>
+              <Label htmlFor="company" className="text-xs">Company</Label>
               <Input
                 id="company"
                 {...form.register('company')}
-                placeholder="Aiva Inc."
+                placeholder="Company"
+                className="h-9"
               />
             </div>
-
             <div>
-              <Label htmlFor="jobTitle">Job Title</Label>
+              <Label htmlFor="jobTitle" className="text-xs">Job Title</Label>
               <Input
                 id="jobTitle"
                 {...form.register('jobTitle')}
-                placeholder="Software Engineer"
+                placeholder="Title"
+                className="h-9"
               />
             </div>
           </div>
 
-          {/* Additional Information */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold">Additional Information</h3>
-            
+          {/* Additional */}
+          <div className="space-y-3">
             <div>
-              <Label htmlFor="avatarUrl">Avatar URL</Label>
+              <Label htmlFor="avatarUrl" className="text-xs">Avatar URL</Label>
               <Input
                 id="avatarUrl"
                 {...form.register('avatarUrl')}
-                placeholder="https://example.com/avatar.jpg"
+                placeholder="https://..."
+                className="h-9"
               />
             </div>
 
             <div>
-              <Label htmlFor="bio">Bio</Label>
+              <Label htmlFor="bio" className="text-xs">Bio</Label>
               <Textarea
                 id="bio"
                 {...form.register('bio')}
-                placeholder="Brief bio or description..."
-                rows={3}
+                placeholder="Brief description..."
+                rows={2}
+                className="resize-none"
               />
             </div>
 
             <div>
-              <Label htmlFor="notes">Notes</Label>
+              <Label htmlFor="notes" className="text-xs">Notes</Label>
               <Textarea
                 id="notes"
                 {...form.register('notes')}
-                placeholder="Private notes about this contact..."
-                rows={3}
+                placeholder="Private notes..."
+                rows={2}
+                className="resize-none"
               />
             </div>
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-border">
+          <div className="flex justify-end gap-2 pt-3 border-t border-border/50">
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
+              size="sm"
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
+              className="h-8"
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {isEditing ? 'Update Contact' : 'Create Contact'}
+            <Button type="submit" size="sm" disabled={isSubmitting} className="h-8">
+              {isSubmitting && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+              {isEditing ? 'Update' : 'Create'}
             </Button>
           </div>
         </form>

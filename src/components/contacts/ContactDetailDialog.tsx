@@ -14,11 +14,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  UserCircle,
   Mail,
   Phone,
   Building,
@@ -27,7 +25,6 @@ import {
   Edit,
   Trash2,
   Plus,
-  X,
   Loader2,
 } from 'lucide-react';
 import { ChannelLogo } from './ChannelLogo';
@@ -97,37 +94,15 @@ export function ContactDetailDialog({
     },
   });
 
-  // Channel icon colors matching the reference design
-  const channelColors: Record<string, { bg: string; icon: string }> = {
-    gmail: { bg: 'bg-red-500', icon: 'text-white' },
-    email: { bg: 'bg-red-500', icon: 'text-white' },
-    outlook: { bg: 'bg-blue-500', icon: 'text-white' },
-    instagram: { bg: 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500', icon: 'text-white' },
-    slack: { bg: 'bg-[#4A154B]', icon: 'text-white' },
-    whatsapp: { bg: 'bg-green-500', icon: 'text-white' },
-    phone: { bg: 'bg-green-500', icon: 'text-white' },
-    sms: { bg: 'bg-green-500', icon: 'text-white' },
-    linkedin: { bg: 'bg-[#0077B5]', icon: 'text-white' },
-    teams: { bg: 'bg-[#6264A7]', icon: 'text-white' },
-    default: { bg: 'bg-muted', icon: 'text-muted-foreground' },
-  };
-
-// ChannelLogo component is used instead of getChannelIcon
-
-  const getChannelColor = (channelType: string) => {
-    const normalized = channelType.toLowerCase();
-    return channelColors[normalized] || channelColors.default;
-  };
-
-  // Generate a color based on contact name for profile picture glow
+  // Generate a subtle color based on contact name for avatar
   const getContactColor = (name: string) => {
     const colors = [
-      'from-green-400 to-green-600',
-      'from-blue-400 to-blue-600',
-      'from-purple-400 to-purple-600',
-      'from-pink-400 to-pink-600',
-      'from-orange-400 to-orange-600',
-      'from-cyan-400 to-cyan-600',
+      'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+      'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+      'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+      'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400',
+      'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+      'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
     ];
     const index = name.charCodeAt(0) % colors.length;
     return colors[index];
@@ -153,57 +128,41 @@ export function ContactDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
-        {/* Modern Header with Profile Picture Glow */}
-        <div className="relative bg-gradient-to-b from-background to-background/95 border-b border-border px-8 py-8">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start gap-6">
-              {/* Profile Picture with Glow */}
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto p-0">
+        {/* Minimal Header */}
+        <div className="px-6 py-5 border-b border-border/50">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-4">
+              {/* Compact Avatar */}
               {contact.avatar_url ? (
-                <div className="relative">
-                  <div
-                    className={cn(
-                      'absolute inset-0 rounded-full blur-2xl opacity-50 bg-gradient-to-br',
-                      contactColor
-                    )}
-                  />
-                  <Image
-                    src={contact.avatar_url}
-                    alt={contact.full_name}
-                    width={96}
-                    height={96}
-                    className="relative h-24 w-24 rounded-full object-cover ring-4 ring-background"
-                    loading="lazy"
-                  />
-                </div>
+                <Image
+                  src={contact.avatar_url}
+                  alt={contact.full_name}
+                  width={56}
+                  height={56}
+                  className="h-14 w-14 rounded-full object-cover flex-shrink-0"
+                  loading="lazy"
+                />
               ) : (
-                <div className="relative">
-                  <div
-                    className={cn(
-                      'absolute inset-0 rounded-full blur-2xl opacity-50 bg-gradient-to-br',
-                      contactColor
-                    )}
-                  />
-                  <div
-                    className={cn(
-                      'relative h-24 w-24 rounded-full bg-gradient-to-br flex items-center justify-center text-3xl font-bold text-white ring-4 ring-background',
-                      contactColor
-                    )}
-                  >
-                    {contact.full_name.charAt(0).toUpperCase()}
-                  </div>
+                <div
+                  className={cn(
+                    'h-14 w-14 rounded-full flex items-center justify-center text-xl font-semibold flex-shrink-0',
+                    contactColor
+                  )}
+                >
+                  {contact.full_name.charAt(0).toUpperCase()}
                 </div>
               )}
 
               {/* Name and Title */}
-              <div className="flex-1 pt-2">
-                <DialogTitle className="text-3xl font-bold mb-2">
+              <div className="min-w-0">
+                <DialogTitle className="text-lg font-semibold truncate">
                   {contact.full_name}
                 </DialogTitle>
                 {(displayTitle || displayLocation) && (
-                  <p className="text-base text-muted-foreground">
+                  <p className="text-sm text-muted-foreground truncate">
                     {displayTitle && displayLocation
-                      ? `${displayTitle} - ${displayLocation}`
+                      ? `${displayTitle} · ${displayLocation}`
                       : displayTitle || displayLocation}
                   </p>
                 )}
@@ -211,16 +170,17 @@ export function ContactDetailDialog({
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 flex-shrink-0">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => toggleFavorite({ id: contact.id, workspaceId })}
+                className="h-8 w-8"
                 aria-label={contact.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
               >
                 <Star
                   className={cn(
-                    'h-5 w-5',
+                    'h-4 w-4',
                     contact.is_favorite
                       ? 'fill-yellow-500 text-yellow-500'
                       : 'text-muted-foreground'
@@ -228,171 +188,138 @@ export function ContactDetailDialog({
                   aria-hidden="true"
                 />
               </Button>
-              <Button variant="outline" size="sm" onClick={onEdit} aria-label="Edit contact">
-                <Edit className="h-4 w-4 mr-2" aria-hidden="true" />
+              <Button variant="ghost" size="sm" onClick={onEdit} className="h-8 gap-1.5" aria-label="Edit contact">
+                <Edit className="h-3.5 w-3.5" aria-hidden="true" />
                 Edit
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => onOpenChange(false)}
-                aria-label="Close contact details"
-              >
-                <X className="h-5 w-5" aria-hidden="true" />
               </Button>
             </div>
           </div>
 
-          {/* Channel Icons Row */}
+          {/* Channel Icons Row - Inline small */}
           {contact.contact_channels && contact.contact_channels.length > 0 && (
-            <div className="flex flex-wrap gap-3 mt-6">
-              {contact.contact_channels.map((channel: any) => {
-                const colors = getChannelColor(channel.channel_type);
-                return (
-                  <div
-                    key={channel.id}
-                    className={cn(
-                      'h-10 w-10 rounded-lg flex items-center justify-center transition-transform hover:scale-110 cursor-pointer',
-                      colors.bg,
-                      colors.icon
-                    )}
-                    title={`${channel.channel_type}: ${channel.channel_display_name || channel.channel_id}`}
-                  >
-                    <ChannelLogo channelType={channel.channel_type} size={20} className="text-white" />
-                  </div>
-                );
-              })}
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              {contact.contact_channels.slice(0, 6).map((channel: any) => (
+                <div
+                  key={channel.id}
+                  className="opacity-60 hover:opacity-100 transition-opacity"
+                  title={`${channel.channel_type}: ${channel.channel_display_name || channel.channel_id}`}
+                >
+                  <ChannelLogo channelType={channel.channel_type} size={18} />
+                </div>
+              ))}
+              {contact.contact_channels.length > 6 && (
+                <span className="text-xs text-muted-foreground">
+                  +{contact.contact_channels.length - 6} more
+                </span>
+              )}
             </div>
           )}
         </div>
 
         {/* Content Area */}
-        <div className="px-8 py-6 space-y-6">
+        <div className="px-6 py-5 space-y-5">
 
           {/* Bio - Full Text */}
           {contact.bio && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                Biography
-              </h3>
-              <p className="text-base text-foreground leading-relaxed whitespace-pre-wrap">
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">About</p>
+              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
                 {contact.bio}
               </p>
             </div>
           )}
 
           {/* Contact Information */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              Contact Information
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {contact.email && (
-                <div className="flex items-center gap-3">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Email</p>
-                    <p className="text-sm">{contact.email}</p>
+          {(contact.email || contact.phone || contact.company || contact.job_title) && (
+            <div className="space-y-3">
+              <p className="text-xs font-medium text-muted-foreground">Details</p>
+              <div className="space-y-2">
+                {contact.email && (
+                  <div className="flex items-center gap-2.5">
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-sm">{contact.email}</span>
                   </div>
-                </div>
-              )}
-              {contact.phone && (
-                <div className="flex items-center gap-3">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Phone</p>
-                    <p className="text-sm">{contact.phone}</p>
+                )}
+                {contact.phone && (
+                  <div className="flex items-center gap-2.5">
+                    <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-sm">{contact.phone}</span>
                   </div>
-                </div>
-              )}
-              {contact.company && (
-                <div className="flex items-center gap-3">
-                  <Building className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Company</p>
-                    <p className="text-sm">{contact.company}</p>
+                )}
+                {contact.company && (
+                  <div className="flex items-center gap-2.5">
+                    <Building className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-sm">{contact.company}</span>
                   </div>
-                </div>
-              )}
-              {contact.job_title && (
-                <div className="flex items-center gap-3">
-                  <Briefcase className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Job Title</p>
-                    <p className="text-sm">{contact.job_title}</p>
+                )}
+                {contact.job_title && (
+                  <div className="flex items-center gap-2.5">
+                    <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-sm">{contact.job_title}</span>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Communication Channels */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                Communication Channels
-              </h3>
-              <Button
-                variant="outline"
-                size="sm"
+              <p className="text-xs font-medium text-muted-foreground">Channels</p>
+              <button
                 onClick={() => setShowAddChannel(!showAddChannel)}
+                className="text-xs text-primary hover:underline flex items-center gap-1"
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Channel
-              </Button>
+                <Plus className="h-3 w-3" />
+                Add
+              </button>
             </div>
 
             {/* Add Channel Form */}
             {showAddChannel && (
-              <div className="border border-border rounded-lg p-4 space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg bg-muted/30 p-3 space-y-2.5">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <Label htmlFor="channelType">Channel Type</Label>
+                    <Label htmlFor="channelType" className="text-xs">Type</Label>
                     <Input
                       id="channelType"
-                      placeholder="e.g., instagram, whatsapp"
+                      placeholder="instagram, whatsapp..."
                       value={newChannel.type}
                       onChange={(e) =>
                         setNewChannel({ ...newChannel, type: e.target.value })
                       }
+                      className="h-8 text-sm"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="channelId">Channel ID</Label>
+                    <Label htmlFor="channelId" className="text-xs">ID</Label>
                     <Input
                       id="channelId"
-                      placeholder="e.g., @username or email"
+                      placeholder="@username"
                       value={newChannel.id}
                       onChange={(e) =>
                         setNewChannel({ ...newChannel, id: e.target.value })
                       }
+                      className="h-8 text-sm"
                     />
                   </div>
-                </div>
-                <div>
-                  <Label htmlFor="channelDisplayName">Display Name (Optional)</Label>
-                  <Input
-                    id="channelDisplayName"
-                    placeholder="e.g., Personal Instagram"
-                    value={newChannel.displayName}
-                    onChange={(e) =>
-                      setNewChannel({ ...newChannel, displayName: e.target.value })
-                    }
-                  />
                 </div>
                 <div className="flex gap-2">
                   <Button
                     onClick={handleAddChannel}
                     disabled={linkStatus === 'executing'}
-                    className="flex-1"
+                    size="sm"
+                    className="h-7 text-xs"
                   >
                     {linkStatus === 'executing' && (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
                     )}
-                    Link Channel
+                    Link
                   </Button>
                   <Button
-                    variant="outline"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs"
                     onClick={() => {
                       setShowAddChannel(false);
                       setNewChannel({ type: '', id: '', displayName: '' });
@@ -406,125 +333,83 @@ export function ContactDetailDialog({
 
             {/* Channels List */}
             {contact.contact_channels && contact.contact_channels.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {contact.contact_channels.map((channel: any) => (
                   <div
                     key={channel.id}
-                    className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-accent"
+                    className="group flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors"
                   >
-                    <div className="flex items-center gap-3 flex-1">
-                      <ChannelLogo channelType={channel.channel_type} size={20} />
+                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                      <ChannelLogo channelType={channel.channel_type} size={16} />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium capitalize">{channel.channel_type}</p>
-                          {channel.is_primary && (
-                            <Badge variant="secondary" className="text-xs">
-                              Primary
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground truncate">
+                        <p className="text-sm capitalize truncate">
                           {channel.channel_display_name || channel.channel_id}
                         </p>
-                        {channel.message_count > 0 && (
-                          <p className="text-xs text-muted-foreground">
-                            {channel.message_count} messages
-                          </p>
-                        )}
                       </div>
                     </div>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
                       onClick={() => {
-                        if (
-                          confirm(
-                            `Remove ${channel.channel_type} channel from this contact?`
-                          )
-                        ) {
+                        if (confirm(`Remove ${channel.channel_type} channel?`)) {
                           deleteChannel({ id: channel.id, workspaceId });
                         }
                       }}
                       aria-label={`Remove ${channel.channel_type} channel`}
                     >
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      <Trash2 className="h-3 w-3" aria-hidden="true" />
                     </Button>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-sm text-muted-foreground border border-dashed border-border rounded-lg">
-                No communication channels linked yet
-              </div>
+              <p className="text-xs text-muted-foreground py-3 text-center">
+                No channels linked
+              </p>
             )}
           </div>
 
           {/* Tags */}
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              Tags
-            </h3>
-            {contact.tags && contact.tags.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
+          {contact.tags && contact.tags.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">Tags</p>
+              <div className="flex flex-wrap gap-1.5">
                 {contact.tags.map((tag: string, idx: number) => (
-                  <Badge key={idx} variant="secondary">
+                  <span key={idx} className="text-xs bg-muted px-2 py-0.5 rounded">
                     {tag}
-                  </Badge>
+                  </span>
                 ))}
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground italic">
-                No tags added yet. Click Edit to add tags for better organization.
-              </p>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Notes */}
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              Notes
-            </h3>
-            {contact.notes ? (
-              <p className="text-base text-foreground whitespace-pre-wrap leading-relaxed">
+          {contact.notes && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">Notes</p>
+              <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
                 {contact.notes}
               </p>
-            ) : (
-              <p className="text-sm text-muted-foreground italic">
-                No notes added yet. Click Edit to add notes about this contact.
-              </p>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Recent Messages / Communication History */}
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-              Communication History
-            </h3>
-            {contact.interaction_count > 0 ? (
-              <div className="space-y-2 text-sm">
-                <p className="text-foreground">
-                  <span className="font-medium">{contact.interaction_count}</span> total interaction{contact.interaction_count !== 1 ? 's' : ''}
-                </p>
+          {/* Activity Summary */}
+          {contact.interaction_count > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">Activity</p>
+              <div className="text-sm text-muted-foreground">
+                <span className="text-foreground font-medium">{contact.interaction_count}</span> interaction{contact.interaction_count !== 1 ? 's' : ''}
                 {contact.last_interaction_at && (
-                  <p className="text-muted-foreground">
-                    Last interaction: {new Date(contact.last_interaction_at).toLocaleDateString()}
-                  </p>
+                  <span> · Last {new Date(contact.last_interaction_at).toLocaleDateString()}</span>
                 )}
-                <p className="text-xs text-muted-foreground pt-2 border-t border-border">
-                  View related messages in the Inbox to see full conversation history.
-                </p>
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground italic">
-                No communication history yet. Messages from this contact will appear here once you connect your channels.
-              </p>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Metadata */}
-          <div className="pt-4 border-t border-border text-xs text-muted-foreground">
-            <p>Added: {new Date(contact.created_at).toLocaleDateString()}</p>
+          <div className="pt-3 border-t border-border/50 text-[11px] text-muted-foreground">
+            Added {new Date(contact.created_at).toLocaleDateString()}
           </div>
         </div>
       </DialogContent>

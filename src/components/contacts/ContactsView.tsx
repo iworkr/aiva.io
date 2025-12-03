@@ -9,20 +9,12 @@
 import React, { useEffect, useState, useMemo, useCallback, useTransition, useDeferredValue, memo, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import {
   UserCircle,
   Plus,
   Search,
   Star,
-  Mail,
-  Phone,
-  Building,
-  Instagram,
-  MessageCircle,
   Loader2,
-  Trash2,
-  Edit,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAction } from 'next-safe-action/hooks';
@@ -205,118 +197,101 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
     setShowCreateDialog(true);
   }, []);
 
-  const getChannelIcon = useCallback((channelType: string) => {
-    switch (channelType.toLowerCase()) {
-      case 'instagram':
-        return <Instagram className="h-4 w-4" />;
-      case 'whatsapp':
-      case 'sms':
-        return <MessageCircle className="h-4 w-4" />;
-      case 'email':
-      case 'gmail':
-      case 'outlook':
-        return <Mail className="h-4 w-4" />;
-      case 'phone':
-        return <Phone className="h-4 w-4" />;
-      default:
-        return <MessageCircle className="h-4 w-4" />;
-    }
-  }, []);
-
   return (
     <div className="flex h-full flex-col bg-background">
-      {/* Header */}
-      <div className="border-b border-border px-6 py-4">
+      {/* Minimal Header */}
+      <div className="px-6 py-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">Contacts</h1>
-            <Badge variant="secondary">{contacts.length}</Badge>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-medium">Contacts</h1>
+            <span className="text-sm text-muted-foreground">({contacts.length})</span>
           </div>
-          <div className="flex items-center gap-3">
-            {/* Search */}
+          <div className="flex items-center gap-2">
+            {/* Search - Compact */}
             <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <Input
-                placeholder="Search contacts..."
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-64 pl-9 bg-background border-2 border-border hover:border-primary/40 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                className="w-48 h-8 pl-8 text-sm bg-muted/30 border-border/50 hover:border-border focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
                 aria-label="Search contacts by name, email, or company"
               />
             </div>
             
-            {/* Favorites Filter */}
+            {/* Favorites Filter - Icon only */}
             <Button
-              variant={showFavoritesOnly ? 'default' : 'outline'}
-              size="sm"
+              variant="ghost"
+              size="icon"
               onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+              className={cn(
+                'h-8 w-8 rounded-lg',
+                showFavoritesOnly && 'bg-primary/10 text-primary'
+              )}
               aria-label={showFavoritesOnly ? 'Show all contacts' : 'Show only favorite contacts'}
               aria-pressed={showFavoritesOnly}
             >
-              <Star className={cn('h-4 w-4 mr-2', showFavoritesOnly && 'fill-current')} aria-hidden="true" />
-              Favorites
+              <Star className={cn('h-4 w-4', showFavoritesOnly && 'fill-current')} aria-hidden="true" />
             </Button>
 
-            {/* Add Contact */}
+            {/* Add Contact - Compact */}
             <Button 
+              size="sm"
               onClick={() => {
-                // Clear search to ensure dialog opens properly
                 setSearchQuery('');
                 setSelectedContact(null);
-                // Use setTimeout to ensure state is cleared before opening dialog
                 setTimeout(() => {
                   setShowCreateDialog(true);
                 }, 0);
               }}
+              className="h-8 gap-1.5"
               aria-label="Add new contact"
             >
-              <Plus className="h-4 w-4 mr-2" aria-hidden="true" />
-              Add Contact
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Add</span>
             </Button>
           </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto px-6 pb-6">
         {loading ? (
           <ContactsSkeleton />
         ) : contacts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-center">
-            <UserCircle className="h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">
-              {showFavoritesOnly 
-                ? 'No favorite contacts yet'
-                : searchQuery 
-                  ? 'No contacts found'
-                  : 'No contacts yet'}
-            </h3>
-            <p className="text-sm text-muted-foreground mb-4">
+          <div className="flex flex-col items-center justify-center h-48 text-center">
+            <UserCircle className="h-10 w-10 text-muted-foreground/50 mb-3" />
+            <p className="text-sm text-muted-foreground mb-3">
               {showFavoritesOnly
-                ? 'Star some contacts to see them here'
+                ? 'No favorites yet'
                 : searchQuery
                   ? `No contacts match "${searchQuery}"`
-                  : 'Add your first contact to get started'}
+                  : 'No contacts yet'}
             </p>
             {!searchQuery && !showFavoritesOnly && (
-              <Button onClick={() => setShowCreateDialog(true)}>
-                <Plus className="h-4 w-4 mr-2" />
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowCreateDialog(true)}
+                className="h-8 gap-1.5"
+              >
+                <Plus className="h-3.5 w-3.5" />
                 Add Contact
               </Button>
             )}
             {showFavoritesOnly && (
-              <Button 
-                variant="outline"
+              <button
                 onClick={() => setShowFavoritesOnly(false)}
+                className="text-sm text-primary hover:underline"
               >
-                Show All Contacts
-              </Button>
+                Show all contacts
+              </button>
             )}
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Contacts Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {contacts.map((contact) => (
                 <ContactTile
                   key={contact.id}
@@ -332,32 +307,25 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
               ))}
             </div>
             
-            {/* Pagination Footer */}
-            <div className="flex flex-col items-center gap-3 pt-4 border-t">
-              <p className="text-sm text-muted-foreground">
-                Showing {contacts.length} contact{contacts.length !== 1 ? 's' : ''}
-                {hasMore && ' • More available'}
-              </p>
-              
-              {/* Load More Button */}
-              {hasMore && !debouncedSearchQuery && (
-                <Button
-                  variant="outline"
+            {/* Minimal Pagination Footer */}
+            {hasMore && !debouncedSearchQuery && (
+              <div className="flex justify-center pt-2">
+                <button
                   onClick={loadMoreContacts}
                   disabled={loadingMore}
-                  className="min-w-[140px]"
+                  className="text-sm text-primary hover:underline flex items-center gap-1.5 disabled:opacity-50"
                 >
                   {loadingMore ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       Loading...
                     </>
                   ) : (
-                    'Load More'
+                    `+${CONTACTS_PER_PAGE} more`
                   )}
-                </Button>
-              )}
-            </div>
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -1,23 +1,15 @@
 /**
- * Modern Contact Tile Component
- * Displays contact information in a modern card format with profile picture glow,
- * large name, title/location, and colorful channel icons
+ * Minimal Contact Tile Component
+ * Clean, compact contact card with subtle hover states
  */
 
 'use client';
 
 import React, { memo } from 'react';
 import Image from 'next/image';
-import { Star, X, Edit } from 'lucide-react';
+import { Star, Trash2, Edit } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import { ChannelLogo } from './ChannelLogo';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 
 interface ContactTileProps {
   contact: any;
@@ -27,37 +19,15 @@ interface ContactTileProps {
   onDelete?: (e: React.MouseEvent) => void;
 }
 
-// Channel icon colors matching the reference design
-const channelColors: Record<string, { bg: string; icon: string }> = {
-  gmail: { bg: 'bg-red-500', icon: 'text-white' },
-  email: { bg: 'bg-red-500', icon: 'text-white' },
-  outlook: { bg: 'bg-blue-500', icon: 'text-white' },
-  instagram: { bg: 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500', icon: 'text-white' },
-  slack: { bg: 'bg-[#4A154B]', icon: 'text-white' },
-  whatsapp: { bg: 'bg-green-500', icon: 'text-white' },
-  phone: { bg: 'bg-green-500', icon: 'text-white' },
-  sms: { bg: 'bg-green-500', icon: 'text-white' },
-  linkedin: { bg: 'bg-[#0077B5]', icon: 'text-white' },
-  teams: { bg: 'bg-[#6264A7]', icon: 'text-white' },
-  default: { bg: 'bg-muted', icon: 'text-muted-foreground' },
-};
-
-// ChannelLogo component is used instead of getChannelIcon
-
-const getChannelColor = (channelType: string) => {
-  const normalized = channelType.toLowerCase();
-  return channelColors[normalized] || channelColors.default;
-};
-
-// Generate a color based on contact name for profile picture glow
+// Generate a subtle color based on contact name for avatar
 const getContactColor = (name: string) => {
   const colors = [
-    'from-green-400 to-green-600',
-    'from-blue-400 to-blue-600',
-    'from-purple-400 to-purple-600',
-    'from-pink-400 to-pink-600',
-    'from-orange-400 to-orange-600',
-    'from-cyan-400 to-cyan-600',
+    'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+    'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+    'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+    'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400',
+    'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+    'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
   ];
   const index = name.charCodeAt(0) % colors.length;
   return colors[index];
@@ -71,167 +41,106 @@ export const ContactTile = memo(function ContactTile({
   onDelete,
 }: ContactTileProps) {
   const contactColor = getContactColor(contact.full_name || 'A');
-  const displayTitle = contact.job_title || '';
-  const displayLocation = contact.company || contact.location || '';
+  const displaySubtitle = contact.job_title || contact.company || contact.email || '';
 
   return (
     <div
       onClick={onClick}
-      className="group relative bg-card border border-border rounded-xl p-6 hover:border-primary/50 cursor-pointer transition-all duration-200 hover:shadow-lg"
+      className="group relative rounded-lg p-3 hover:bg-muted/50 cursor-pointer transition-colors"
     >
-      {/* Favorite Star - Top Right */}
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={onToggleFavorite}
-              className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
-              aria-label={contact.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
-            >
-              <Star
-                className={cn(
-                  'h-5 w-5 transition-colors',
-                  contact.is_favorite
-                    ? 'fill-yellow-500 text-yellow-500 opacity-100'
-                    : 'text-muted-foreground hover:text-yellow-500'
-                )}
-              />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{contact.is_favorite ? 'Remove from favorites' : 'Add to favorites'}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-
-      {/* Profile Picture with Glow */}
-      <div className="flex items-start gap-4 mb-4">
+      <div className="flex items-center gap-3">
+        {/* Compact Avatar */}
         {contact.avatar_url ? (
-          <div className={cn('relative')}>
-            <div
-              className={cn(
-                'absolute inset-0 rounded-full blur-xl opacity-60 bg-gradient-to-br',
-                contactColor
-              )}
-            />
-            <Image
-              src={contact.avatar_url}
-              alt={contact.full_name}
-              width={64}
-              height={64}
-              className="relative h-16 w-16 rounded-full object-cover ring-2 ring-background"
-              loading="lazy"
-            />
-          </div>
+          <Image
+            src={contact.avatar_url}
+            alt={contact.full_name}
+            width={40}
+            height={40}
+            className="h-10 w-10 rounded-full object-cover flex-shrink-0"
+            loading="lazy"
+          />
         ) : (
-          <div className="relative">
-            <div
-              className={cn(
-                'absolute inset-0 rounded-full blur-xl opacity-60 bg-gradient-to-br',
-                contactColor
-              )}
-            />
-            <div
-              className={cn(
-                'relative h-16 w-16 rounded-full bg-gradient-to-br flex items-center justify-center text-2xl font-bold text-white ring-2 ring-background',
-                contactColor
-              )}
-            >
-              {contact.full_name.charAt(0).toUpperCase()}
-            </div>
+          <div
+            className={cn(
+              'h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0',
+              contactColor
+            )}
+          >
+            {contact.full_name.charAt(0).toUpperCase()}
           </div>
         )}
 
-        {/* Name and Title */}
-        <div className="flex-1 min-w-0 pt-1">
-          <h3 className="text-xl font-bold text-foreground mb-1 truncate">
-            {contact.full_name}
-          </h3>
-          {(displayTitle || displayLocation) && (
-            <p className="text-sm text-muted-foreground truncate">
-              {displayTitle && displayLocation
-                ? `${displayTitle} - ${displayLocation}`
-                : displayTitle || displayLocation}
+        {/* Name and Subtitle */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-medium text-foreground truncate">
+              {contact.full_name}
+            </h3>
+            {contact.is_favorite && (
+              <Star className="h-3 w-3 fill-yellow-500 text-yellow-500 flex-shrink-0" />
+            )}
+          </div>
+          {displaySubtitle && (
+            <p className="text-xs text-muted-foreground truncate">
+              {displaySubtitle}
             </p>
           )}
         </div>
-      </div>
 
-      {/* Channel Icons Row */}
-      {contact.contact_channels && contact.contact_channels.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          {contact.contact_channels.slice(0, 6).map((channel: any) => {
-            const colors = getChannelColor(channel.channel_type);
-            return (
+        {/* Channel Icons - Inline small */}
+        {contact.contact_channels && contact.contact_channels.length > 0 && (
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {contact.contact_channels.slice(0, 3).map((channel: any) => (
               <div
                 key={channel.id}
-                className={cn(
-                  'h-8 w-8 rounded-lg flex items-center justify-center transition-transform hover:scale-110',
-                  colors.bg,
-                  colors.icon
-                )}
+                className="opacity-50 group-hover:opacity-80 transition-opacity"
                 title={`${channel.channel_type}: ${channel.channel_display_name || channel.channel_id}`}
               >
-                <ChannelLogo channelType={channel.channel_type} size={16} className="text-white" />
+                <ChannelLogo channelType={channel.channel_type} size={14} />
               </div>
-            );
-          })}
-          {contact.contact_channels.length > 6 && (
-            <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center text-muted-foreground text-xs font-medium">
-              +{contact.contact_channels.length - 6}
-            </div>
-          )}
-        </div>
-      )}
+            ))}
+            {contact.contact_channels.length > 3 && (
+              <span className="text-[10px] text-muted-foreground">
+                +{contact.contact_channels.length - 3}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
 
-      {/* Bio Preview */}
-      {contact.bio && (
-        <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
-          {contact.bio}
-        </p>
-      )}
-
-      {/* Action Buttons - Bottom Right */}
-      <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+      {/* Hover Actions - Positioned absolute */}
+      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+        <button
+          onClick={onToggleFavorite}
+          className="p-1.5 rounded hover:bg-background/80 transition-colors"
+          aria-label={contact.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
+        >
+          <Star
+            className={cn(
+              'h-3.5 w-3.5',
+              contact.is_favorite
+                ? 'fill-yellow-500 text-yellow-500'
+                : 'text-muted-foreground hover:text-yellow-500'
+            )}
+          />
+        </button>
         {onEdit && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={onEdit}
-                  aria-label="Edit contact"
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Edit contact</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <button
+            onClick={onEdit}
+            className="p-1.5 rounded hover:bg-background/80 transition-colors"
+            aria-label="Edit contact"
+          >
+            <Edit className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+          </button>
         )}
         {onDelete && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-destructive hover:text-destructive"
-                  onClick={onDelete}
-                  aria-label="Delete contact"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Delete contact</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <button
+            onClick={onDelete}
+            className="p-1.5 rounded hover:bg-background/80 transition-colors"
+            aria-label="Delete contact"
+          >
+            <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+          </button>
         )}
       </div>
     </div>
