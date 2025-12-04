@@ -132,26 +132,32 @@ ${message.body}
 ${conversationContext ? `\n\nConversation Context:\n${conversationContext}` : ''}
 ${context ? `\n\nAdditional Context: ${context}` : ''}
 
-Requirements:
-1. Tone: ${tone} (${tone === 'formal' ? 'Use professional language, avoid contractions' : tone === 'casual' ? 'Use friendly, conversational language' : tone === 'friendly' ? 'Warm and approachable' : 'Professional but approachable'})
-2. Length: Approximately ${maxLength} characters
-3. ${includeQuote ? 'Include a relevant quote from the original message' : 'Do not include quoted text'}
-4. Address the main points from the original message
+REQUIREMENTS:
+1. Tone: ${tone} (${tone === 'formal' ? 'Professional language, avoid contractions' : tone === 'casual' ? 'Friendly, conversational' : tone === 'friendly' ? 'Warm and approachable' : 'Professional but approachable'})
+2. Length: ~${maxLength} characters
+3. ${includeQuote ? 'Include relevant quote' : 'No quoted text'}
+4. Address main points from original
 5. Be helpful and clear
 6. End with appropriate closing
-7. Do NOT include a signature (it will be added automatically)
+7. NO signature (added automatically)
+8. NO "Dear/Hi" salutation - start directly with content
 
-Respond with ONLY the email body text, no subject line, no "Dear/Hi", start directly with the content.
+CONFIDENCE SCORE GUIDELINES (be realistic):
+- 0.90-1.00: Clear question with obvious answer, straightforward acknowledgment
+- 0.75-0.89: Most business replies with clear context
+- 0.60-0.74: Some ambiguity in how to respond
+- 0.45-0.59: Unclear what response is needed, sensitive topic
+- Below 0.45: Very unclear context, might be wrong approach
 
-Also provide:
-- A confidence score (0-1) indicating how confident you are in this reply
-- Whether this reply is suitable for auto-send (true/false)
+AUTO-SEND CRITERIA (isAutoSendable):
+- true: Simple acknowledgments, routine responses, non-sensitive
+- false: Sensitive topics, financial matters, complaints, anything requiring human review
 
-Format your response as JSON:
+Format as JSON:
 {
-  "body": "The reply text here...",
-  "confidenceScore": 0.85,
-  "isAutoSendable": false
+  "body": "<reply text>",
+  "confidenceScore": <number 0.40-1.0>,
+  "isAutoSendable": <boolean>
 }`;
 
     const startTime = Date.now();
@@ -173,21 +179,56 @@ Format your response as JSON:
       messages: [
         {
           role: 'system',
-          content: `You are an expert email assistant. Generate professional, contextually appropriate email replies. Match the tone and style requested. Be concise and helpful.`,
+          content: `You are an expert email assistant. Generate contextually appropriate replies.
+
+CRITICAL: Confidence scores must be realistic and varied:
+- Only use 0.90+ for simple, clear responses (thank you, confirmation, etc.)
+- Use 0.70-0.89 for standard business replies with clear context
+- Use 0.50-0.69 for ambiguous situations or sensitive topics
+- Use below 0.50 when unsure about appropriate response
+
+Be honest about uncertainty. Don't default to high confidence.`,
         },
         {
           role: 'user',
           content: prompt,
         },
       ],
-      temperature: 0.7,
+      temperature: 0.5, // Moderate creativity for replies
       max_tokens: Math.ceil(maxLength / 2),
       response_format: { type: 'json_object' },
     });
 
     const processingTime = Date.now() - startTime;
 
-    const result = JSON.parse(completion.choices[0].message.content || '{}');
+    const rawResult = JSON.parse(completion.choices[0].message.content || '{}');
+    
+    // Post-process confidence score to ensure realistic values
+    let confidence = rawResult.confidenceScore;
+    if (typeof confidence !== 'number' || isNaN(confidence)) {
+      confidence = 0.65; // Default to moderate confidence
+    }
+    confidence = Math.max(0.40, Math.min(1.0, confidence));
+    
+    // Adjust based on message characteristics
+    const messageBody = message.body || '';
+    const lowerBody = messageBody.toLowerCase();
+    
+    // Sensitive topics should reduce confidence
+    const sensitiveKeywords = ['refund', 'complaint', 'legal', 'urgent', 'emergency', 'angry', 'disappointed', 'terrible'];
+    if (sensitiveKeywords.some(kw => lowerBody.includes(kw))) {
+      confidence = Math.min(confidence, 0.70);
+    }
+    
+    // Very short original messages are harder to respond to appropriately
+    if (messageBody.length < 100) {
+      confidence = Math.min(confidence, 0.75);
+    }
+    
+    const result = {
+      ...rawResult,
+      confidenceScore: Math.round(confidence * 100) / 100,
+    };
 
     // Store draft in database
     const { data: draft, error: draftError } = await supabase

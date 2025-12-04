@@ -6,9 +6,6 @@
 
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,16 +16,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Send, Sparkles, Loader2, AlertTriangle, RefreshCw, X } from 'lucide-react';
+import { generateReplyDraftAction, sendReplyAction } from '@/data/user/messages';
 import { cn } from '@/lib/utils';
-import { sendReplyAction, generateReplyDraftAction } from '@/data/user/messages';
+import { Loader2, RefreshCw, Send, Sparkles, X } from 'lucide-react';
 import { useAction } from 'next-safe-action/hooks';
+import { useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 interface InlineReplyComposerProps {

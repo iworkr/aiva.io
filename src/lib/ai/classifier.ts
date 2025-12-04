@@ -68,101 +68,154 @@ export async function classifyMessage(
 
 Subject: ${message.subject || '(no subject)'}
 From: ${message.sender_name || message.sender_email}
-Body: ${message.body.substring(0, 1500)} ${message.body.length > 1500 ? '...' : ''}
+Body: ${message.body?.substring(0, 1500) || ''} ${(message.body?.length || 0) > 1500 ? '...' : ''}
 
-Classify this message into the following categories:
+CLASSIFICATION CATEGORIES (choose the MOST SPECIFIC match):
 
-1. Category (choose the MOST SPECIFIC category):
-   - customer_inquiry: Customer questions, order status ("where is my order", "when will it arrive", "tracking number")
-   - customer_complaint: Customer complaints, issues, problems, refund requests
-   - sales_lead: New business opportunities, prospects, potential clients
-   - client_support: Technical support, help requests, troubleshooting
-   - bill: Bills, payment requests, statements
-   - invoice: Invoices, receipts, billing documents
-   - payment_confirmation: Payment confirmations, transaction receipts
-   - authorization_code: 2FA codes, verification codes, OTP codes (usually 4-6 digits)
-   - sign_in_code: Sign-in codes, login codes, authentication codes
-   - security_alert: Security notifications, login alerts, account changes
-   - marketing: Promotional emails, sales offers, discounts
-   - junk_email: Spam, junk mail, unwanted promotional, obvious spam
-   - newsletter: Newsletters, company updates, regular updates
-   - internal: Team communications, company updates, internal messages
-   - meeting_request: Meeting invitations, scheduling requests
-   - personal: Personal correspondence, friends, family
-   - social: Social invites, personal messages, social media notifications
-   - notification: Automated notifications, system messages, alerts
-   - other: Doesn't fit above categories
+BUSINESS/CUSTOMER:
+- customer_inquiry: Direct questions from customers (order status, shipping, product info)
+- customer_complaint: Complaints, refund requests, negative feedback about service/product
+- sales_lead: New business opportunities, prospects wanting info, potential clients
+- client_support: Technical help requests, troubleshooting, how-to questions
 
-2. Priority (urgent, high, medium, low, noise):
-   - urgent: Time-sensitive codes (authorization/sign-in codes), urgent customer issues requiring immediate response
-   - high: Customer inquiries, complaints, sales leads, security alerts, client support
-   - medium: Bills, invoices, payment confirmations, meeting requests, internal communications
-   - low: Personal, social, notifications, newsletters
-   - noise: Marketing, junk_email (spam)
+FINANCIAL:
+- bill: Bills, payment due notices, statements requesting payment
+- invoice: Invoices, receipts, formal billing documents
+- payment_confirmation: Payment successful confirmations, transaction receipts
 
-3. Sentiment (neutral, positive, negative, urgent):
-   - neutral: Normal tone
-   - positive: Appreciative, friendly, thank you messages
-   - negative: Complaints, concerns, frustration, anger
-   - urgent: Requires immediate attention, time-sensitive
+SECURITY/AUTH:
+- authorization_code: 2FA/OTP codes (usually 4-8 digits for verification)
+- sign_in_code: Login codes, magic links, authentication codes
+- security_alert: Login notifications, password changes, suspicious activity alerts
 
-4. Actionability (question, request, fyi, scheduling_intent, task, none):
-   - question: Asking for information
-   - request: Requesting action or response
-   - fyi: Informational only, no action needed
-   - scheduling_intent: Mentions meeting/scheduling
-   - task: Contains actionable task
-   - none: No action needed (codes, confirmations, notifications)
+PROMOTIONAL/UPDATES:
+- marketing: Sales promotions, discounts, product launches
+- junk_email: Obvious spam, phishing attempts, unwanted mass emails
+- newsletter: Regular newsletters, blog digests, periodic updates
 
-5. Provide a brief summary (1-2 sentences)
+COMMUNICATION:
+- internal: Team/workplace messages, company announcements
+- meeting_request: Calendar invites, scheduling requests
+- personal: Friends, family, personal matters
+- social: Social media notifications, event invites
 
-6. Extract 2-3 key points if applicable
+OTHER:
+- notification: Automated system alerts, app notifications, delivery updates
+- other: Only if nothing else fits
 
-IMPORTANT PRIORITY RULES:
-- authorization_code or sign_in_code → ALWAYS "urgent" priority
-- customer_inquiry or customer_complaint → "urgent" if sentiment is urgent/negative, otherwise "high"
-- marketing or junk_email → ALWAYS "noise" priority
-- bills, invoices → "medium" priority
-- sales_lead, client_support → "high" priority
+PRIORITY RULES (strict):
+- urgent: Auth codes, sign-in codes, security alerts, time-critical customer issues
+- high: Customer inquiries/complaints, sales leads, client support
+- medium: Bills, invoices, meetings, internal comms
+- low: Personal, social, newsletters, notifications
+- noise: Marketing, junk email
 
-Respond ONLY with valid JSON in this exact format:
+SENTIMENT:
+- positive: Grateful, happy, appreciative tone
+- neutral: Standard business tone, informational
+- negative: Frustrated, angry, disappointed
+- urgent: Time-sensitive, requires immediate action
+
+ACTIONABILITY:
+- question: Directly asking for information
+- request: Asking for action/response
+- fyi: Information only, no response needed
+- scheduling_intent: About meetings/scheduling
+- task: Contains clear task/to-do
+- none: No action needed (confirmations, notifications)
+
+CONFIDENCE SCORE CALCULATION (be realistic and varied):
+Calculate based on these factors:
+- 0.95-1.00: Crystal clear category (e.g., "Your code is 123456" = authorization_code)
+- 0.85-0.94: Very clear with strong indicators
+- 0.70-0.84: Clear but some ambiguity exists
+- 0.55-0.69: Moderate ambiguity, could fit 2+ categories
+- 0.40-0.54: High ambiguity, weak signals
+- Below 0.40: Very unclear, essentially guessing
+
+Short/vague messages like "Test", "Hi", or single words should have LOW confidence (0.40-0.60).
+Generic messages without clear business context should be "notification" or "personal" with moderate confidence.
+
+Respond with ONLY valid JSON:
 {
-  "category": "customer_inquiry|customer_complaint|sales_lead|client_support|bill|invoice|payment_confirmation|authorization_code|sign_in_code|security_alert|marketing|junk_email|newsletter|internal|meeting_request|personal|social|notification|other",
-  "priority": "urgent|high|medium|low|noise",
-  "sentiment": "neutral|positive|negative|urgent",
-  "actionability": "question|request|fyi|scheduling_intent|task|none",
-  "summary": "Brief summary here",
-  "keyPoints": ["Point 1", "Point 2"],
-  "confidenceScore": 0.85
+  "category": "<category>",
+  "priority": "<priority>",
+  "sentiment": "<sentiment>",
+  "actionability": "<actionability>",
+  "summary": "<1-2 sentence summary>",
+  "keyPoints": ["<key point 1>", "<key point 2>"],
+  "confidenceScore": <number between 0.35 and 1.0>
 }`;
 
     const startTime = Date.now();
 
-    // Call OpenAI
+    // Call OpenAI with low temperature for consistent results
     const openai = getOpenAIClient();
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         {
           role: 'system',
-          content:
-            'You are an expert email classifier. Analyze emails and provide accurate classifications in JSON format.',
+          content: `You are an expert email classifier. Analyze emails accurately and provide realistic confidence scores.
+
+CRITICAL: Confidence scores must reflect actual certainty:
+- Only use 0.95+ for obvious cases (verification codes, clear customer complaints)
+- Use 0.70-0.85 for most clear business emails
+- Use 0.50-0.69 for ambiguous cases
+- Use below 0.50 for unclear/vague messages
+
+Short test messages, single-word emails, or vague content should ALWAYS have confidence below 0.60.
+Be consistent: similar messages should get similar classifications.`,
         },
         {
           role: 'user',
           content: prompt,
         },
       ],
-      temperature: 0.3,
+      temperature: 0.1, // Very low for consistency
       max_tokens: 500,
       response_format: { type: 'json_object' },
     });
 
     const processingTime = Date.now() - startTime;
 
-    const result = JSON.parse(
+    const rawResult = JSON.parse(
       completion.choices[0].message.content || '{}'
     ) as ClassificationResult;
+    
+    // Post-process confidence score to ensure realistic values
+    let confidence = rawResult.confidenceScore;
+    
+    // Validate confidence is in range
+    if (typeof confidence !== 'number' || isNaN(confidence)) {
+      confidence = 0.5;
+    }
+    confidence = Math.max(0.35, Math.min(1.0, confidence));
+    
+    // Adjust confidence based on message characteristics
+    const bodyLength = message.body?.length || 0;
+    const subjectLength = (message.subject || '').length;
+    
+    // Very short messages should have lower confidence
+    if (bodyLength < 50 && subjectLength < 20) {
+      confidence = Math.min(confidence, 0.60);
+    }
+    
+    // Generic test-like messages should have low confidence
+    const lowerBody = (message.body || '').toLowerCase();
+    const lowerSubject = (message.subject || '').toLowerCase();
+    if (
+      lowerSubject.includes('test') || 
+      lowerBody.includes('test message') ||
+      lowerBody.match(/^test\s*\d*$/i)
+    ) {
+      confidence = Math.min(confidence, 0.55);
+    }
+    
+    const result: ClassificationResult = {
+      ...rawResult,
+      confidenceScore: Math.round(confidence * 100) / 100, // Round to 2 decimals
+    };
 
     // Ensure priority is correctly assigned based on category
     // Override AI priority with our priority mapping logic for consistency

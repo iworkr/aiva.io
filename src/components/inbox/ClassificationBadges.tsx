@@ -6,7 +6,32 @@
 'use client';
 
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, TrendingUp, Minus, TrendingDown, Flame, Ban } from 'lucide-react';
+import {
+  AlertTriangle,
+  TrendingUp,
+  Minus,
+  TrendingDown,
+  Flame,
+  Ban,
+  HelpCircle,
+  MessageSquareWarning,
+  DollarSign,
+  Receipt,
+  CreditCard,
+  KeyRound,
+  LogIn,
+  ShieldAlert,
+  Megaphone,
+  Trash2,
+  Newspaper,
+  Building2,
+  Calendar,
+  User,
+  Users,
+  Bell,
+  CircleDot,
+  Headphones,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getPriorityDisplay, getCategoryDisplay } from '@/lib/ai/priority-mapper';
 import type { MessagePriority, MessageCategory } from '@/utils/zod-schemas/aiva-schemas';
@@ -32,6 +57,29 @@ export function PriorityBadge({ priority }: { priority: string | null | undefine
   );
 }
 
+// Icon and color mapping for categories
+const CATEGORY_CONFIG: Record<string, { icon: any; color: string; bgColor: string }> = {
+  customer_inquiry: { icon: HelpCircle, color: 'text-blue-600 dark:text-blue-400', bgColor: 'bg-blue-50 dark:bg-blue-950' },
+  customer_complaint: { icon: MessageSquareWarning, color: 'text-red-600 dark:text-red-400', bgColor: 'bg-red-50 dark:bg-red-950' },
+  sales_lead: { icon: TrendingUp, color: 'text-green-600 dark:text-green-400', bgColor: 'bg-green-50 dark:bg-green-950' },
+  client_support: { icon: Headphones, color: 'text-blue-600 dark:text-blue-400', bgColor: 'bg-blue-50 dark:bg-blue-950' },
+  bill: { icon: DollarSign, color: 'text-orange-600 dark:text-orange-400', bgColor: 'bg-orange-50 dark:bg-orange-950' },
+  invoice: { icon: Receipt, color: 'text-orange-600 dark:text-orange-400', bgColor: 'bg-orange-50 dark:bg-orange-950' },
+  payment_confirmation: { icon: CreditCard, color: 'text-green-600 dark:text-green-400', bgColor: 'bg-green-50 dark:bg-green-950' },
+  authorization_code: { icon: KeyRound, color: 'text-purple-600 dark:text-purple-400', bgColor: 'bg-purple-50 dark:bg-purple-950' },
+  sign_in_code: { icon: LogIn, color: 'text-purple-600 dark:text-purple-400', bgColor: 'bg-purple-50 dark:bg-purple-950' },
+  security_alert: { icon: ShieldAlert, color: 'text-red-600 dark:text-red-400', bgColor: 'bg-red-50 dark:bg-red-950' },
+  marketing: { icon: Megaphone, color: 'text-pink-600 dark:text-pink-400', bgColor: 'bg-pink-50 dark:bg-pink-950' },
+  junk_email: { icon: Trash2, color: 'text-gray-500 dark:text-gray-500', bgColor: 'bg-gray-100 dark:bg-gray-900' },
+  newsletter: { icon: Newspaper, color: 'text-gray-600 dark:text-gray-400', bgColor: 'bg-gray-50 dark:bg-gray-950' },
+  internal: { icon: Building2, color: 'text-indigo-600 dark:text-indigo-400', bgColor: 'bg-indigo-50 dark:bg-indigo-950' },
+  meeting_request: { icon: Calendar, color: 'text-cyan-600 dark:text-cyan-400', bgColor: 'bg-cyan-50 dark:bg-cyan-950' },
+  personal: { icon: User, color: 'text-purple-600 dark:text-purple-400', bgColor: 'bg-purple-50 dark:bg-purple-950' },
+  social: { icon: Users, color: 'text-cyan-600 dark:text-cyan-400', bgColor: 'bg-cyan-50 dark:bg-cyan-950' },
+  notification: { icon: Bell, color: 'text-gray-600 dark:text-gray-400', bgColor: 'bg-gray-50 dark:bg-gray-950' },
+  other: { icon: CircleDot, color: 'text-gray-600 dark:text-gray-400', bgColor: 'bg-gray-50 dark:bg-gray-950' },
+};
+
 export function CategoryBadge({ 
   category, 
   confidenceScore 
@@ -42,31 +90,9 @@ export function CategoryBadge({
   if (!category) return null;
 
   const display = getCategoryDisplay(category as MessageCategory);
+  const config = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.other;
+  const Icon = config.icon;
   
-  // Color mapping for categories
-  const colorMap: Record<string, { color: string; bgColor: string }> = {
-    customer_inquiry: { color: 'text-blue-600 dark:text-blue-400', bgColor: 'bg-blue-50 dark:bg-blue-950' },
-    customer_complaint: { color: 'text-red-600 dark:text-red-400', bgColor: 'bg-red-50 dark:bg-red-950' },
-    sales_lead: { color: 'text-green-600 dark:text-green-400', bgColor: 'bg-green-50 dark:bg-green-950' },
-    client_support: { color: 'text-blue-600 dark:text-blue-400', bgColor: 'bg-blue-50 dark:bg-blue-950' },
-    bill: { color: 'text-orange-600 dark:text-orange-400', bgColor: 'bg-orange-50 dark:bg-orange-950' },
-    invoice: { color: 'text-orange-600 dark:text-orange-400', bgColor: 'bg-orange-50 dark:bg-orange-950' },
-    payment_confirmation: { color: 'text-green-600 dark:text-green-400', bgColor: 'bg-green-50 dark:bg-green-950' },
-    authorization_code: { color: 'text-purple-600 dark:text-purple-400', bgColor: 'bg-purple-50 dark:bg-purple-950' },
-    sign_in_code: { color: 'text-purple-600 dark:text-purple-400', bgColor: 'bg-purple-50 dark:bg-purple-950' },
-    security_alert: { color: 'text-red-600 dark:text-red-400', bgColor: 'bg-red-50 dark:bg-red-950' },
-    marketing: { color: 'text-pink-600 dark:text-pink-400', bgColor: 'bg-pink-50 dark:bg-pink-950' },
-    junk_email: { color: 'text-gray-500 dark:text-gray-500', bgColor: 'bg-gray-100 dark:bg-gray-900' },
-    newsletter: { color: 'text-gray-600 dark:text-gray-400', bgColor: 'bg-gray-50 dark:bg-gray-950' },
-    internal: { color: 'text-indigo-600 dark:text-indigo-400', bgColor: 'bg-indigo-50 dark:bg-indigo-950' },
-    meeting_request: { color: 'text-cyan-600 dark:text-cyan-400', bgColor: 'bg-cyan-50 dark:bg-cyan-950' },
-    personal: { color: 'text-purple-600 dark:text-purple-400', bgColor: 'bg-purple-50 dark:bg-purple-950' },
-    social: { color: 'text-cyan-600 dark:text-cyan-400', bgColor: 'bg-cyan-50 dark:bg-cyan-950' },
-    notification: { color: 'text-gray-600 dark:text-gray-400', bgColor: 'bg-gray-50 dark:bg-gray-950' },
-    other: { color: 'text-gray-600 dark:text-gray-400', bgColor: 'bg-gray-50 dark:bg-gray-950' },
-  };
-
-  const colors = colorMap[category] || colorMap.other;
   const confidence = confidenceScore !== null && confidenceScore !== undefined 
     ? Math.round(confidenceScore * 100) 
     : null;
@@ -74,9 +100,10 @@ export function CategoryBadge({
   return (
     <Badge 
       variant="outline" 
-      className={cn('text-xs', colors.color, colors.bgColor)} 
+      className={cn('text-xs', config.color, config.bgColor)} 
       title={confidence !== null ? `${display.description} (${confidence}% confidence)` : display.description}
     >
+      <Icon className="mr-1 h-3 w-3" />
       {display.label}
       {confidence !== null && (
         <span className="ml-1.5 text-[10px] opacity-70">{confidence}%</span>

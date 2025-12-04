@@ -68,6 +68,30 @@ function linkifyText(text: string): string {
   return text.replace(urlPattern, '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline break-all">$1</a>');
 }
 
+/**
+ * Convert markdown-style formatting to HTML
+ * Supports: **bold**, *italic*, __underline__, ~~strikethrough~~
+ */
+function formatMarkdown(text: string): string {
+  let formatted = text;
+  
+  // Bold: **text** or __text__
+  formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold">$1</strong>');
+  formatted = formatted.replace(/__(.+?)__/g, '<strong class="font-semibold">$1</strong>');
+  
+  // Italic: *text* (but not inside URLs or already processed bold)
+  // Use negative lookbehind/lookahead to avoid matching inside other tags
+  formatted = formatted.replace(/(?<![*<])\*([^*\n]+?)\*(?![*>])/g, '<em class="italic">$1</em>');
+  
+  // Strikethrough: ~~text~~
+  formatted = formatted.replace(/~~(.+?)~~/g, '<del class="line-through opacity-70">$1</del>');
+  
+  // Code: `text`
+  formatted = formatted.replace(/`([^`\n]+?)`/g, '<code class="px-1 py-0.5 rounded bg-muted text-sm font-mono">$1</code>');
+  
+  return formatted;
+}
+
 export const ThreadMessage = memo(function ThreadMessage({
   message,
   isCurrentMessage = false,
@@ -185,7 +209,7 @@ export const ThreadMessage = memo(function ThreadMessage({
         ) : (
           <div 
             className="text-sm text-foreground/90 whitespace-pre-wrap break-words overflow-wrap-anywhere"
-            dangerouslySetInnerHTML={{ __html: linkifyText(displayContent) }}
+            dangerouslySetInnerHTML={{ __html: formatMarkdown(linkifyText(displayContent)) }}
           />
         )}
 

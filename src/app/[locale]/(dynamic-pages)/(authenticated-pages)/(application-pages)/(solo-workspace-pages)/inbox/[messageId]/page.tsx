@@ -3,12 +3,12 @@
  * Full message view with AI insights and reply composer
  */
 
-import { Suspense } from 'react';
-import { getUser } from '@/utils/server/serverSessionUtils';
-import { createSupabaseUserServerComponentClient } from '@/supabase-clients/user/createSupabaseUserServerComponentClient';
-import { MessageDetailView } from '@/components/inbox/MessageDetailView';
 import { MessageDetailSkeleton } from '@/components/inbox/MessageDetailSkeleton';
+import { MessageDetailView } from '@/components/inbox/MessageDetailView';
+import { createSupabaseUserServerComponentClient } from '@/supabase-clients/user/createSupabaseUserServerComponentClient';
+import { getUser } from '@/utils/server/serverSessionUtils';
 import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
 
 export default async function MessageDetailPage({
   params,
@@ -28,7 +28,7 @@ export default async function MessageDetailPage({
     .eq('workspace_member_id', user.id)
     .limit(1)
     .single();
-  
+
   if (!workspaceMembers) {
     redirect('/onboarding');
   }
