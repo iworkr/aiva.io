@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useEffect, useState, useMemo, useCallback, useTransition, useDeferredValue, memo, Suspense } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useTransition, memo, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -67,6 +67,12 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
   const [currentOffset, setCurrentOffset] = useState(CONTACTS_PER_PAGE);
   const [hasMore, setHasMore] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
+  
+  // Optimistic updates - track changes before server confirms
+  const [optimisticUpdates, setOptimisticUpdates] = useState<{
+    toggledFavorites: Set<string>;
+    deletedIds: Set<string>;
+  }>({ toggledFavorites: new Set(), deletedIds: new Set() });
 
   // Debounce search query for better performance
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
@@ -96,15 +102,27 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
         setCurrentOffset(data.length);
         setHasMore(data.length === CONTACTS_PER_PAGE);
         setTotalCount(data.length);
+        // Clear optimistic updates when fresh data arrives
+        setOptimisticUpdates({ toggledFavorites: new Set(), deletedIds: new Set() });
       },
     }
   );
 
-  // Combine cached contacts with additional paginated contacts
+  // Combine cached contacts with additional paginated contacts, applying optimistic updates
   const allContacts = useMemo(() => {
     const base = cachedContacts || [];
-    return [...base, ...additionalContacts];
-  }, [cachedContacts, additionalContacts]);
+    const combined = [...base, ...additionalContacts];
+    
+    // Apply optimistic updates
+    return combined
+      .filter(c => !optimisticUpdates.deletedIds.has(c.id))
+      .map(c => ({
+        ...c,
+        is_favorite: optimisticUpdates.toggledFavorites.has(c.id) 
+          ? !c.is_favorite 
+          : c.is_favorite,
+      }));
+  }, [cachedContacts, additionalContacts, optimisticUpdates]);
 
   // Legacy fetchContacts for backward compatibility
   const fetchContacts = useCallback(async (reset = true) => {
@@ -173,23 +191,28 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
   const { execute: toggleFavorite } = useAction(toggleContactFavoriteAction, {
     onSuccess: () => {
       // Silently refetch in background
-      fetchContacts();
+      refreshContacts();
     },
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to toggle favorite');
-      // Revert optimistic update
-      fetchContacts();
+      // Revert optimistic update by clearing
+      setOptimisticUpdates({ toggledFavorites: new Set(), deletedIds: new Set() });
+      refreshContacts();
     },
   });
 
   // Optimistic toggle favorite
   const handleToggleFavorite = useCallback((contact: any) => {
-    // Optimistically update UI
-    setAllContacts((prev) =>
-      prev.map((c) =>
-        c.id === contact.id ? { ...c, is_favorite: !c.is_favorite } : c
-      )
-    );
+    // Apply optimistic update
+    setOptimisticUpdates(prev => {
+      const newToggles = new Set(prev.toggledFavorites);
+      if (newToggles.has(contact.id)) {
+        newToggles.delete(contact.id); // Toggle off if already toggled
+      } else {
+        newToggles.add(contact.id);
+      }
+      return { ...prev, toggledFavorites: newToggles };
+    });
     // Execute actual update
     toggleFavorite({ id: contact.id, workspaceId });
   }, [toggleFavorite, workspaceId]);
@@ -198,11 +221,13 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
   const { execute: deleteContact } = useAction(deleteContactAction, {
     onSuccess: () => {
       toast.success('Contact deleted successfully');
+      refreshContacts();
     },
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to delete contact');
       // Revert optimistic delete
-      fetchContacts();
+      setOptimisticUpdates({ toggledFavorites: new Set(), deletedIds: new Set() });
+      refreshContacts();
     },
   });
 
@@ -212,8 +237,12 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
     const displayName = sanitizeContactName(contact.full_name) || contact.full_name;
     if (!confirm(`Are you sure you want to delete ${displayName}?`)) return;
     
-    // Optimistically remove from UI
-    setAllContacts((prev) => prev.filter((c) => c.id !== contact.id));
+    // Apply optimistic delete
+    setOptimisticUpdates(prev => {
+      const newDeleted = new Set(prev.deletedIds);
+      newDeleted.add(contact.id);
+      return { ...prev, deletedIds: newDeleted };
+    });
     // Execute actual delete
     deleteContact({ id: contact.id, workspaceId });
   }, [deleteContact, workspaceId]);
