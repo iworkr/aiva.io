@@ -109,25 +109,32 @@ export function QuickReply({
   });
 
   const { execute: generateDraft } = useAction(generateReplyDraftAction, {
+    onExecute: () => {
+      console.log('[QuickReply] Action executing for message:', messageId);
+    },
     onSuccess: ({ data }) => {
+      console.log('[QuickReply] Action success, raw response:', data);
       const result = data?.data;
       const body = result?.body;
       const confidence = result?.confidenceScore;
       
       if (body) {
+        console.log('[QuickReply] Generated reply body:', body.substring(0, 100) + '...');
         setReplyText(body);
         setConfidenceScore(confidence || null);
         draftToastIdRef.current = toast.success('AI draft ready');
       } else {
+        console.warn('[QuickReply] No body in response:', result);
         setReplyText('');
-        toast.info('Type your reply manually');
+        toast.warning('Could not generate reply. Please type manually.');
       }
       setIsGenerating(false);
       // Focus textarea after generating
       setTimeout(() => textareaRef.current?.focus(), 100);
     },
     onError: ({ error }) => {
-      toast.error(error.serverError || 'Failed to generate reply');
+      console.error('[QuickReply] Action error:', error);
+      toast.error(error.serverError || 'Failed to generate reply. Please try again.');
       setIsGenerating(false);
       setConfidenceScore(null);
     },
@@ -143,7 +150,9 @@ export function QuickReply({
 
   const handleExpand = (e: React.MouseEvent) => {
     e.stopPropagation();
+    console.log('[QuickReply] Expand clicked, isExpanded:', isExpanded, 'replyText:', replyText);
     if (!isExpanded && !replyText) {
+      console.log('[QuickReply] Starting AI generation for message:', messageId, 'workspace:', workspaceId);
       setIsGenerating(true);
       generateDraft({
         messageId,
@@ -198,6 +207,7 @@ export function QuickReply({
   // Regenerate the AI reply
   const handleRegenerate = (e: React.MouseEvent) => {
     e.stopPropagation();
+    console.log('[QuickReply] Regenerating reply for message:', messageId);
     setIsGenerating(true);
     setReplyText('');
     setConfidenceScore(null);
@@ -319,54 +329,60 @@ export function QuickReply({
         </Button>
       </div>
 
-      {/* Content */}
-      {isGenerating ? (
-        <div className="flex items-center gap-2 py-4 justify-center">
-          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-          <span className="text-sm text-muted-foreground">Generating reply...</span>
-        </div>
-      ) : (
-        <>
-          <Textarea
-            ref={textareaRef}
-            value={replyText}
-            onChange={(e) => setReplyText(e.target.value)}
-            placeholder="Type your reply..."
-            className="min-h-[80px] resize-none text-sm bg-background border-border/50 focus:border-primary/50"
-            onClick={(e) => e.stopPropagation()}
-          />
-          
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleCollapse}
-              className="h-8 px-3 text-xs"
-            >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleSendClick}
-              disabled={isSending || !replyText.trim()}
-              className="h-8 px-3 text-xs gap-1.5"
-            >
-              {isSending ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Sending
-                </>
-              ) : (
-                <>
-                  <Send className="h-3.5 w-3.5" />
-                  Send
-                </>
-              )}
-            </Button>
+      {/* Content - Textarea with loading overlay */}
+      <div className="relative">
+        <Textarea
+          ref={textareaRef}
+          value={replyText}
+          onChange={(e) => setReplyText(e.target.value)}
+          placeholder={isGenerating ? "Generating AI reply..." : "Type your reply..."}
+          disabled={isGenerating}
+          className={cn(
+            "min-h-[80px] resize-none text-sm bg-background border-border/50 focus:border-primary/50",
+            isGenerating && "opacity-50"
+          )}
+          onClick={(e) => e.stopPropagation()}
+        />
+        {/* Loading overlay */}
+        {isGenerating && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-md">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              <span className="text-sm text-muted-foreground">Generating...</span>
+            </div>
           </div>
-        </>
-      )}
+        )}
+      </div>
+      
+      {/* Actions */}
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleCollapse}
+          className="h-8 px-3 text-xs"
+        >
+          Cancel
+        </Button>
+        <Button
+          size="sm"
+          onClick={handleSendClick}
+          disabled={isSending || isGenerating || !replyText.trim()}
+          className="h-8 px-3 text-xs gap-1.5"
+        >
+          {isSending ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Sending
+            </>
+          ) : (
+            <>
+              <Send className="h-3.5 w-3.5" />
+              Send
+            </>
+          )}
+        </Button>
+      </div>
 
       {/* Confirmation Dialog */}
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
