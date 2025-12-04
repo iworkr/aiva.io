@@ -18,7 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Send, Sparkles, Loader2, AlertTriangle, X } from 'lucide-react';
+import { Send, Sparkles, Loader2, AlertTriangle, X, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { sendReplyAction, generateReplyDraftAction } from '@/data/user/messages';
 import { useAction } from 'next-safe-action/hooks';
@@ -195,6 +195,31 @@ export function QuickReply({
     });
   };
 
+  // Regenerate the AI reply
+  const handleRegenerate = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsGenerating(true);
+    setReplyText('');
+    setConfidenceScore(null);
+    generateDraft({
+      messageId,
+      workspaceId,
+      tone: 'professional',
+      maxLength: 300,
+    });
+  };
+
+  // Get confidence badge styling based on score
+  const getConfidenceBadgeStyle = (score: number) => {
+    if (score >= 0.85) {
+      return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400';
+    } else if (score >= 0.7) {
+      return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
+    } else {
+      return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+    }
+  };
+
   // Button component (used in both modes)
   const renderButton = () => (
     <TooltipProvider>
@@ -256,9 +281,32 @@ export function QuickReply({
           <Sparkles className="h-3.5 w-3.5 text-primary" />
           <span className="font-medium">AI Quick Reply</span>
           {confidenceScore !== null && (
-            <span className="text-muted-foreground/70">
-              ({Math.round(confidenceScore * 100)}% confidence)
+            <span className={cn(
+              'px-1.5 py-0.5 rounded text-[10px] font-semibold',
+              getConfidenceBadgeStyle(confidenceScore)
+            )}>
+              {Math.round(confidenceScore * 100)}% confidence
             </span>
+          )}
+          {/* Regenerate button */}
+          {!isGenerating && replyText && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRegenerate}
+                    className="h-6 w-6 p-0 text-muted-foreground hover:text-primary"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p>Regenerate reply</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
         </div>
         <Button

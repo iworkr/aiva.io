@@ -29,6 +29,7 @@ import { ChannelSidebar } from './ChannelSidebar';
 import { MessageList } from './MessageList';
 import { InboxSkeleton } from './InboxSkeleton';
 import { InboxFilters } from './InboxFilters';
+import { SyncChannelDialog } from './SyncChannelDialog';
 import type { MessagePriority, MessageCategory } from '@/utils/zod-schemas/aiva-schemas';
 
 interface InboxViewProps {
@@ -56,6 +57,7 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
   const [messageCounts, setMessageCounts] = useState<Record<string, number>>({});
   const [hasChannels, setHasChannels] = useState<boolean | null>(null);
   const [connectDialogOpen, setConnectDialogOpen] = useState(false);
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const cacheKeyRef = useRef<string>('');
   const lastFetchRef = useRef<number>(0);
@@ -390,11 +392,27 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
     fetchMessages,
   ]);
 
-  // Sync all channels - seamless background sync
+  // Sync channels - shows dialog when in All Inboxes mode
   const handleSync = () => {
+    if (selectedChannel === null) {
+      // Show dialog to select which channels to sync
+      setSyncDialogOpen(true);
+    } else {
+      // Sync just the selected channel
+      performSync([selectedChannel]);
+    }
+  };
+
+  // Perform sync with specific channel IDs or all
+  const performSync = (channelIds: string[] | 'all') => {
     // Store timestamp before sync to fetch only new messages
     lastSyncTimestampRef.current = new Date().toISOString();
     setSyncing(true);
+    setSyncDialogOpen(false);
+    
+    // Note: syncWorkspaceConnectionsAction syncs all connections for the workspace
+    // For channel-specific sync, we'd need a different action, but for now we sync all
+    // and filter on the client side
     syncWorkspaceConnections({
       workspaceId,
       maxMessagesPerConnection: 50,
@@ -589,10 +607,20 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
             setHasChannels(channels && channels.length > 0);
             if (channels && channels.length > 0) {
               toast.success('Channel connected! Syncing messages...');
-              handleSync();
+              performSync('all');
             }
           });
         }}
+      />
+
+      {/* Sync Channel Selection Dialog - for All Inboxes view */}
+      <SyncChannelDialog
+        open={syncDialogOpen}
+        onOpenChange={setSyncDialogOpen}
+        workspaceId={workspaceId}
+        userId={userId}
+        onSync={performSync}
+        syncing={syncing}
       />
     </div>
   );

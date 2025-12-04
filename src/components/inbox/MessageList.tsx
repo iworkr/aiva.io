@@ -6,10 +6,10 @@
 
 'use client';
 
-import { useMemo, memo, useState, useCallback } from 'react';
-import { MessageItem } from './MessageItem';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { memo, useCallback, useMemo, useState } from 'react';
+import { MessageItem } from './MessageItem';
 
 interface MessageListProps {
   messages: any[];
@@ -110,7 +110,7 @@ export const MessageList = memo(function MessageList({
             </div>
           </div>
         )}
-        
+
         {/* Load More button for server-side pagination */}
         {hasMore && onLoadMore && (
           <div className="flex justify-center">

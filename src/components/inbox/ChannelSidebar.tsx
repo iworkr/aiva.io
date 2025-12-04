@@ -155,12 +155,16 @@ export function ChannelSidebar({
           )}
         >
           <div className={cn(
-            'flex items-center justify-center w-11 h-11 rounded-xl mb-1 transition-all',
+            'relative flex items-center justify-center w-11 h-11 rounded-xl mb-1 transition-all',
             selectedChannel === null 
               ? 'bg-primary shadow-md ring-2 ring-primary' 
               : 'bg-muted/50 group-hover:bg-muted'
           )}>
             <InboxIcon className="h-5 w-5" />
+            {/* Active indicator dot - overlaps top-right corner of icon container */}
+            {selectedChannel === null && (
+              <div className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-background shadow-sm" />
+            )}
           </div>
           <span className={cn(
             'text-[10px] font-medium truncate max-w-full',
@@ -168,9 +172,6 @@ export function ChannelSidebar({
           )}>
             All
           </span>
-          {selectedChannel === null && (
-            <div className="absolute top-1 right-2 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-primary" />
-          )}
         </button>
 
         {/* Channel Icons + Add Channel (tiles in a single list) */}
