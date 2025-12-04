@@ -62,6 +62,7 @@ interface MessageItemProps {
 export const MessageItem = memo(function MessageItem({ message, workspaceId, onUpdate, selectedChannel }: MessageItemProps) {
   const router = useRouter();
   const [isStarred, setIsStarred] = useState(message.is_starred || false);
+  const [isQuickReplyExpanded, setIsQuickReplyExpanded] = useState(false);
 
   // Mark as read action with optimistic update
   const { execute: markAsRead } = useAction(markMessageAsReadAction, {
@@ -434,10 +435,11 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
               )}
             </div>
 
-            {/* Right: Quick Reply button */}
+            {/* Right: Quick Reply button (only when collapsed) */}
             {message.channel_connection?.provider && 
              (message.channel_connection.provider === 'gmail' || 
-              message.channel_connection.provider === 'outlook') && (
+              message.channel_connection.provider === 'outlook') && 
+             !isQuickReplyExpanded && (
               <QuickReply
                 messageId={message.id}
                 workspaceId={workspaceId}
@@ -446,9 +448,34 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
                 provider={message.channel_connection.provider}
                 providerMessageId={message.provider_message_id}
                 onSent={onUpdate}
+                isExpanded={isQuickReplyExpanded}
+                onExpandedChange={setIsQuickReplyExpanded}
+                renderMode="button"
               />
             )}
           </div>
+
+          {/* Expanded Quick Reply (full width, below the badges row) */}
+          {message.channel_connection?.provider && 
+           (message.channel_connection.provider === 'gmail' || 
+            message.channel_connection.provider === 'outlook') && 
+           isQuickReplyExpanded && (
+            <QuickReply
+              messageId={message.id}
+              workspaceId={workspaceId}
+              messageSubject={message.subject || '(no subject)'}
+              senderEmail={message.sender_email}
+              provider={message.channel_connection.provider}
+              providerMessageId={message.provider_message_id}
+              onSent={() => {
+                setIsQuickReplyExpanded(false);
+                onUpdate();
+              }}
+              isExpanded={isQuickReplyExpanded}
+              onExpandedChange={setIsQuickReplyExpanded}
+              renderMode="content"
+            />
+          )}
         </div>
       </div>
     </div>

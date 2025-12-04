@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useCachedData } from '@/hooks/useCachedData';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -245,33 +245,35 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
     }
   }, [cachedSettings, settingsInitialized]);
 
-  // AI Settings
+  // Debounce timer refs for auto-save
+  const aiSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const notifSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const syncSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Track if values have been modified to avoid saving on initial load
+  const hasInitializedRef = useRef(false);
+
+  // AI Settings - auto-save with debounce
   const { execute: saveAISettings, status: aiStatus } = useAction(updateAISettingsAction, {
     onSuccess: () => {
-      toast.success('AI settings saved successfully', {
-        description: 'Your AI feature preferences have been updated.',
-        duration: 4000,
-      });
+      toast.success('Setting updated', { duration: 2000 });
     },
     onError: ({ error }) => {
-      toast.error(error.serverError || 'Failed to save AI settings');
+      toast.error(error.serverError || 'Failed to save setting');
     },
   });
 
-  // Notification Settings
+  // Notification Settings - auto-save
   const { execute: saveNotificationSettings, status: notifStatus } = useAction(updateNotificationSettingsAction, {
     onSuccess: () => {
-      toast.success('Notification settings saved', {
-        description: 'Your notification preferences have been updated.',
-        duration: 4000,
-      });
+      toast.success('Setting updated', { duration: 2000 });
     },
     onError: ({ error }) => {
-      toast.error(error.serverError || 'Failed to save notification settings');
+      toast.error(error.serverError || 'Failed to save setting');
     },
   });
 
-  // Account Settings
+  // Account Settings - manual save only for text inputs
   const { execute: saveAccountSettings, status: accountStatus } = useAction(updateAccountSettingsAction, {
     onSuccess: () => {
       toast.success('Profile updated successfully', {
@@ -284,50 +286,148 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
     },
   });
 
-  // Sync Settings (Timezone & Sync Frequency)
+  // Sync Settings - auto-save with debounce
   const { execute: saveSyncSettings, status: syncStatus } = useAction(updateSyncSettingsAction, {
     onSuccess: () => {
-      toast.success('Preferences saved successfully', {
-        description: 'Your timezone and sync settings have been updated.',
-        duration: 4000,
-      });
+      toast.success('Setting updated', { duration: 2000 });
     },
     onError: ({ error }) => {
-      toast.error(error.serverError || 'Failed to save settings');
+      toast.error(error.serverError || 'Failed to save setting');
     },
   });
 
-  const handleSaveAISettings = () => {
-    saveAISettings({
-      workspaceId,
-      autoClassify,
-      autoExtractTasks: autoTasks,
-      autoCreateEvents: autoEvents,
-      defaultReplyTone: defaultTone as any,
-    });
+  // Auto-save AI settings when switches/selects change
+  const triggerAIAutoSave = useCallback((updates: { 
+    autoClassify?: boolean; 
+    autoTasks?: boolean; 
+    autoEvents?: boolean; 
+    defaultTone?: string 
+  }) => {
+    if (!hasInitializedRef.current) return;
+    
+    if (aiSaveTimerRef.current) {
+      clearTimeout(aiSaveTimerRef.current);
+    }
+    
+    aiSaveTimerRef.current = setTimeout(() => {
+      saveAISettings({
+        workspaceId,
+        autoClassify: updates.autoClassify ?? autoClassify,
+        autoExtractTasks: updates.autoTasks ?? autoTasks,
+        autoCreateEvents: updates.autoEvents ?? autoEvents,
+        defaultReplyTone: (updates.defaultTone ?? defaultTone) as any,
+      });
+    }, 500);
+  }, [workspaceId, autoClassify, autoTasks, autoEvents, defaultTone, saveAISettings]);
+
+  // Auto-save notification settings when switches change
+  const triggerNotifAutoSave = useCallback((updates: { 
+    emailNotifications?: boolean; 
+    pushNotifications?: boolean 
+  }) => {
+    if (!hasInitializedRef.current) return;
+    
+    if (notifSaveTimerRef.current) {
+      clearTimeout(notifSaveTimerRef.current);
+    }
+    
+    notifSaveTimerRef.current = setTimeout(() => {
+      saveNotificationSettings({
+        workspaceId,
+        emailNotifications: updates.emailNotifications ?? emailNotifications,
+        pushNotifications: updates.pushNotifications ?? pushNotifications,
+      });
+    }, 500);
+  }, [workspaceId, emailNotifications, pushNotifications, saveNotificationSettings]);
+
+  // Auto-save sync settings when selects change
+  const triggerSyncAutoSave = useCallback((updates: { 
+    timezone?: string; 
+    syncFrequency?: string 
+  }) => {
+    if (!hasInitializedRef.current) return;
+    
+    if (syncSaveTimerRef.current) {
+      clearTimeout(syncSaveTimerRef.current);
+    }
+    
+    syncSaveTimerRef.current = setTimeout(() => {
+      const tz = updates.timezone ?? timezone;
+      const freq = updates.syncFrequency ?? syncFrequency;
+      saveSyncSettings({
+        workspaceId,
+        timezone: tz !== 'utc' ? tz : undefined,
+        syncFrequency: freq ? Number(freq) : undefined,
+      });
+    }, 500);
+  }, [workspaceId, timezone, syncFrequency, saveSyncSettings]);
+
+  // Handlers for auto-save enabled fields
+  const handleAutoClassifyChange = (value: boolean) => {
+    setAutoClassify(value);
+    triggerAIAutoSave({ autoClassify: value });
   };
 
-  const handleSaveNotificationSettings = () => {
-    saveNotificationSettings({
-      workspaceId,
-      emailNotifications,
-      pushNotifications,
-    });
+  const handleAutoTasksChange = (value: boolean) => {
+    setAutoTasks(value);
+    triggerAIAutoSave({ autoTasks: value });
   };
 
-  const handleSaveAccountSettings = () => {
+  const handleAutoEventsChange = (value: boolean) => {
+    setAutoEvents(value);
+    triggerAIAutoSave({ autoEvents: value });
+  };
+
+  const handleDefaultToneChange = (value: string) => {
+    setDefaultTone(value);
+    triggerAIAutoSave({ defaultTone: value });
+  };
+
+  const handleEmailNotificationsChange = (value: boolean) => {
+    setEmailNotifications(value);
+    triggerNotifAutoSave({ emailNotifications: value });
+  };
+
+  const handlePushNotificationsChange = (value: boolean) => {
+    setPushNotifications(value);
+    triggerNotifAutoSave({ pushNotifications: value });
+  };
+
+  const handleTimezoneChange = (value: string) => {
+    setTimezone(value);
+    triggerSyncAutoSave({ timezone: value });
+  };
+
+  const handleSyncFrequencyChange = (value: string) => {
+    setSyncFrequency(value);
+    triggerSyncAutoSave({ syncFrequency: value });
+  };
+
+  // Manual save for text inputs only
+  const handleSaveProfile = () => {
     saveAccountSettings({
       displayName,
     });
   };
 
-  const handleSaveSyncSettings = () => {
-    saveSyncSettings({
-      workspaceId,
-      timezone: timezone !== 'utc' ? timezone : undefined,
-      syncFrequency: syncFrequency ? Number(syncFrequency) : undefined,
-    });
-  };
+  // Mark as initialized after first data load
+  useEffect(() => {
+    if (settingsInitialized && !hasInitializedRef.current) {
+      // Small delay to ensure state is fully set before enabling auto-save
+      setTimeout(() => {
+        hasInitializedRef.current = true;
+      }, 100);
+    }
+  }, [settingsInitialized]);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (aiSaveTimerRef.current) clearTimeout(aiSaveTimerRef.current);
+      if (notifSaveTimerRef.current) clearTimeout(notifSaveTimerRef.current);
+      if (syncSaveTimerRef.current) clearTimeout(syncSaveTimerRef.current);
+    };
+  }, []);
 
   const handleChangePassword = () => {
     router.push('/update-password');
@@ -400,11 +500,12 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
+                    {aiStatus === 'executing' && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
                     <span className="text-sm text-muted-foreground">{autoClassify ? 'On' : 'Off'}</span>
                     <Switch
                       id="auto-classify"
                       checked={autoClassify}
-                      onCheckedChange={setAutoClassify}
+                      onCheckedChange={handleAutoClassifyChange}
                     />
                   </div>
                 </div>
@@ -424,11 +525,12 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
+                    {aiStatus === 'executing' && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
                     <span className="text-sm text-muted-foreground">{autoTasks ? 'On' : 'Off'}</span>
                     <Switch
                       id="auto-tasks"
                       checked={autoTasks}
-                      onCheckedChange={setAutoTasks}
+                      onCheckedChange={handleAutoTasksChange}
                     />
                   </div>
                 </div>
@@ -448,11 +550,12 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
+                    {aiStatus === 'executing' && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
                     <span className="text-sm text-muted-foreground">{autoEvents ? 'On' : 'Off'}</span>
                     <Switch
                       id="auto-events"
                       checked={autoEvents}
-                      onCheckedChange={setAutoEvents}
+                      onCheckedChange={handleAutoEventsChange}
                     />
                   </div>
                 </div>
@@ -480,10 +583,13 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="default-tone">Default reply tone</Label>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="default-tone">Default reply tone</Label>
+                    {aiStatus === 'executing' && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                  </div>
                   <Select
                     value={defaultTone}
-                    onValueChange={setDefaultTone}
+                    onValueChange={handleDefaultToneChange}
                     disabled={!hasPro || loadingPro}
                   >
                     <SelectTrigger id="default-tone">
@@ -516,25 +622,11 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
               </CardContent>
             </Card>
 
-            <div className="flex justify-end">
-              <Button 
-                onClick={handleSaveAISettings}
-                disabled={aiStatus === 'executing' || loading}
-                className="shadow-md hover:shadow-lg transition-all h-9 px-5 font-medium bg-primary text-primary-foreground"
-              >
-                {aiStatus === 'executing' ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="mr-2 h-4 w-4" />
-                    Save AI Settings
-                  </>
-                )}
-              </Button>
-            </div>
+            {/* Auto-save notice */}
+            <p className="text-xs text-muted-foreground text-right">
+              <CheckCircle className="inline h-3 w-3 mr-1" />
+              Changes are saved automatically
+            </p>
           </TabsContent>
 
           {/* Notifications Settings */}
@@ -555,11 +647,12 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
+                    {notifStatus === 'executing' && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
                     <span className="text-sm text-muted-foreground">{emailNotifications ? 'On' : 'Off'}</span>
                     <Switch
                       id="email-notif"
                       checked={emailNotifications}
-                      onCheckedChange={setEmailNotifications}
+                      onCheckedChange={handleEmailNotificationsChange}
                     />
                   </div>
                 </div>
@@ -574,36 +667,23 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
+                    {notifStatus === 'executing' && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
                     <span className="text-sm text-muted-foreground">{pushNotifications ? 'On' : 'Off'}</span>
                     <Switch
                       id="push-notif"
                       checked={pushNotifications}
-                      onCheckedChange={setPushNotifications}
+                      onCheckedChange={handlePushNotificationsChange}
                     />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <div className="flex justify-end">
-              <Button 
-                onClick={handleSaveNotificationSettings}
-                disabled={notifStatus === 'executing' || loading}
-                className="shadow-md hover:shadow-lg transition-all h-9 px-5 font-medium bg-primary text-primary-foreground"
-              >
-                {notifStatus === 'executing' ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="mr-2 h-4 w-4" />
-                    Save Notification Settings
-                  </>
-                )}
-              </Button>
-            </div>
+            {/* Auto-save notice */}
+            <p className="text-xs text-muted-foreground text-right">
+              <CheckCircle className="inline h-3 w-3 mr-1" />
+              Changes are saved automatically
+            </p>
           </TabsContent>
 
           {/* Account Settings */}
@@ -673,8 +753,11 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="timezone">Timezone</Label>
-                  <Select value={timezone} onValueChange={setTimezone}>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="timezone">Timezone</Label>
+                    {syncStatus === 'executing' && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                  </div>
+                  <Select value={timezone} onValueChange={handleTimezoneChange}>
                     <SelectTrigger id="timezone">
                       <SelectValue placeholder="Select timezone">
                         {getTimezoneLabel(timezone)}
@@ -709,8 +792,11 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="sync-frequency">Sync Frequency</Label>
-                  <Select value={syncFrequency} onValueChange={setSyncFrequency}>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="sync-frequency">Sync Frequency</Label>
+                    {syncStatus === 'executing' && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                  </div>
+                  <Select value={syncFrequency} onValueChange={handleSyncFrequencyChange}>
                     <SelectTrigger id="sync-frequency">
                       <SelectValue placeholder="Select sync frequency">
                         {syncFrequency === '5' ? 'Every 5 minutes' :
@@ -727,48 +813,34 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                     </SelectContent>
                   </Select>
                   <p className="text-sm text-muted-foreground">
-                    Current: {syncFrequency === '5' ? 'Every 5 minutes' :
-                     syncFrequency === '15' ? 'Every 15 minutes' :
-                     syncFrequency === '30' ? 'Every 30 minutes' :
-                     syncFrequency === '60' ? 'Every hour' : 'Every 15 minutes'} • How often channels sync new messages
+                    How often channels sync new messages
                   </p>
                 </div>
+
+                {/* Auto-save notice for preferences */}
+                <p className="text-xs text-muted-foreground pt-2">
+                  <CheckCircle className="inline h-3 w-3 mr-1" />
+                  Preferences are saved automatically
+                </p>
               </CardContent>
             </Card>
 
-            <div className="flex justify-end gap-3">
+            {/* Single save button for text inputs (profile) */}
+            <div className="flex justify-end">
               <Button 
-                onClick={handleSaveAccountSettings}
+                onClick={handleSaveProfile}
                 disabled={accountStatus === 'executing' || loading}
-                variant="outline"
-                className="h-9 px-4 border-2 hover:bg-muted/50 transition-all font-medium"
+                className="shadow-md hover:shadow-lg transition-all h-10 px-6 font-medium bg-primary text-primary-foreground"
               >
                 {accountStatus === 'executing' ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <User className="mr-2 h-4 w-4" />
-                    Save Profile
-                  </>
-                )}
-              </Button>
-              <Button 
-                onClick={handleSaveSyncSettings}
-                disabled={syncStatus === 'executing' || loading}
-                className="shadow-md hover:shadow-lg transition-all h-9 px-5 font-medium bg-primary text-primary-foreground"
-              >
-                {syncStatus === 'executing' ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
+                    Saving Profile...
                   </>
                 ) : (
                   <>
                     <Save className="mr-2 h-4 w-4" />
-                    Save Preferences
+                    Save Changes
                   </>
                 )}
               </Button>

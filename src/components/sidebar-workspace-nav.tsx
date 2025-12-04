@@ -90,7 +90,6 @@ export const SidebarWorkspaceNav = memo(function SidebarWorkspaceNav({
                 <Link 
                   href={href}
                   onMouseEnter={onMouseEnter(href)}
-                  className={isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : ""}
                 >
                   {link.icon}
                   <span>{link.label}</span>

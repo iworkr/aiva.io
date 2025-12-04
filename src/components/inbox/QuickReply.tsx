@@ -54,6 +54,11 @@ interface QuickReplyProps {
   provider: 'gmail' | 'outlook' | 'slack' | 'teams';
   providerMessageId?: string;
   onSent?: () => void;
+  // Controlled mode - when provided, parent controls expanded state
+  isExpanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
+  // Render mode - 'button' only shows button, 'content' only shows expanded content, 'full' shows both
+  renderMode?: 'button' | 'content' | 'full';
 }
 
 export function QuickReply({
@@ -64,8 +69,21 @@ export function QuickReply({
   provider,
   providerMessageId,
   onSent,
+  isExpanded: controlledExpanded,
+  onExpandedChange,
+  renderMode = 'full',
 }: QuickReplyProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [internalExpanded, setInternalExpanded] = useState(false);
+  
+  // Use controlled or internal state
+  const isExpanded = controlledExpanded !== undefined ? controlledExpanded : internalExpanded;
+  const setIsExpanded = (value: boolean) => {
+    if (onExpandedChange) {
+      onExpandedChange(value);
+    } else {
+      setInternalExpanded(value);
+    }
+  };
   const [replyText, setReplyText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -177,31 +195,54 @@ export function QuickReply({
     });
   };
 
-  // Collapsed state - small button
-  if (!isExpanded) {
+  // Button component (used in both modes)
+  const renderButton = () => (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleExpand}
+            className="h-7 px-2.5 gap-1.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            <span>Quick Reply</span>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top">
+          <p>Generate AI reply</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+
+  // If renderMode is 'button', only show the button (no wrapper)
+  if (renderMode === 'button') {
     return (
-      <div className="mt-2 flex justify-end" onClick={(e) => e.stopPropagation()}>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleExpand}
-                className="h-7 px-2.5 gap-1.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>Quick Reply</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              <p>Generate AI reply</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+      <div onClick={(e) => e.stopPropagation()}>
+        {renderButton()}
       </div>
     );
   }
+
+  // If renderMode is 'content', only show expanded content when expanded
+  if (renderMode === 'content') {
+    if (!isExpanded) return null;
+    // Fall through to render expanded content below
+  }
+
+  // Full mode: collapsed state - small button with wrapper
+  if (!isExpanded && renderMode === 'full') {
+    return (
+      <div className="mt-2 flex justify-end" onClick={(e) => e.stopPropagation()}>
+        {renderButton()}
+      </div>
+    );
+  }
+
+  // Don't render anything in content-only mode when not expanded
+  if (!isExpanded) return null;
 
   // Expanded state - reply form
   return (

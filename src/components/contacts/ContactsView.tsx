@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useEffect, useState, useMemo, useCallback, useTransition, memo, Suspense } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useTransition, memo, Suspense, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -67,6 +67,9 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
   const [currentOffset, setCurrentOffset] = useState(CONTACTS_PER_PAGE);
   const [hasMore, setHasMore] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
+  
+  // Ref to prevent concurrent load-more calls
+  const loadingMoreRef = useRef(false);
   
   // Optimistic updates - track changes before server confirms
   const [optimisticUpdates, setOptimisticUpdates] = useState<{
@@ -133,11 +136,14 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
     }
   }, [refreshContacts]);
 
-  // Load more contacts (pagination)
+  // Load more contacts (pagination) - with ref guard to prevent concurrent calls
   const loadMoreContacts = useCallback(async () => {
-    if (loadingMore || !hasMore) return;
+    // Use ref guard to prevent concurrent calls (more reliable than state)
+    if (loadingMoreRef.current || !hasMore) return;
     
+    loadingMoreRef.current = true;
     setLoadingMore(true);
+    
     try {
       const data = await getContacts(workspaceId, userId, {
         isFavorite: showFavoritesOnly || undefined,
@@ -146,26 +152,26 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
       });
       const newContacts = data || [];
       
-      if (newContacts.length > 0) {
-        setAdditionalContacts((prev) => [...prev, ...newContacts]);
-        setCurrentOffset((prev) => prev + newContacts.length);
-        setTotalCount((prev) => prev + newContacts.length);
-      }
-      
-      setHasMore(newContacts.length === CONTACTS_PER_PAGE);
+      // Batch state updates in startTransition to prevent cascading re-renders
+      startTransition(() => {
+        if (newContacts.length > 0) {
+          setAdditionalContacts((prev) => [...prev, ...newContacts]);
+          setCurrentOffset((prev) => prev + newContacts.length);
+          setTotalCount((prev) => prev + newContacts.length);
+        }
+        setHasMore(newContacts.length === CONTACTS_PER_PAGE);
+      });
     } catch (error) {
       toast.error('Failed to load more contacts');
       console.error(error);
     } finally {
+      loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [workspaceId, userId, showFavoritesOnly, currentOffset, loadingMore, hasMore]);
+  }, [workspaceId, userId, showFavoritesOnly, currentOffset, hasMore, startTransition]);
 
-  useEffect(() => {
-    startTransition(() => {
-      fetchContacts(true);
-    });
-  }, [fetchContacts]);
+  // Note: useCachedData handles initial fetch automatically
+  // No need for useEffect to call fetchContacts on mount
 
   // Client-side filtering for instant search feedback
   const contacts = useMemo(() => {
