@@ -44,18 +44,13 @@ export default async function MessageDetailPage({
   }
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Main Content */}
-      <div className="flex-1 overflow-hidden">
-        <Suspense fallback={<MessageDetailSkeleton />}>
-          <MessageDetailView
-            messageId={messageId}
-            workspaceId={workspace.id}
-            userId={user.id}
-          />
-        </Suspense>
-      </div>
-    </div>
+    <Suspense fallback={<MessageDetailSkeleton />}>
+      <MessageDetailView
+        messageId={messageId}
+        workspaceId={workspace.id}
+        userId={user.id}
+      />
+    </Suspense>
   );
 }
 

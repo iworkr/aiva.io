@@ -245,7 +245,7 @@ export function InlineReplyComposer({
             }
             disabled={isGenerating}
             className={cn(
-              'min-h-[100px] resize-none pr-20',
+              'min-h-[80px] resize-none pr-20',
               isGenerating && 'opacity-50'
             )}
           />
@@ -282,11 +282,11 @@ export function InlineReplyComposer({
         </div>
 
         {/* Replying to indicator */}
-        <div className="mt-2 text-xs text-muted-foreground">
-          Replying to: <span className="font-medium">{senderEmail}</span>
+        <div className="mt-1.5 text-[11px] text-muted-foreground truncate">
+          Replying to <span className="font-medium">{senderEmail}</span>
           {messageSubject && (
-            <span className="ml-2 truncate">
-              • Re: {messageSubject.replace(/^Re:\s*/i, '')}
+            <span className="ml-1 opacity-70">
+              • {messageSubject.replace(/^Re:\s*/i, '').slice(0, 50)}{messageSubject.length > 50 ? '...' : ''}
             </span>
           )}
         </div>

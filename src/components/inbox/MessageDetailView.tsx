@@ -6,26 +6,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabaseUserClientComponent } from '@/supabase-clients/user/supabaseUserClientComponent';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import {
-  ArrowLeft,
-  Star,
-  Archive,
-  Mail,
-  Calendar,
-  Loader2,
-  MoreHorizontal,
-} from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,21 +15,39 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+  archiveMessageAction,
   markMessageAsReadAction,
   starMessageAction,
   unstarMessageAction,
-  archiveMessageAction,
 } from '@/data/user/messages';
-import { useAction } from 'next-safe-action/hooks';
-import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
 import { getIntegrationById } from '@/lib/integrations/config';
+import { cn } from '@/lib/utils';
+import { supabaseUserClientComponent } from '@/supabase-clients/user/supabaseUserClientComponent';
+import {
+  Archive,
+  ArrowLeft,
+  Calendar,
+  Loader2,
+  Mail,
+  MoreHorizontal,
+  Star,
+} from 'lucide-react';
+import { useAction } from 'next-safe-action/hooks';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 // Components
+import { autoCreateEventFromMessage } from '@/lib/ai/scheduling';
 import { ConversationThread } from './ConversationThread';
 import { InlineReplyComposer } from './InlineReplyComposer';
-import { autoCreateEventFromMessage } from '@/lib/ai/scheduling';
 
 interface MessageDetailViewProps {
   messageId: string;
@@ -214,9 +213,9 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
   }
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Sticky Header */}
-      <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      {/* Header */}
+      <header className="shrink-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center justify-between px-4 py-3">
           {/* Left: Back button + Subject */}
           <div className="flex items-center gap-3 min-w-0 flex-1">
