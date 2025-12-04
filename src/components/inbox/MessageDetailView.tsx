@@ -321,8 +321,8 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
       </header>
 
       {/* Scrollable Content - Conversation Thread */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl p-4 pb-6">
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="mx-auto max-w-3xl p-4 pb-32">
           <ConversationThread
             currentMessageId={messageId}
             threadId={message.provider_thread_id}

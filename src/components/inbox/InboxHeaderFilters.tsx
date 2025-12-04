@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import type { MessagePriority, MessageCategory } from '@/utils/zod-schemas/aiva-schemas';
 
 export type SortOption = 'date_desc' | 'date_asc' | 'priority' | 'sender';
 export type StatusFilter = 'all' | 'unread' | 'starred';
@@ -42,24 +43,24 @@ interface InboxHeaderFiltersProps {
   sortBy: SortOption;
   onSortChange: (sort: SortOption) => void;
   // Priority filter
-  priorityFilter?: string;
-  onPriorityFilterChange: (priority: string | undefined) => void;
+  priorityFilter?: MessagePriority;
+  onPriorityFilterChange: (priority: MessagePriority | undefined) => void;
   // Category filter
-  categoryFilter?: string;
-  onCategoryFilterChange: (category: string | undefined) => void;
+  categoryFilter?: MessageCategory;
+  onCategoryFilterChange: (category: MessageCategory | undefined) => void;
   // Counts for badges
   unreadCount?: number;
   starredCount?: number;
 }
 
-const PRIORITY_OPTIONS = [
+const PRIORITY_OPTIONS: { value: MessagePriority; label: string; icon: typeof Flame }[] = [
   { value: 'urgent', label: 'Urgent', icon: Flame },
   { value: 'high', label: 'High', icon: AlertTriangle },
   { value: 'medium', label: 'Medium', icon: Clock },
   { value: 'low', label: 'Low', icon: Clock },
 ];
 
-const CATEGORY_OPTIONS = [
+const CATEGORY_OPTIONS: { value: MessageCategory; label: string }[] = [
   { value: 'customer_inquiry', label: 'Customer Inquiry' },
   { value: 'customer_complaint', label: 'Customer Complaint' },
   { value: 'sales_lead', label: 'Sales Lead' },

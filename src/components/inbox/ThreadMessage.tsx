@@ -59,6 +59,15 @@ function stripHtml(input: string | null | undefined): string {
   return input ? input.replace(/<[^>]+>/g, '').trim() : '';
 }
 
+/**
+ * Convert URLs in text to clickable hyperlinks
+ */
+function linkifyText(text: string): string {
+  // URL regex pattern
+  const urlPattern = /(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g;
+  return text.replace(urlPattern, '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline break-all">$1</a>');
+}
+
 export const ThreadMessage = memo(function ThreadMessage({
   message,
   isCurrentMessage = false,
@@ -167,16 +176,17 @@ export const ThreadMessage = memo(function ThreadMessage({
       </div>
 
       {/* Message Content */}
-      <div className="px-4 pb-3 pl-[52px]">
+      <div className="px-4 pb-3 pl-[52px] overflow-hidden">
         {isCurrentMessage && hasHtmlContent ? (
           <div 
-            className="prose prose-sm max-w-none dark:prose-invert text-foreground"
+            className="prose prose-sm max-w-none dark:prose-invert text-foreground overflow-x-auto break-words [&_a]:text-primary [&_a]:break-all [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_table]:max-w-full [&_table]:overflow-x-auto"
             dangerouslySetInnerHTML={{ __html: sanitizedHtmlContent }}
           />
         ) : (
-          <div className="text-sm text-foreground/90 whitespace-pre-wrap">
-            {displayContent}
-          </div>
+          <div 
+            className="text-sm text-foreground/90 whitespace-pre-wrap break-words overflow-wrap-anywhere"
+            dangerouslySetInnerHTML={{ __html: linkifyText(displayContent) }}
+          />
         )}
 
         {/* Show more/less for truncated messages */}

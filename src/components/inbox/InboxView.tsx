@@ -6,8 +6,8 @@
 
 'use client';
 
-import { LazyConnectChannelDialog } from '@/components/lazy/LazyDialogs';
 import { IntegrationAvatars } from '@/components/integrations/IntegrationAvatars';
+import { LazyConnectChannelDialog } from '@/components/lazy/LazyDialogs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { getUserChannelConnections } from '@/data/user/channels';
@@ -20,17 +20,17 @@ import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useDebouncedValue } from '@/hooks/usePrefetch';
 import { allIntegrations } from '@/lib/integrations/config';
 import { cn } from '@/lib/utils';
+import type { MessageCategory, MessagePriority } from '@/utils/zod-schemas/aiva-schemas';
 import { Inbox as InboxIcon, Plus, RefreshCw, Search } from 'lucide-react';
 import { useAction } from 'next-safe-action/hooks';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { memo, useCallback, useEffect, useState, useTransition, useMemo, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { ChannelSidebar } from './ChannelSidebar';
-import { MessageList } from './MessageList';
+import { InboxHeaderFilters, type SortOption, type StatusFilter } from './InboxHeaderFilters';
 import { InboxSkeleton } from './InboxSkeleton';
-import { InboxFilters } from './InboxFilters';
+import { MessageList } from './MessageList';
 import { SyncChannelDialog } from './SyncChannelDialog';
-import type { MessagePriority, MessageCategory } from '@/utils/zod-schemas/aiva-schemas';
 
 interface InboxViewProps {
   workspaceId: string;
@@ -67,9 +67,26 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
   // Debounce search for better performance
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
 
-  // Local status filter (Unread/All) for quick toggling
-  const [statusFilter, setStatusFilter] = useState<string | undefined>(filters?.status);
-  
+  // Local status filter (All/Unread/Starred) with localStorage persistence
+  const [statusFilter, setStatusFilter] = useLocalStorage<StatusFilter>(
+    `inbox-status-filter-${workspaceId}`,
+    (filters?.status as StatusFilter) || 'all'
+  );
+
+  // Sort option with localStorage persistence
+  const [sortBy, setSortBy] = useLocalStorage<SortOption>(
+    `inbox-sort-${workspaceId}`,
+    'date_desc'
+  );
+
+  // Local priority and category filters
+  const [priorityFilter, setPriorityFilter] = useState<MessagePriority | undefined>(filters?.priority);
+  const [categoryFilter, setCategoryFilter] = useState<MessageCategory | undefined>(filters?.category);
+
+  // Counts for filter badges
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [starredCount, setStarredCount] = useState(0);
+
   // Pagination state
   const [currentOffset, setCurrentOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
@@ -79,10 +96,9 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
   // Create cache key
   const cacheKey = useMemo(
     () =>
-      `inbox-cache-${workspaceId}-${selectedChannel || 'all'}-${
-        filters?.priority || 'all'
-      }-${filters?.category || 'all'}-${statusFilter || 'all'}`,
-    [workspaceId, selectedChannel, filters?.priority, filters?.category, statusFilter]
+      `inbox-cache-${workspaceId}-${selectedChannel || 'all'}-${priorityFilter || 'all'
+      }-${categoryFilter || 'all'}-${statusFilter || 'all'}-${sortBy}`,
+    [workspaceId, selectedChannel, priorityFilter, categoryFilter, statusFilter, sortBy]
   );
 
   // Load from cache on mount
@@ -109,7 +125,7 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
     onSuccess: ({ data }) => {
       if (data && data.messages) {
         const messagesArray = Array.isArray(data.messages) ? data.messages : [];
-        
+
         // Batch update to prevent individual UI refreshes
         startTransition(() => {
           // If offset is 0, replace messages; otherwise append for pagination
@@ -123,10 +139,10 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
               return [...prev, ...newMessages];
             });
           }
-          
+
           setHasMore(data.hasMore ?? false);
           setTotalMessages(data.total ?? messagesArray.length);
-          
+
           // Update offset for next load
           if (currentOffset === 0) {
             setCurrentOffset(messagesArray.length);
@@ -136,13 +152,23 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
 
           // Calculate message counts per channel
           const counts: Record<string, number> = {};
+          let unread = 0;
+          let starred = 0;
           messagesArray.forEach((msg: any) => {
             const channelId = msg.channel_connection_id || msg.channel_connection?.id;
-            if (!msg.is_read && channelId) {
-              counts[channelId] = (counts[channelId] || 0) + 1;
+            if (!msg.is_read) {
+              unread++;
+              if (channelId) {
+                counts[channelId] = (counts[channelId] || 0) + 1;
+              }
+            }
+            if (msg.is_starred) {
+              starred++;
             }
           });
           setMessageCounts(counts);
+          setUnreadCount(unread);
+          setStarredCount(starred);
 
           // Cache the result
           try {
@@ -157,7 +183,7 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
           } catch (error) {
             console.error('Failed to cache messages:', error);
           }
-          
+
           // Update last sync timestamp based on newest message
           if (messagesArray.length > 0) {
             const newestMessage = messagesArray[0];
@@ -183,23 +209,42 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
       fetchingRef.current = false;
     },
   });
-  
+
+  // Convert sortBy to orderBy and orderDirection
+  const getSortParams = useCallback((sort: SortOption) => {
+    switch (sort) {
+      case 'date_desc':
+        return { orderBy: 'timestamp' as const, orderDirection: 'desc' as const };
+      case 'date_asc':
+        return { orderBy: 'timestamp' as const, orderDirection: 'asc' as const };
+      case 'priority':
+        return { orderBy: 'priority' as const, orderDirection: 'desc' as const };
+      case 'sender':
+        return { orderBy: 'sender_email' as const, orderDirection: 'asc' as const };
+      default:
+        return { orderBy: 'timestamp' as const, orderDirection: 'desc' as const };
+    }
+  }, []);
+
   // Load more messages (pagination)
   const loadMoreMessages = useCallback(() => {
     if (!hasMore || fetchingRef.current) return;
     const nextOffset = currentOffset + MESSAGES_PER_PAGE;
+    const { orderBy, orderDirection } = getSortParams(sortBy);
     setCurrentOffset(nextOffset);
     fetchMessages({
       workspaceId,
       channelConnectionId: selectedChannel || undefined,
-      priority: filters?.priority,
-      category: filters?.category,
+      priority: priorityFilter as MessagePriority | undefined,
+      category: categoryFilter as MessageCategory | undefined,
       isRead: statusFilter === 'unread' ? false : undefined,
       isStarred: statusFilter === 'starred' ? true : undefined,
       limit: MESSAGES_PER_PAGE,
       offset: nextOffset,
+      orderBy,
+      orderDirection,
     });
-  }, [hasMore, currentOffset, fetchMessages, workspaceId, selectedChannel, filters, statusFilter]);
+  }, [hasMore, currentOffset, fetchMessages, workspaceId, selectedChannel, priorityFilter, categoryFilter, statusFilter, sortBy, getSortParams]);
 
   // Fetch only new messages (for seamless background sync)
   const { execute: fetchNewMessages } = useAction(getNewMessagesAction, {
@@ -210,10 +255,10 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
           setMessages((prevMessages) => {
             // Create a map of existing message IDs for quick lookup
             const existingIds = new Set(prevMessages.map((msg) => msg.id));
-            
+
             // Filter out duplicates and merge new messages at the top
             const newMessages = data.messages.filter((msg) => !existingIds.has(msg.id));
-            
+
             if (newMessages.length > 0) {
               // Merge: new messages first, then existing messages
               // Sort by timestamp descending to maintain order
@@ -222,7 +267,7 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
                 const timeB = new Date(b.created_at || b.timestamp || 0).getTime();
                 return timeB - timeA;
               });
-              
+
               // Update message counts for unread messages
               const newCounts = { ...messageCounts };
               newMessages.forEach((msg) => {
@@ -232,7 +277,7 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
                 }
               });
               setMessageCounts(newCounts);
-              
+
               // Update cache silently
               try {
                 const cacheData = {
@@ -244,17 +289,17 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
               } catch (error) {
                 console.error('Failed to update cache:', error);
               }
-              
+
               // Show subtle notification only if there are new messages
               if (newMessages.length > 0) {
                 toast.success(`${newMessages.length} new message${newMessages.length > 1 ? 's' : ''}`, {
                   duration: 2000,
                 });
               }
-              
+
               return merged;
             }
-            
+
             return prevMessages;
           });
         });
@@ -274,21 +319,21 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
         if (data && data.totalNewMessages && data.totalNewMessages > 0) {
           // Store timestamp before sync to fetch only new messages
           const syncStartTime = lastSyncTimestampRef.current;
-          
+
           // Fetch only new messages created after the sync started
           // Use a small delay to ensure all messages are committed to DB
           setTimeout(() => {
             fetchNewMessages({
               workspaceId,
               channelConnectionId: selectedChannel || undefined,
-              priority: filters?.priority,
-              category: filters?.category,
-              isRead: filters?.status === 'unread' ? false : undefined,
+              priority: priorityFilter as MessagePriority | undefined,
+              category: categoryFilter as MessageCategory | undefined,
+              isRead: statusFilter === 'unread' ? false : undefined,
               afterTimestamp: syncStartTime,
               limit: 100,
             });
           }, 500);
-          
+
           // Update sync timestamp for next sync
           lastSyncTimestampRef.current = new Date().toISOString();
         }
@@ -339,14 +384,17 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
     if (selectedChannel) {
       params.set('channel', selectedChannel);
     }
-    if (filters?.priority) {
-      params.set('priority', filters.priority);
+    if (priorityFilter) {
+      params.set('priority', priorityFilter);
     }
-    if (filters?.category) {
-      params.set('category', filters.category);
+    if (categoryFilter) {
+      params.set('category', categoryFilter);
     }
-    if (filters?.status === 'unread') {
-      params.set('status', 'unread');
+    if (statusFilter && statusFilter !== 'all') {
+      params.set('status', statusFilter);
+    }
+    if (sortBy && sortBy !== 'date_desc') {
+      params.set('sort', sortBy);
     }
 
     const newQuery = params.toString();
@@ -360,7 +408,7 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
     const now = Date.now();
     const timeSinceLastFetch = now - lastFetchRef.current;
     const cacheKeyChanged = cacheKeyRef.current !== cacheKey;
-    
+
     // Only fetch if:
     // 1. Not already fetching
     // 2. Cache key changed (different filters/channel) OR it's been more than 30 seconds
@@ -368,28 +416,33 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
       cacheKeyRef.current = cacheKey;
       fetchingRef.current = true;
       setLoading(true);
+      const { orderBy, orderDirection } = getSortParams(sortBy);
       fetchMessages({
         workspaceId,
         channelConnectionId: selectedChannel || undefined,
-        priority: filters?.priority,
-        category: filters?.category,
+        priority: priorityFilter as MessagePriority | undefined,
+        category: categoryFilter as MessageCategory | undefined,
         isRead: statusFilter === 'unread' ? false : undefined,
         isStarred: statusFilter === 'starred' ? true : undefined,
         limit: MESSAGES_PER_PAGE,
         offset: currentOffset,
+        orderBy,
+        orderDirection,
       });
     }
   }, [
     workspaceId,
     selectedChannel,
-    filters?.priority,
-    filters?.category,
-    filters?.status,
+    priorityFilter,
+    categoryFilter,
+    statusFilter,
+    sortBy,
     hasChannels,
     searchParams,
     router,
     cacheKey,
     fetchMessages,
+    getSortParams,
   ]);
 
   // Sync channels - shows dialog when in All Inboxes mode
@@ -409,7 +462,7 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
     lastSyncTimestampRef.current = new Date().toISOString();
     setSyncing(true);
     setSyncDialogOpen(false);
-    
+
     // Note: syncWorkspaceConnectionsAction syncs all connections for the workspace
     // For channel-specific sync, we'd need a different action, but for now we sync all
     // and filter on the client side
@@ -486,6 +539,20 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
             </Button>
           </div>
         </div>
+
+        {/* Header Filters */}
+        <InboxHeaderFilters
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          sortBy={sortBy}
+          onSortChange={setSortBy}
+          priorityFilter={priorityFilter}
+          onPriorityFilterChange={setPriorityFilter}
+          categoryFilter={categoryFilter}
+          onCategoryFilterChange={setCategoryFilter}
+          unreadCount={unreadCount}
+          starredCount={starredCount}
+        />
 
         {/* Message List */}
         <div className="flex-1 overflow-hidden">
@@ -579,15 +646,18 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
                 fetchingRef.current = false;
                 lastFetchRef.current = 0; // Force refresh
                 setCurrentOffset(0);
+                const { orderBy, orderDirection } = getSortParams(sortBy);
                 fetchMessages({
                   workspaceId,
                   channelConnectionId: selectedChannel || undefined,
-                  priority: filters?.priority,
-                  category: filters?.category,
-                  isRead: statusFilter === 'unread' ? false : statusFilter === 'starred' ? undefined : undefined,
+                  priority: priorityFilter as MessagePriority | undefined,
+                  category: categoryFilter as MessageCategory | undefined,
+                  isRead: statusFilter === 'unread' ? false : undefined,
                   isStarred: statusFilter === 'starred' ? true : undefined,
                   limit: MESSAGES_PER_PAGE,
                   offset: 0,
+                  orderBy,
+                  orderDirection,
                 });
               }}
             />

@@ -148,8 +148,8 @@ export function InlineReplyComposer({
   };
 
   return (
-    <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="p-4">
+    <div className="sticky bottom-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10">
+      <div className="p-4 pb-6">
         {/* Header with AI button */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
