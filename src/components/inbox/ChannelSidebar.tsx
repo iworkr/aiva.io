@@ -150,15 +150,15 @@ export function ChannelSidebar({
           className={cn(
             'relative mb-4 flex flex-col items-center justify-center w-full px-2 py-2 rounded-xl transition-all group',
             selectedChannel === null
-              ? 'bg-primary text-primary-foreground shadow-lg'
-              : 'bg-transparent hover:bg-muted text-muted-foreground'
+              ? 'text-primary-foreground'
+              : 'text-muted-foreground'
           )}
         >
           <div className={cn(
             'flex items-center justify-center w-11 h-11 rounded-xl mb-1 transition-all',
             selectedChannel === null 
-              ? 'bg-primary-foreground/10' 
-              : 'bg-muted group-hover:bg-muted-foreground/10'
+              ? 'bg-primary shadow-md ring-2 ring-primary' 
+              : 'bg-muted/50 group-hover:bg-muted'
           )}>
             <InboxIcon className="h-5 w-5" />
           </div>
@@ -241,13 +241,10 @@ export function ChannelSidebar({
           {/* Add Channel Tile (appears as last tile under connections) */}
           <button
             onClick={() => setConnectDialogOpen(true)}
-            className={cn(
-              'relative flex flex-col items-center justify-center w-full px-2 py-2 rounded-xl transition-all group',
-              'bg-transparent hover:bg-primary/5 text-primary'
-            )}
+            className="relative flex flex-col items-center justify-center w-full px-2 py-2 rounded-xl transition-all group text-primary"
             title="Connect new channel"
           >
-            <div className="flex items-center justify-center w-11 h-11 rounded-xl border-2 border-dashed border-primary/40 group-hover:border-primary/60 mb-1 transition-all">
+            <div className="flex items-center justify-center w-11 h-11 rounded-xl border-2 border-dashed border-primary/30 group-hover:border-primary group-hover:bg-primary/10 mb-1 transition-all">
               <Plus className="h-5 w-5" />
             </div>
             <span className="text-[10px] font-medium">Add</span>

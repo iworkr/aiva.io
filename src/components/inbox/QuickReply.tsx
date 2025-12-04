@@ -1,6 +1,6 @@
 /**
  * QuickReply Component
- * Collapsible AI-generated reply with editing capability
+ * Small button that expands to show AI-generated reply with editing capability
  */
 
 'use client';
@@ -18,11 +18,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { ChevronDown, ChevronUp, Send, Sparkles, Loader2, AlertTriangle } from 'lucide-react';
+import { Send, Sparkles, Loader2, AlertTriangle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { sendReplyAction, generateReplyDraftAction } from '@/data/user/messages';
 import { useAction } from 'next-safe-action/hooks';
 import { toast } from 'sonner';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 // Keywords that indicate sensitive content in the message
 const SENSITIVE_KEYWORDS = [
@@ -69,6 +75,7 @@ export function QuickReply({
   
   // Track toast ID to dismiss it when cancelling
   const draftToastIdRef = useRef<string | number | undefined>(undefined);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { execute: sendReply } = useAction(sendReplyAction, {
     onSuccess: () => {
@@ -80,13 +87,11 @@ export function QuickReply({
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to send reply');
       setIsSending(false);
-      // Keep reply text so user can retry
     },
   });
 
   const { execute: generateDraft } = useAction(generateReplyDraftAction, {
     onSuccess: ({ data }) => {
-      // Handle both possible data structures: data.data.body or direct body
       const result = data?.data;
       const body = result?.body;
       const confidence = result?.confidenceScore;
@@ -94,25 +99,23 @@ export function QuickReply({
       if (body) {
         setReplyText(body);
         setConfidenceScore(confidence || null);
-        // Store the toast ID so we can dismiss it when cancelling
-        draftToastIdRef.current = toast.success('AI draft generated! Review and edit before sending.');
+        draftToastIdRef.current = toast.success('AI draft ready');
       } else {
-        // Draft generated but empty - show placeholder
         setReplyText('');
-        toast.info('AI could not generate a draft. Please type your reply manually.');
+        toast.info('Type your reply manually');
       }
       setIsGenerating(false);
+      // Focus textarea after generating
+      setTimeout(() => textareaRef.current?.focus(), 100);
     },
     onError: ({ error }) => {
-      toast.error(
-        error.serverError || 'Failed to generate reply. You can still type your own reply.'
-      );
+      toast.error(error.serverError || 'Failed to generate reply');
       setIsGenerating(false);
       setConfidenceScore(null);
     },
   });
   
-  // Dismiss the "AI draft generated" toast when the component collapses (cancel)
+  // Dismiss toast when collapsing
   useEffect(() => {
     if (!isExpanded && draftToastIdRef.current) {
       toast.dismiss(draftToastIdRef.current);
@@ -120,9 +123,9 @@ export function QuickReply({
     }
   }, [isExpanded]);
 
-  const handleToggle = () => {
+  const handleExpand = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!isExpanded && !replyText) {
-      // Generate reply when expanding
       setIsGenerating(true);
       generateDraft({
         messageId,
@@ -131,7 +134,18 @@ export function QuickReply({
         maxLength: 300,
       });
     }
-    setIsExpanded(!isExpanded);
+    setIsExpanded(true);
+  };
+
+  const handleCollapse = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (draftToastIdRef.current) {
+      toast.dismiss(draftToastIdRef.current);
+      draftToastIdRef.current = undefined;
+    }
+    setIsExpanded(false);
+    setReplyText('');
+    setConfidenceScore(null);
   };
 
   const handleSendClick = (e: React.MouseEvent) => {
@@ -141,7 +155,6 @@ export function QuickReply({
       return;
     }
 
-    // Check for sensitive content and show confirmation dialog
     const isSensitive = containsSensitiveContent(replyText) || containsSensitiveContent(messageSubject);
     setHasSensitiveContent(isSensitive);
     setShowConfirmDialog(true);
@@ -149,8 +162,6 @@ export function QuickReply({
 
   const handleConfirmSend = () => {
     setShowConfirmDialog(false);
-    
-    // Optimistic update - close immediately, show success
     const replyBody = replyText.trim();
     setIsSending(true);
     setIsExpanded(false);
@@ -166,89 +177,106 @@ export function QuickReply({
     });
   };
 
-  return (
-    <div className="mt-3 border-t pt-3" onClick={(e) => e.stopPropagation()}>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handleToggle}
-        className="h-9 w-full justify-between text-sm border-2 border-primary/40 bg-primary/10 hover:bg-primary/20 hover:border-primary/60 text-foreground font-medium shadow-sm hover:shadow-md transition-all"
-      >
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <span>Quick Reply with AI</span>
-        </div>
-        {isExpanded ? (
-          <ChevronUp className="h-4 w-4" />
-        ) : (
-          <ChevronDown className="h-4 w-4" />
-        )}
-      </Button>
+  // Collapsed state - small button
+  if (!isExpanded) {
+    return (
+      <div className="mt-2 flex justify-end" onClick={(e) => e.stopPropagation()}>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleExpand}
+                className="h-7 px-2.5 gap-1.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>Quick Reply</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p>Generate AI reply</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+    );
+  }
 
-      {isExpanded && (
-        <div className="mt-2 space-y-2">
-          {isGenerating ? (
-            <div className="flex items-center gap-2 rounded-md border bg-muted/50 p-3">
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Generating AI reply...</span>
-            </div>
-          ) : (
-            <>
-              <Textarea
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                placeholder="Type your reply or edit the AI-generated reply..."
-                className="min-h-[80px] resize-none text-sm"
-                onClick={(e) => e.stopPropagation()}
-              />
-              {confidenceScore !== null && (
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Sparkles className="h-3 w-3" />
-                  <span>AI Confidence: {Math.round(confidenceScore * 100)}%</span>
-                </div>
-              )}
-              <div className="flex items-center justify-end gap-3 pt-1">
-                <Button
-                  variant="outline"
-                  size="default"
-                  onClick={() => {
-                    // Dismiss the AI draft toast if it exists
-                    if (draftToastIdRef.current) {
-                      toast.dismiss(draftToastIdRef.current);
-                      draftToastIdRef.current = undefined;
-                    }
-                    setIsExpanded(false);
-                    // Clear the reply text if user cancels
-                    setReplyText('');
-                    setConfidenceScore(null);
-                  }}
-                  className="h-9 px-4 border-border/70 hover:bg-muted"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="default"
-                  size="default"
-                  onClick={handleSendClick}
-                  disabled={isSending || !replyText.trim()}
-                  className="h-9 px-4 shadow-sm hover:shadow-md transition-shadow"
-                >
-                  {isSending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Sending...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="mr-2 h-4 w-4" />
-                      Send Reply
-                    </>
-                  )}
-                </Button>
-              </div>
-            </>
+  // Expanded state - reply form
+  return (
+    <div 
+      className="mt-3 rounded-lg border border-border/60 bg-muted/30 p-3 space-y-3"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Sparkles className="h-3.5 w-3.5 text-primary" />
+          <span className="font-medium">AI Quick Reply</span>
+          {confidenceScore !== null && (
+            <span className="text-muted-foreground/70">
+              ({Math.round(confidenceScore * 100)}% confidence)
+            </span>
           )}
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleCollapse}
+          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* Content */}
+      {isGenerating ? (
+        <div className="flex items-center gap-2 py-4 justify-center">
+          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          <span className="text-sm text-muted-foreground">Generating reply...</span>
+        </div>
+      ) : (
+        <>
+          <Textarea
+            ref={textareaRef}
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            placeholder="Type your reply..."
+            className="min-h-[80px] resize-none text-sm bg-background border-border/50 focus:border-primary/50"
+            onClick={(e) => e.stopPropagation()}
+          />
+          
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCollapse}
+              className="h-8 px-3 text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSendClick}
+              disabled={isSending || !replyText.trim()}
+              className="h-8 px-3 text-xs gap-1.5"
+            >
+              {isSending ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Sending
+                </>
+              ) : (
+                <>
+                  <Send className="h-3.5 w-3.5" />
+                  Send
+                </>
+              )}
+            </Button>
+          </div>
+        </>
       )}
 
       {/* Confirmation Dialog */}
@@ -259,21 +287,21 @@ export function QuickReply({
               {hasSensitiveContent && (
                 <AlertTriangle className="h-5 w-5 text-yellow-500" />
               )}
-              Confirm Send AI-Generated Reply
+              Send Reply?
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
               {hasSensitiveContent ? (
                 <>
                   <p className="text-yellow-600 dark:text-yellow-400 font-medium">
-                    ⚠️ This message may contain or reference sensitive content (verification codes, passwords, financial information).
+                    ⚠️ This may contain sensitive content.
                   </p>
                   <p>
-                    Please double-check that this AI-generated reply is appropriate and doesn't expose any confidential information.
+                    Please verify this AI-generated reply is appropriate.
                   </p>
                 </>
               ) : (
                 <p>
-                  Are you sure you want to send this AI-generated reply? Make sure you've reviewed the content before sending.
+                  Please confirm you've reviewed this AI-generated reply.
                 </p>
               )}
             </AlertDialogDescription>
@@ -285,7 +313,7 @@ export function QuickReply({
               className={hasSensitiveContent ? 'bg-yellow-600 hover:bg-yellow-700' : ''}
             >
               <Send className="mr-2 h-4 w-4" />
-              Confirm & Send
+              Send
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -293,4 +321,3 @@ export function QuickReply({
     </div>
   );
 }
-
