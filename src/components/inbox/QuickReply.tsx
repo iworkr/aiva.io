@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -77,21 +77,24 @@ export function QuickReply({
   
   // Use controlled or internal state
   const isExpanded = controlledExpanded !== undefined ? controlledExpanded : internalExpanded;
-  const setIsExpanded = (value: boolean) => {
+  const setIsExpanded = useCallback((value: boolean) => {
     if (onExpandedChange) {
       onExpandedChange(value);
     } else {
       setInternalExpanded(value);
     }
-  };
+  }, [onExpandedChange]);
+  
   const [replyText, setReplyText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [confidenceScore, setConfidenceScore] = useState<number | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [hasSensitiveContent, setHasSensitiveContent] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
   
-  // Track toast ID to dismiss it when cancelling
+  // Track if we've already tried generating for this expand
+  const hasTriedGenerating = useRef(false);
   const draftToastIdRef = useRef<string | number | undefined>(undefined);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -108,45 +111,78 @@ export function QuickReply({
     },
   });
 
-  const { execute: generateDraft } = useAction(generateReplyDraftAction, {
-    onExecute: () => {
-      console.log('[QuickReply] Action executing for message:', messageId);
-    },
+  const { execute: generateDraft, status: generateStatus } = useAction(generateReplyDraftAction, {
     onSuccess: ({ data }) => {
-      console.log('[QuickReply] Action success, raw response:', data);
+      console.log('[QuickReply] Generation success:', data);
+      setIsGenerating(false);
+      
       const result = data?.data;
       const body = result?.body;
       const confidence = result?.confidenceScore;
       const aiError = (result as { error?: string })?.error;
       
-      if (body) {
-        console.log('[QuickReply] Generated reply body:', body.substring(0, 100) + '...');
+      if (body && body.trim()) {
         setReplyText(body);
         setConfidenceScore(confidence || null);
-        draftToastIdRef.current = toast.success('AI draft ready');
+        setGenerationError(null);
+        draftToastIdRef.current = toast.success('AI draft generated!');
       } else if (aiError) {
-        // AI not configured - let user type manually
         console.warn('[QuickReply] AI error:', aiError);
-        setReplyText('');
-        toast.info('AI not available. Please type your reply manually.', {
+        setGenerationError(aiError);
+        toast.error('AI Reply Failed', {
           description: aiError,
         });
       } else {
         console.warn('[QuickReply] No body in response:', result);
-        setReplyText('');
-        toast.warning('Could not generate reply. Please type manually.');
+        setGenerationError('Could not generate a reply. Please type manually.');
+        toast.warning('Could not generate reply');
       }
-      setIsGenerating(false);
-      // Focus textarea after generating
+      
       setTimeout(() => textareaRef.current?.focus(), 100);
     },
     onError: ({ error }) => {
-      console.error('[QuickReply] Action error:', error);
-      toast.error(error.serverError || 'Failed to generate reply. Please try again.');
+      console.error('[QuickReply] Generation error:', error);
       setIsGenerating(false);
-      setConfidenceScore(null);
+      setGenerationError(error.serverError || 'Failed to generate reply');
+      toast.error(error.serverError || 'Failed to generate reply');
     },
   });
+  
+  // Generate AI reply when expanded and no reply text exists
+  const triggerGeneration = useCallback(() => {
+    if (!messageId || !workspaceId) {
+      console.error('[QuickReply] Missing messageId or workspaceId');
+      setGenerationError('Missing message or workspace information');
+      return;
+    }
+    
+    console.log('[QuickReply] Triggering generation for:', { messageId, workspaceId });
+    setIsGenerating(true);
+    setGenerationError(null);
+    hasTriedGenerating.current = true;
+    
+    generateDraft({
+      messageId,
+      workspaceId,
+      tone: 'professional',
+      maxLength: 300,
+    });
+  }, [messageId, workspaceId, generateDraft]);
+  
+  // Auto-generate when expanded and no reply exists
+  useEffect(() => {
+    if (isExpanded && !replyText && !isGenerating && !hasTriedGenerating.current && !generationError) {
+      triggerGeneration();
+    }
+  }, [isExpanded, replyText, isGenerating, generationError, triggerGeneration]);
+  
+  // Reset generation flag when collapsed
+  useEffect(() => {
+    if (!isExpanded) {
+      hasTriedGenerating.current = false;
+      setGenerationError(null);
+    }
+  }, [isExpanded]);
   
   // Dismiss toast when collapsing
   useEffect(() => {
@@ -158,17 +194,7 @@ export function QuickReply({
 
   const handleExpand = (e: React.MouseEvent) => {
     e.stopPropagation();
-    console.log('[QuickReply] Expand clicked, isExpanded:', isExpanded, 'replyText:', replyText);
-    if (!isExpanded && !replyText) {
-      console.log('[QuickReply] Starting AI generation for message:', messageId, 'workspace:', workspaceId);
-      setIsGenerating(true);
-      generateDraft({
-        messageId,
-        workspaceId,
-        tone: 'professional',
-        maxLength: 300,
-      });
-    }
+    console.log('[QuickReply] Expand clicked');
     setIsExpanded(true);
   };
 
@@ -181,6 +207,8 @@ export function QuickReply({
     setIsExpanded(false);
     setReplyText('');
     setConfidenceScore(null);
+    setGenerationError(null);
+    hasTriedGenerating.current = false;
   };
 
   const handleSendClick = (e: React.MouseEvent) => {
@@ -215,16 +243,12 @@ export function QuickReply({
   // Regenerate the AI reply
   const handleRegenerate = (e: React.MouseEvent) => {
     e.stopPropagation();
-    console.log('[QuickReply] Regenerating reply for message:', messageId);
-    setIsGenerating(true);
+    console.log('[QuickReply] Regenerating');
     setReplyText('');
     setConfidenceScore(null);
-    generateDraft({
-      messageId,
-      workspaceId,
-      tone: 'professional',
-      maxLength: 300,
-    });
+    setGenerationError(null);
+    hasTriedGenerating.current = false;
+    triggerGeneration();
   };
 
   // Get confidence badge styling based on score
@@ -298,7 +322,13 @@ export function QuickReply({
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Sparkles className="h-3.5 w-3.5 text-primary" />
           <span className="font-medium">AI Quick Reply</span>
-          {confidenceScore !== null && (
+          {isGenerating && (
+            <span className="flex items-center gap-1.5 text-primary">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>Generating...</span>
+            </span>
+          )}
+          {!isGenerating && confidenceScore !== null && (
             <span className={cn(
               'px-1.5 py-0.5 rounded text-[10px] font-semibold',
               getConfidenceBadgeStyle(confidenceScore)
@@ -307,7 +337,7 @@ export function QuickReply({
             </span>
           )}
           {/* Regenerate button */}
-          {!isGenerating && replyText && (
+          {!isGenerating && (replyText || generationError) && (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -337,28 +367,35 @@ export function QuickReply({
         </Button>
       </div>
 
+      {/* Error message */}
+      {generationError && !isGenerating && (
+        <div className="flex items-center gap-2 p-2 rounded-md bg-destructive/10 text-destructive text-xs">
+          <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+          <span>{generationError}</span>
+        </div>
+      )}
+
       {/* Content - Textarea with loading overlay */}
       <div className="relative">
-        <Textarea
-          ref={textareaRef}
-          value={replyText}
-          onChange={(e) => setReplyText(e.target.value)}
-          placeholder={isGenerating ? "Generating AI reply..." : "Type your reply..."}
-          disabled={isGenerating}
-          className={cn(
-            "min-h-[80px] resize-none text-sm bg-background border-border/50 focus:border-primary/50",
-            isGenerating && "opacity-50"
-          )}
-          onClick={(e) => e.stopPropagation()}
-        />
-        {/* Loading overlay */}
-        {isGenerating && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-md">
-            <div className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin text-primary" />
-              <span className="text-sm text-muted-foreground">Generating...</span>
+        {isGenerating ? (
+          // Loading state - full loading UI
+          <div className="min-h-[80px] flex items-center justify-center rounded-md border border-border/50 bg-background">
+            <div className="flex flex-col items-center gap-2 p-4">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <span className="text-sm text-muted-foreground">Generating AI reply...</span>
+              <span className="text-xs text-muted-foreground/60">This may take a few seconds</span>
             </div>
           </div>
+        ) : (
+          // Textarea for editing
+          <Textarea
+            ref={textareaRef}
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            placeholder={generationError ? "Type your reply manually..." : "AI reply will appear here..."}
+            className="min-h-[80px] resize-none text-sm bg-background border-border/50 focus:border-primary/50"
+            onClick={(e) => e.stopPropagation()}
+          />
         )}
       </div>
       
