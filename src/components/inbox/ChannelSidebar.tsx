@@ -1,6 +1,7 @@
 /**
  * ChannelSidebar Component
  * Left sidebar for filtering inbox by channel
+ * Uses stale-while-revalidate caching for instant load
  */
 
 'use client';
@@ -8,6 +9,7 @@
 import { ConnectChannelDialog } from '@/components/channels/ConnectChannelDialog';
 import { getUserChannelConnections } from '@/data/user/channels';
 import { getIntegrationById } from '@/lib/integrations/config';
+import { useCachedData } from '@/hooks/useCachedData';
 import { cn } from '@/lib/utils';
 import {
   Calendar,
@@ -20,7 +22,7 @@ import {
   Plus,
 } from 'lucide-react';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -49,9 +51,26 @@ const getProviderIcon = (provider: string) => {
   return icons[provider.toLowerCase()] || Mail;
 };
 
-// Provider display names
-const getProviderName = (provider: string) => {
-  const names: Record<string, string> = {
+// Provider display names - shortened for sidebar, full for tooltips
+const getProviderName = (provider: string, short = false) => {
+  if (short) {
+    // Shortened names for sidebar display
+    const shortNames: Record<string, string> = {
+      gmail: 'Gmail',
+      outlook: 'Outlook',
+      slack: 'Slack',
+      teams: 'Teams',
+      whatsapp: 'WhatsApp',
+      instagram: 'Instagram',
+      linkedin: 'LinkedIn',
+      facebook_messenger: 'Messenger',
+      google_calendar: 'Calendar',
+      outlook_calendar: 'Calendar',
+    };
+    return shortNames[provider.toLowerCase()] || provider;
+  }
+  // Full names for tooltips
+  const fullNames: Record<string, string> = {
     gmail: 'Gmail',
     outlook: 'Outlook',
     slack: 'Slack',
@@ -63,7 +82,7 @@ const getProviderName = (provider: string) => {
     google_calendar: 'Google Calendar',
     outlook_calendar: 'Outlook Calendar',
   };
-  return names[provider.toLowerCase()] || provider;
+  return fullNames[provider.toLowerCase()] || provider;
 };
 
 export function ChannelSidebar({
@@ -73,33 +92,34 @@ export function ChannelSidebar({
   onChannelSelect,
   messageCounts = {},
 }: ChannelSidebarProps) {
-  const [channels, setChannels] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [connectDialogOpen, setConnectDialogOpen] = useState(false);
 
-  const fetchChannels = async () => {
-    try {
+  // Use cached data hook for instant load with background refresh
+  const {
+    data: channels,
+    isLoading: loading,
+    isRefreshing,
+    refresh: refreshChannels,
+  } = useCachedData<any[]>(
+    `channels-${workspaceId}`,
+    useCallback(async () => {
       const data = await getUserChannelConnections(workspaceId, userId);
-      setChannels(data || []);
-    } catch (error) {
-      toast.error('Failed to load channels');
-      console.error(error);
-    } finally {
-      setLoading(false);
+      return data || [];
+    }, [workspaceId, userId]),
+    {
+      ttl: 5 * 60 * 1000, // 5 minutes cache
+      deps: [workspaceId, userId],
     }
-  };
+  );
 
-  useEffect(() => {
-    fetchChannels();
-  }, [workspaceId, userId]);
-
-  const handleChannelConnected = () => {
+  const handleChannelConnected = useCallback(() => {
     // Refresh channels list after connecting
-    fetchChannels();
+    refreshChannels();
     toast.success('Channel connected successfully!');
-  };
+  }, [refreshChannels]);
 
-  if (loading) {
+  // Only show skeleton on first load when no cached data exists
+  if (loading && !channels) {
     return (
       <div className="w-24 flex flex-col items-center py-4 border-r space-y-3 px-2">
         <div className="flex flex-col items-center w-full py-2">
@@ -117,6 +137,9 @@ export function ChannelSidebar({
       </div>
     );
   }
+  
+  // Default to empty array if channels is null
+  const channelsList = channels || [];
 
   return (
     <>
@@ -152,19 +175,20 @@ export function ChannelSidebar({
 
         {/* Channel Icons + Add Channel (tiles in a single list) */}
         <div className="flex flex-col gap-2 flex-1 w-full">
-          {channels.map((channel) => {
+          {channelsList.map((channel) => {
             const Icon = getProviderIcon(channel.provider);
             const isSelected = selectedChannel === channel.id;
             const unreadCount = messageCounts[channel.id] || 0;
 
-            // Build a helpful tooltip including provider + account name/email
-            const providerName = getProviderName(channel.provider);
+            // Build a helpful tooltip including provider + account name/email (use full name)
+            const providerFullName = getProviderName(channel.provider, false);
+            const providerShortName = getProviderName(channel.provider, true);
             const accountLabel =
               channel.provider_account_name || channel.provider_account_id || '';
             const tooltip =
-              accountLabel && accountLabel !== providerName
-                ? `${providerName} – ${accountLabel}`
-                : providerName;
+              accountLabel && accountLabel !== providerFullName
+                ? `${providerFullName} – ${accountLabel}`
+                : providerFullName;
 
             const integration = getIntegrationById(channel.provider);
 
@@ -175,19 +199,22 @@ export function ChannelSidebar({
                 className={cn(
                   'relative flex flex-col items-center justify-center w-full px-2 py-2 rounded-xl transition-all group',
                   isSelected
-                    ? 'bg-muted text-foreground shadow-md ring-2 ring-primary/50'
+                    ? 'bg-muted text-foreground'
                     : 'bg-transparent hover:bg-muted/60 text-muted-foreground'
                 )}
                 title={tooltip}
               >
+                {/* Icon container - ring applied here, not on button */}
                 <div className={cn(
                   'flex items-center justify-center w-11 h-11 rounded-xl mb-1 transition-all',
-                  isSelected ? 'bg-background shadow-sm' : 'bg-muted/50 group-hover:bg-muted'
+                  isSelected 
+                    ? 'bg-background shadow-sm ring-2 ring-primary/50' 
+                    : 'bg-muted/50 group-hover:bg-muted'
                 )}>
                   {integration?.logoUrl ? (
                     <Image
                       src={integration.logoUrl}
-                      alt={providerName}
+                      alt={providerFullName}
                       width={22}
                       height={22}
                       className="object-contain"
@@ -202,7 +229,7 @@ export function ChannelSidebar({
                   'text-[10px] font-medium truncate max-w-full',
                   isSelected ? 'text-foreground' : 'text-muted-foreground'
                 )}>
-                  {providerName}
+                  {providerShortName}
                 </span>
                 {unreadCount > 0 && (
                   <div className="absolute top-1 right-2 flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] font-semibold">

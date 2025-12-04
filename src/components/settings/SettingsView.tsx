@@ -5,7 +5,8 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useCachedData } from '@/hooks/useCachedData';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -121,23 +122,36 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   const [displayName, setDisplayName] = useState(user?.user_metadata?.full_name || '');
   const [timezone, setTimezone] = useState(() => detectUserTimezone()); // Auto-detect on init
   const [syncFrequency, setSyncFrequency] = useState('15');
-  const [loading, setLoading] = useState(true);
+  const [settingsInitialized, setSettingsInitialized] = useState(false);
   const [detectedTimezone] = useState(() => detectUserTimezone()); // Store detected timezone
   
   // Check Pro subscription status
   const { hasPro, loading: loadingPro } = useProSubscription(workspaceId);
 
-  // Load settings on mount
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const [rawSettings, profile] = await Promise.all([
-          getWorkspaceSettings(workspaceId, userId),
-          getUserProfile(userId),
-        ]);
+  // Cache key for settings
+  const cacheKey = useMemo(() => `settings-${workspaceId}-${userId}`, [workspaceId, userId]);
 
-        // Type assertion for settings
-        const settings = rawSettings as {
+  // Fetch function for settings
+  const fetchSettingsData = useCallback(async () => {
+    const [rawSettings, profile] = await Promise.all([
+      getWorkspaceSettings(workspaceId, userId),
+      getUserProfile(userId),
+    ]);
+    return { settings: rawSettings, profile };
+  }, [workspaceId, userId]);
+
+  // Use cached data for instant load
+  const { data: cachedSettings, isLoading: loading } = useCachedData(
+    cacheKey,
+    fetchSettingsData,
+    {
+      ttl: 10 * 60 * 1000, // 10 minutes cache for settings
+      deps: [workspaceId, userId],
+      onUpdate: (data) => {
+        // Update local state when fresh data arrives
+        if (!data) return;
+        
+        const settings = data.settings as {
           ai?: {
             autoClassify?: boolean;
             autoExtractTasks?: boolean;
@@ -151,6 +165,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
           timezone?: string;
           syncFrequency?: number;
         };
+        const profile = data.profile;
 
         // Set AI settings
         if (settings?.ai) {
@@ -171,23 +186,64 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
           setDisplayName(profile.full_name);
         }
 
-        // Set sync settings (timezone, sync frequency)
-        // Use saved timezone if exists, otherwise keep auto-detected value
+        // Set sync settings
         if (settings?.timezone) {
           setTimezone(settings.timezone);
         }
         if (settings?.syncFrequency) {
           setSyncFrequency(String(settings.syncFrequency));
         }
-      } catch (error) {
-        console.error('Failed to load settings:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+        
+        setSettingsInitialized(true);
+      },
+    }
+  );
 
-    loadSettings();
-  }, [workspaceId, userId]);
+  // Initialize settings from cache on first load
+  useEffect(() => {
+    if (cachedSettings && !settingsInitialized) {
+      const settings = cachedSettings.settings as {
+        ai?: {
+          autoClassify?: boolean;
+          autoExtractTasks?: boolean;
+          autoCreateEvents?: boolean;
+          defaultReplyTone?: string;
+        };
+        notifications?: {
+          email?: boolean;
+          push?: boolean;
+        };
+        timezone?: string;
+        syncFrequency?: number;
+      };
+      const profile = cachedSettings.profile;
+
+      if (settings?.ai) {
+        setAutoClassify(settings.ai.autoClassify ?? true);
+        setAutoTasks(settings.ai.autoExtractTasks ?? false);
+        setAutoEvents(settings.ai.autoCreateEvents ?? false);
+        setDefaultTone(settings.ai.defaultReplyTone || 'professional');
+      }
+
+      if (settings?.notifications) {
+        setEmailNotifications(settings.notifications.email ?? true);
+        setPushNotifications(settings.notifications.push ?? true);
+      }
+
+      if (profile?.full_name) {
+        setDisplayName(profile.full_name);
+      }
+
+      if (settings?.timezone) {
+        setTimezone(settings.timezone);
+      }
+      if (settings?.syncFrequency) {
+        setSyncFrequency(String(settings.syncFrequency));
+      }
+      
+      setSettingsInitialized(true);
+    }
+  }, [cachedSettings, settingsInitialized]);
 
   // AI Settings
   const { execute: saveAISettings, status: aiStatus } = useAction(updateAISettingsAction, {

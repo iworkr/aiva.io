@@ -31,6 +31,7 @@ import { ContactsSkeleton } from './ContactsSkeleton';
 import { cn } from '@/lib/utils';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useDebouncedValue } from '@/hooks/usePrefetch';
+import { useCachedData } from '@/hooks/useCachedData';
 
 interface ContactsViewProps {
   workspaceId: string;
@@ -46,8 +47,7 @@ const sanitizeContactName = (name: string): string => {
 const CONTACTS_PER_PAGE = 12; // Show 12 contacts per page (4x3 grid)
 
 export const ContactsView = memo(function ContactsView({ workspaceId, userId }: ContactsViewProps) {
-  const [allContacts, setAllContacts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [additionalContacts, setAdditionalContacts] = useState<any[]>([]); // For pagination
   const [loadingMore, setLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showFavoritesOnly, setShowFavoritesOnly] = useLocalStorage(
@@ -64,54 +64,73 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
   const [isPending, startTransition] = useTransition();
   
   // Pagination state
-  const [currentOffset, setCurrentOffset] = useState(0);
+  const [currentOffset, setCurrentOffset] = useState(CONTACTS_PER_PAGE);
   const [hasMore, setHasMore] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
 
   // Debounce search query for better performance
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
-
-  // Fetch initial contacts (with pagination)
-  const fetchContacts = useCallback(async (reset = true) => {
-    if (reset) {
-    setLoading(true);
-      setCurrentOffset(0);
-    }
-    try {
+  
+  // Use cached data for initial contacts - shows instantly if cached
+  const {
+    data: cachedContacts,
+    isLoading: loading,
+    isRefreshing,
+    refresh: refreshContacts,
+  } = useCachedData<any[]>(
+    `contacts-${workspaceId}-${showFavoritesOnly ? 'favorites' : 'all'}`,
+    useCallback(async () => {
       const data = await getContacts(workspaceId, userId, {
         isFavorite: showFavoritesOnly || undefined,
         limit: CONTACTS_PER_PAGE,
         offset: 0,
       });
-      const contactsList = data || [];
-      setAllContacts(contactsList);
-      setHasMore(contactsList.length === CONTACTS_PER_PAGE);
-      setTotalCount(contactsList.length);
-    } catch (error) {
-      toast.error('Failed to load contacts');
-      console.error(error);
-    } finally {
-      setLoading(false);
+      return data || [];
+    }, [workspaceId, userId, showFavoritesOnly]),
+    {
+      ttl: 3 * 60 * 1000, // 3 minutes cache
+      deps: [workspaceId, userId, showFavoritesOnly],
+      onUpdate: (data) => {
+        // Reset pagination when initial data updates
+        setAdditionalContacts([]);
+        setCurrentOffset(data.length);
+        setHasMore(data.length === CONTACTS_PER_PAGE);
+        setTotalCount(data.length);
+      },
     }
-  }, [workspaceId, userId, showFavoritesOnly]);
+  );
 
-  // Load more contacts
+  // Combine cached contacts with additional paginated contacts
+  const allContacts = useMemo(() => {
+    const base = cachedContacts || [];
+    return [...base, ...additionalContacts];
+  }, [cachedContacts, additionalContacts]);
+
+  // Legacy fetchContacts for backward compatibility
+  const fetchContacts = useCallback(async (reset = true) => {
+    if (reset) {
+      setAdditionalContacts([]);
+      setCurrentOffset(CONTACTS_PER_PAGE);
+      refreshContacts();
+    }
+  }, [refreshContacts]);
+
+  // Load more contacts (pagination)
   const loadMoreContacts = useCallback(async () => {
     if (loadingMore || !hasMore) return;
     
     setLoadingMore(true);
     try {
-      const nextOffset = currentOffset + CONTACTS_PER_PAGE;
       const data = await getContacts(workspaceId, userId, {
         isFavorite: showFavoritesOnly || undefined,
         limit: CONTACTS_PER_PAGE,
-        offset: nextOffset,
+        offset: currentOffset,
       });
       const newContacts = data || [];
       
       if (newContacts.length > 0) {
-        setAllContacts((prev) => [...prev, ...newContacts]);
-        setCurrentOffset(nextOffset);
+        setAdditionalContacts((prev) => [...prev, ...newContacts]);
+        setCurrentOffset((prev) => prev + newContacts.length);
         setTotalCount((prev) => prev + newContacts.length);
       }
       

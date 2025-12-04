@@ -5,7 +5,8 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { useCachedData } from '@/hooks/useCachedData';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -75,8 +76,6 @@ interface MotionCalendarViewProps {
 type ViewMode = 'month' | 'week' | 'day';
 
 export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewProps) {
-  const [events, setEvents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
@@ -92,53 +91,67 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
     categories: string[];
   }>({ calendars: [], categories: [] });
 
-  // Fetch events
-  const fetchEvents = async () => {
-    setLoading(true);
-    try {
-      let startTime, endTime;
+  // Calculate date range based on view mode
+  const dateRange = useMemo(() => {
+    let startTime: string, endTime: string;
 
-      switch (viewMode) {
-        case 'month':
-          const monthStart = startOfMonth(currentDate);
-          const monthEnd = endOfMonth(currentDate);
-          startTime = startOfWeek(monthStart).toISOString();
-          endTime = endOfWeek(monthEnd).toISOString();
-          break;
-        case 'week':
-          startTime = startOfWeek(currentDate).toISOString();
-          endTime = endOfWeek(currentDate).toISOString();
-          break;
-        case 'day':
-          startTime = startOfDay(currentDate).toISOString();
-          endTime = addDays(startOfDay(currentDate), 1).toISOString();
-          break;
-      }
-
-      const data = await getEvents(workspaceId, userId, {
-        startTime,
-        endTime,
-      });
-
-      setEvents(data || []);
-    } catch (error) {
-      toast.error('Failed to load events');
-      console.error(error);
-    } finally {
-      setLoading(false);
+    switch (viewMode) {
+      case 'month':
+        const monthStart = startOfMonth(currentDate);
+        const monthEnd = endOfMonth(currentDate);
+        startTime = startOfWeek(monthStart).toISOString();
+        endTime = endOfWeek(monthEnd).toISOString();
+        break;
+      case 'week':
+        startTime = startOfWeek(currentDate).toISOString();
+        endTime = endOfWeek(currentDate).toISOString();
+        break;
+      case 'day':
+        startTime = startOfDay(currentDate).toISOString();
+        endTime = addDays(startOfDay(currentDate), 1).toISOString();
+        break;
     }
-  };
+    return { startTime, endTime };
+  }, [viewMode, currentDate]);
 
-  useEffect(() => {
-    fetchEvents();
-  }, [workspaceId, userId, viewMode, currentDate]);
+  // Cache key includes date range for proper caching per view
+  const cacheKey = useMemo(
+    () => `calendar-events-${workspaceId}-${dateRange.startTime}-${dateRange.endTime}`,
+    [workspaceId, dateRange]
+  );
+
+  // Fetch events with caching
+  const fetchEventsData = useCallback(async () => {
+    const data = await getEvents(workspaceId, userId, {
+      startTime: dateRange.startTime,
+      endTime: dateRange.endTime,
+    });
+    return data || [];
+  }, [workspaceId, userId, dateRange]);
+
+  // Use cached data for instant load with background refresh
+  const {
+    data: events,
+    isLoading: loading,
+    refresh: refreshEvents,
+  } = useCachedData<any[]>(
+    cacheKey,
+    fetchEventsData,
+    {
+      ttl: 5 * 60 * 1000, // 5 minutes cache
+      deps: [workspaceId, userId, dateRange],
+    }
+  );
+
+  // Default to empty array if null
+  const eventsList = events || [];
 
   // Create event
   const { execute: createEvent } = useAction(createEventAction, {
     onSuccess: () => {
       toast.success('Event created successfully');
       setShowCreateDialog(false);
-      fetchEvents();
+      refreshEvents();
     },
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to create event');
@@ -150,7 +163,7 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
     onSuccess: () => {
       toast.success('Event updated successfully');
       setShowEventModal(false);
-      fetchEvents();
+      refreshEvents();
     },
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to update event');
@@ -162,7 +175,7 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
     onSuccess: () => {
       toast.success('Event deleted successfully');
       setShowEventModal(false);
-      fetchEvents();
+      refreshEvents();
     },
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to delete event');
@@ -196,7 +209,7 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
 
   // Filter events based on search and filters
   const getFilteredEvents = () => {
-    return events.filter((event) => {
+    return eventsList.filter((event) => {
       // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -361,7 +374,7 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
         {/* Calendar Content */}
         <div className="flex flex-1 overflow-hidden">
           <div className="flex-1 overflow-auto">
-            {loading ? (
+            {loading && !events ? (
               <div className="flex h-full items-center justify-center">
                 <CalendarIcon className="h-8 w-8 animate-pulse text-muted-foreground" />
               </div>
@@ -435,18 +448,18 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
           <div className="w-80 flex-shrink-0 border-l border-border bg-background">
             <RightSidebar 
               currentDate={currentDate} 
-              events={events}
+              events={eventsList}
               onEventClick={(event) => {
                 setSelectedEvent(event);
                 setShowEventModal(true);
               }}
               onResolveOverdue={() => {
                 toast.success('Overdue tasks resolved');
-                fetchEvents();
+                refreshEvents();
               }}
               onRefreshTasks={() => {
                 toast.info('Refreshing tasks...');
-                fetchEvents();
+                refreshEvents();
               }}
             />
           </div>
@@ -486,7 +499,7 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
         workspaceId={workspaceId}
-        onSuccess={fetchEvents}
+        onSuccess={refreshEvents}
       />
 
       {/* Manage Accounts Dialog */}

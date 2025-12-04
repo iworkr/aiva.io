@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -34,6 +34,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { IntegrationLogo } from '@/components/integrations/IntegrationLogo';
 import { getIntegrationById, providerNames } from '@/lib/integrations/config';
+import { useCachedData } from '@/hooks/useCachedData';
 
 interface ChannelsViewProps {
   workspaceId: string;
@@ -41,34 +42,34 @@ interface ChannelsViewProps {
 }
 
 export function ChannelsView({ workspaceId, userId }: ChannelsViewProps) {
-  const [channels, setChannels] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [syncingChannel, setSyncingChannel] = useState<string | null>(null);
   const [showConnectDialog, setShowConnectDialog] = useState(false);
 
-  // Fetch channels
-  const fetchChannels = async () => {
-    setLoading(true);
-    try {
+  // Use cached data hook for instant load with background refresh
+  const {
+    data: channels,
+    isLoading: loading,
+    refresh: refreshChannels,
+  } = useCachedData<any[]>(
+    `channels-management-${workspaceId}`,
+    useCallback(async () => {
       const data = await getUserChannelConnections(workspaceId, userId);
-      setChannels(data || []);
-    } catch (error) {
-      toast.error('Failed to load channels');
-      console.error(error);
-    } finally {
-      setLoading(false);
+      return data || [];
+    }, [workspaceId, userId]),
+    {
+      ttl: 5 * 60 * 1000, // 5 minutes cache
+      deps: [workspaceId, userId],
     }
-  };
-
-  useEffect(() => {
-    fetchChannels();
-  }, [workspaceId, userId]);
+  );
+  
+  // Default to empty array if null
+  const channelsList = channels || [];
 
   // Disconnect channel
   const { execute: disconnect } = useAction(disconnectChannelAction, {
     onSuccess: () => {
       toast.success('Channel disconnected');
-      fetchChannels();
+      refreshChannels();
     },
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to disconnect channel');
@@ -86,7 +87,7 @@ export function ChannelsView({ workspaceId, userId }: ChannelsViewProps) {
 
       if (result.success) {
         toast.success(`Synced ${result.newCount || 0} new message(s)`);
-        fetchChannels();
+        refreshChannels();
       } else {
         toast.error(result.error || 'Sync failed');
       }
@@ -104,9 +105,9 @@ export function ChannelsView({ workspaceId, userId }: ChannelsViewProps) {
   };
 
   const stats = {
-    total: channels.length,
-    active: channels.filter((c) => c.status === 'active').length,
-    error: channels.filter((c) => c.status === 'error').length,
+    total: channelsList.length,
+    active: channelsList.filter((c) => c.status === 'active').length,
+    error: channelsList.filter((c) => c.status === 'error').length,
   };
 
   return (
@@ -161,12 +162,12 @@ export function ChannelsView({ workspaceId, userId }: ChannelsViewProps) {
         </div>
 
         {/* Channels List */}
-        {loading ? (
+        {loading && !channels ? (
           <div className="text-center py-12">
             <RefreshCw className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
             <p className="mt-2 text-sm text-muted-foreground">Loading channels...</p>
           </div>
-        ) : channels.length === 0 ? (
+        ) : channelsList.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Mail className="h-12 w-12 text-muted-foreground" />
@@ -182,7 +183,7 @@ export function ChannelsView({ workspaceId, userId }: ChannelsViewProps) {
           </Card>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            {channels.map((channel) => {
+            {channelsList.map((channel) => {
               const integration = getIntegrationById(channel.provider);
               const isSyncing = syncingChannel === channel.id;
 
@@ -278,7 +279,7 @@ export function ChannelsView({ workspaceId, userId }: ChannelsViewProps) {
         workspaceId={workspaceId}
         open={showConnectDialog}
         onOpenChange={setShowConnectDialog}
-        onConnected={fetchChannels}
+        onConnected={refreshChannels}
       />
     </div>
   );
