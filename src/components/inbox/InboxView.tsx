@@ -550,6 +550,7 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
               hasMore={hasMore}
               onLoadMore={loadMoreMessages}
               loadingMore={fetchStatus === 'executing' && currentOffset > 0}
+              selectedChannel={selectedChannel}
               onMessageUpdate={() => {
                 // Invalidate cache and refresh messages after update
                 try {

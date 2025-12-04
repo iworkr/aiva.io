@@ -18,6 +18,7 @@ interface MessageListProps {
   hasMore?: boolean;
   onLoadMore?: () => void;
   loadingMore?: boolean;
+  selectedChannel?: string | null;
 }
 
 const MESSAGES_PER_PAGE = 50;
@@ -29,6 +30,7 @@ export const MessageList = memo(function MessageList({
   hasMore = false,
   onLoadMore,
   loadingMore = false,
+  selectedChannel = null,
 }: MessageListProps) {
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -66,6 +68,7 @@ export const MessageList = memo(function MessageList({
               message={message}
               workspaceId={workspaceId}
               onUpdate={onMessageUpdate}
+              selectedChannel={selectedChannel}
             />
           ))}
         </div>
@@ -136,4 +139,3 @@ export const MessageList = memo(function MessageList({
     </div>
   );
 });
-

@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, memo } from 'react';
+import React, { useState, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -44,6 +44,7 @@ import { cn } from '@/lib/utils';
 import { PriorityBadge, CategoryBadge, SentimentBadge } from './ClassificationBadges';
 import { QuickReply } from './QuickReply';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { getIntegrationById } from '@/lib/integrations/config';
 import {
   Tooltip,
   TooltipContent,
@@ -55,9 +56,10 @@ interface MessageItemProps {
   message: any;
   workspaceId: string;
   onUpdate: () => void;
+  selectedChannel?: string | null;
 }
 
-export const MessageItem = memo(function MessageItem({ message, workspaceId, onUpdate }: MessageItemProps) {
+export const MessageItem = memo(function MessageItem({ message, workspaceId, onUpdate, selectedChannel }: MessageItemProps) {
   const router = useRouter();
   const [isStarred, setIsStarred] = useState(message.is_starred || false);
 
@@ -191,6 +193,28 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
     return names[provider.toLowerCase()] || provider;
   };
 
+  // Get provider logo URL from integrations config
+  const getProviderLogo = () => {
+    const provider = message.channel_connection?.provider;
+    if (!provider) return null;
+    const integration = getIntegrationById(provider.toLowerCase());
+    return integration?.logoUrl || null;
+  };
+
+  // Check if we're in "All Inboxes" view (no specific channel selected)
+  const isAllInboxes = !selectedChannel;
+
+  // Simple markdown parser - converts **text** to bold
+  const parseMarkdown = (text: string): React.ReactNode[] => {
+    const parts = text.split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={index} className="font-semibold text-foreground">{part.slice(2, -2)}</strong>;
+      }
+      return <span key={index}>{part}</span>;
+    });
+  };
+
   const timestamp = message.timestamp ? new Date(message.timestamp) : new Date(message.created_at || new Date());
   const isToday = new Date().toDateString() === timestamp.toDateString();
   const timeString = isToday
@@ -295,6 +319,14 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
           {/* Header */}
           <div className="flex items-start justify-between gap-2">
             <div className="flex min-w-0 flex-1 items-center gap-2">
+              {/* Provider logo - only shown in All Inboxes view */}
+              {isAllInboxes && getProviderLogo() && (
+                <img 
+                  src={getProviderLogo()!} 
+                  alt={getProviderName() || 'Provider'} 
+                  className="h-4 w-4 flex-shrink-0 rounded-sm"
+                />
+              )}
               <span
                 className={cn(
                   'truncate text-sm',
@@ -303,15 +335,25 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
               >
                 {message.sender_name || message.sender_email}
               </span>
-              {getProviderName() && (
-                <span className="text-xs text-muted-foreground">
-                  • {getProviderName()}
-                </span>
-              )}
               {message.priority && <PriorityBadge priority={message.priority} />}
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Sensitive content shield - moved to header next to timestamp */}
+              {hasMaskedContent && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="flex-shrink-0">
+                        <ShieldAlert className="h-3.5 w-3.5 text-amber-500" aria-label="Contains masked sensitive content" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">Sensitive content (codes, passwords) hidden for security</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
               <span className="text-xs text-muted-foreground">{timeString}</span>
               
               {/* Actions dropdown */}
@@ -357,34 +399,18 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
             {message.subject || '(no subject)'}
           </div>
 
-          {/* Snippet with masked content indicator */}
-          <div className="mt-1.5 flex items-start gap-1.5">
-            <p className="line-clamp-2 text-sm text-muted-foreground flex-1">
-              {displaySnippet}
-            </p>
-            {hasMaskedContent && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="flex-shrink-0 mt-0.5">
-                      <ShieldAlert className="h-3.5 w-3.5 text-amber-500" aria-label="Contains masked sensitive content" />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="text-xs">Sensitive content (codes, passwords) hidden for security</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
+          {/* Snippet with markdown formatting */}
+          <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">
+            {parseMarkdown(displaySnippet)}
+          </p>
 
-          {/* AI Classifications */}
-          {(message.category || message.sentiment || message.actionability) && (
-            <div className="mt-2 flex flex-wrap items-center gap-2">
+          {/* AI Classifications & Quick Actions Row */}
+          <div className="mt-3 flex items-center justify-between gap-2">
+            {/* Left: Classification badges */}
+            <div className="flex flex-wrap items-center gap-1.5">
               {message.ai_summary && (
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Sparkles className="h-3 w-3" aria-hidden="true" />
-                  <span>AI analyzed</span>
                 </div>
               )}
               {message.category && (
@@ -395,34 +421,34 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
               )}
               {message.sentiment && <SentimentBadge sentiment={message.sentiment} />}
               {message.actionability === 'requires_urgent_action' && (
-                <Badge variant="destructive" className="text-xs">
+                <Badge variant="destructive" className="text-xs py-0 h-5">
                   <AlertCircle className="mr-1 h-3 w-3" aria-hidden="true" />
-                  Urgent Action
+                  Urgent
                 </Badge>
               )}
               {message.actionability === 'requires_action' && (
-                <Badge variant="secondary" className="text-xs">
+                <Badge variant="secondary" className="text-xs py-0 h-5">
                   <Clock className="mr-1 h-3 w-3" aria-hidden="true" />
-                  Action Needed
+                  Action
                 </Badge>
               )}
             </div>
-          )}
 
-          {/* Quick Reply */}
-          {message.channel_connection?.provider && 
-           (message.channel_connection.provider === 'gmail' || 
-            message.channel_connection.provider === 'outlook') && (
-            <QuickReply
-              messageId={message.id}
-              workspaceId={workspaceId}
-              messageSubject={message.subject || '(no subject)'}
-              senderEmail={message.sender_email}
-              provider={message.channel_connection.provider}
-              providerMessageId={message.provider_message_id}
-              onSent={onUpdate}
-            />
-          )}
+            {/* Right: Quick Reply button */}
+            {message.channel_connection?.provider && 
+             (message.channel_connection.provider === 'gmail' || 
+              message.channel_connection.provider === 'outlook') && (
+              <QuickReply
+                messageId={message.id}
+                workspaceId={workspaceId}
+                messageSubject={message.subject || '(no subject)'}
+                senderEmail={message.sender_email}
+                provider={message.channel_connection.provider}
+                providerMessageId={message.provider_message_id}
+                onSent={onUpdate}
+              />
+            )}
+          </div>
         </div>
       </div>
     </div>
