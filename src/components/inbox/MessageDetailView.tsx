@@ -72,7 +72,7 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
         .from('messages')
         .select(`
           *,
-          channel_connections(provider, provider_account_name, provider_account_email)
+          channel_connections(provider, provider_account_name, provider_account_id)
         `)
         .eq('id', messageId)
         .eq('workspace_id', workspaceId)
@@ -179,7 +179,8 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
   // Get provider info
   const provider = message?.channel_connections?.provider;
   const integration = provider ? getIntegrationById(provider) : null;
-  const userEmail = message?.channel_connections?.provider_account_email;
+  // Use sender_email from message as fallback for user email identification
+  const userEmail = message?.channel_connections?.provider_account_id;
 
   // Loading state
   if (loading) {
