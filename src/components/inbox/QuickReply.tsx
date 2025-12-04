@@ -117,12 +117,20 @@ export function QuickReply({
       const result = data?.data;
       const body = result?.body;
       const confidence = result?.confidenceScore;
+      const aiError = (result as { error?: string })?.error;
       
       if (body) {
         console.log('[QuickReply] Generated reply body:', body.substring(0, 100) + '...');
         setReplyText(body);
         setConfidenceScore(confidence || null);
         draftToastIdRef.current = toast.success('AI draft ready');
+      } else if (aiError) {
+        // AI not configured - let user type manually
+        console.warn('[QuickReply] AI error:', aiError);
+        setReplyText('');
+        toast.info('AI not available. Please type your reply manually.', {
+          description: aiError,
+        });
       } else {
         console.warn('[QuickReply] No body in response:', result);
         setReplyText('');

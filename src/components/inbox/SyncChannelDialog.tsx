@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import {
   Dialog,
   DialogContent,
@@ -168,6 +169,7 @@ export function SyncChannelDialog({
               {/* Channel List */}
               <div className="space-y-2 max-h-[240px] overflow-y-auto">
                 {channels.map((channel) => {
+                  const integration = getIntegrationById(channel.provider);
                   const Icon = getChannelIcon(channel.provider);
                   const isSelected = selectedChannels.has(channel.id);
                   
@@ -192,7 +194,18 @@ export function SyncChannelDialog({
                         'flex items-center justify-center w-9 h-9 rounded-lg',
                         isSelected ? 'bg-primary/10' : 'bg-muted/50'
                       )}>
-                        <Icon className="h-5 w-5" />
+                        {integration?.logoUrl ? (
+                          <Image
+                            src={integration.logoUrl}
+                            alt={integration.name}
+                            width={22}
+                            height={22}
+                            className="object-contain"
+                            unoptimized={integration.logoUrl.startsWith('http')}
+                          />
+                        ) : (
+                          <Icon className="h-5 w-5" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm truncate">

@@ -11,13 +11,12 @@ import { createSupabaseUserServerActionClient } from '@/supabase-clients/user/cr
 // Lazy-load OpenAI client to avoid crashes on missing API key
 let openaiClient: OpenAI | null = null;
 
-function getOpenAIClient(): OpenAI {
+function getOpenAIClient(): OpenAI | null {
   if (!openaiClient) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      throw new Error(
-        'OPENAI_API_KEY is not configured. Please add it to your .env.local file to enable AI features.'
-      );
+      console.warn('[AI Reply] OPENAI_API_KEY not configured - AI features disabled');
+      return null;
     }
     openaiClient = new OpenAI({ apiKey });
   }
@@ -36,6 +35,7 @@ interface ReplyDraftResult {
   bodyHtml?: string;
   confidenceScore: number;
   tone: string;
+  error?: string;
 }
 
 /**
@@ -151,6 +151,16 @@ Format your response as JSON:
 
     // Call OpenAI
     const openai = getOpenAIClient();
+    if (!openai) {
+      console.log('[AI Reply] OpenAI not configured, returning fallback');
+      return {
+        body: '',
+        confidenceScore: 0,
+        tone: options.tone || 'professional',
+        error: 'AI not configured. Please add OPENAI_API_KEY to enable AI features.',
+      };
+    }
+    
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
@@ -359,6 +369,11 @@ Respond ONLY with valid JSON array:
 If no tasks found, return empty array: []`;
 
     const openai = getOpenAIClient();
+    if (!openai) {
+      console.log('[AI Reply] OpenAI not configured for task extraction');
+      return [];
+    }
+    
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
@@ -449,6 +464,11 @@ Respond with JSON:
 }`;
 
     const openai = getOpenAIClient();
+    if (!openai) {
+      console.log('[AI Reply] OpenAI not configured for scheduling detection');
+      return { hasIntent: false };
+    }
+    
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
