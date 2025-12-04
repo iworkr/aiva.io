@@ -37,6 +37,12 @@ interface ContactsViewProps {
   userId: string;
 }
 
+// Sanitize contact name - remove leading/trailing quotes and special chars
+const sanitizeContactName = (name: string): string => {
+  if (!name) return '';
+  return name.replace(/^["'"'"']+|["'"'"']+$/g, '').trim();
+};
+
 const CONTACTS_PER_PAGE = 12; // Show 12 contacts per page (4x3 grid)
 
 export const ContactsView = memo(function ContactsView({ workspaceId, userId }: ContactsViewProps) {
@@ -184,7 +190,8 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
   // Optimistic delete
   const handleDeleteContact = useCallback((contact: any, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm(`Are you sure you want to delete ${contact.full_name}?`)) return;
+    const displayName = sanitizeContactName(contact.full_name) || contact.full_name;
+    if (!confirm(`Are you sure you want to delete ${displayName}?`)) return;
     
     // Optimistically remove from UI
     setAllContacts((prev) => prev.filter((c) => c.id !== contact.id));
@@ -347,7 +354,10 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
             {/* Pagination Footer */}
             <div className="flex items-center justify-between pt-3 border-t border-border/50">
               <p className="text-xs text-muted-foreground">
-                Showing {contacts.length} of {totalCount}{hasMore ? '+' : ''} contacts
+                {hasMore 
+                  ? `Showing ${contacts.length} of ${totalCount} or more contacts`
+                  : `Showing ${contacts.length} contact${contacts.length !== 1 ? 's' : ''}`
+                }
               </p>
               {hasMore && !debouncedSearchQuery && (
                 <button

@@ -8,11 +8,37 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ChevronDown, ChevronUp, Send, Sparkles, Loader2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { ChevronDown, ChevronUp, Send, Sparkles, Loader2, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { sendReplyAction, generateReplyDraftAction } from '@/data/user/messages';
 import { useAction } from 'next-safe-action/hooks';
 import { toast } from 'sonner';
+
+// Keywords that indicate sensitive content in the message
+const SENSITIVE_KEYWORDS = [
+  'verification code', 'otp', 'one-time password', 'password',
+  'pin', 'security code', 'access code', '2fa', 'two-factor',
+  'reset link', 'login link', 'confirm your email',
+  'account verification', 'verify your', 'confirm your identity',
+  'credit card', 'card number', 'cvv', 'expiry', 'ssn',
+  'social security', 'bank account', 'routing number',
+];
+
+// Check if reply content might contain or reply to sensitive content
+function containsSensitiveContent(text: string): boolean {
+  const lowerText = text.toLowerCase();
+  return SENSITIVE_KEYWORDS.some(keyword => lowerText.includes(keyword));
+}
 
 interface QuickReplyProps {
   messageId: string;
@@ -38,6 +64,8 @@ export function QuickReply({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [confidenceScore, setConfidenceScore] = useState<number | null>(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [hasSensitiveContent, setHasSensitiveContent] = useState(false);
   
   // Track toast ID to dismiss it when cancelling
   const draftToastIdRef = useRef<string | number | undefined>(undefined);
@@ -106,13 +134,22 @@ export function QuickReply({
     setIsExpanded(!isExpanded);
   };
 
-  const handleSend = (e: React.MouseEvent) => {
+  const handleSendClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!replyText.trim()) {
       toast.error('Please enter a reply');
       return;
     }
 
+    // Check for sensitive content and show confirmation dialog
+    const isSensitive = containsSensitiveContent(replyText) || containsSensitiveContent(messageSubject);
+    setHasSensitiveContent(isSensitive);
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirmSend = () => {
+    setShowConfirmDialog(false);
+    
     // Optimistic update - close immediately, show success
     const replyBody = replyText.trim();
     setIsSending(true);
@@ -192,7 +229,7 @@ export function QuickReply({
                 <Button
                   variant="default"
                   size="default"
-                  onClick={handleSend}
+                  onClick={handleSendClick}
                   disabled={isSending || !replyText.trim()}
                   className="h-9 px-4 shadow-sm hover:shadow-md transition-shadow"
                 >
@@ -213,6 +250,46 @@ export function QuickReply({
           )}
         </div>
       )}
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              {hasSensitiveContent && (
+                <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              )}
+              Confirm Send AI-Generated Reply
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              {hasSensitiveContent ? (
+                <>
+                  <p className="text-yellow-600 dark:text-yellow-400 font-medium">
+                    ⚠️ This message may contain or reference sensitive content (verification codes, passwords, financial information).
+                  </p>
+                  <p>
+                    Please double-check that this AI-generated reply is appropriate and doesn't expose any confidential information.
+                  </p>
+                </>
+              ) : (
+                <p>
+                  Are you sure you want to send this AI-generated reply? Make sure you've reviewed the content before sending.
+                </p>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmSend}
+              className={hasSensitiveContent ? 'bg-yellow-600 hover:bg-yellow-700' : ''}
+            >
+              <Send className="mr-2 h-4 w-4" />
+              Confirm & Send
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,10 +1,13 @@
+"use client";
+
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonWithTimeout } from "@/components/ui/skeleton-with-timeout";
 import { ProjectsLoadingFallback } from "./ProjectsLoadingFallback";
 
 export const DashboardLoadingFallback = () => {
   return (
-    <div className="flex flex-col space-y-8 mt-6 w-full">
+    <SkeletonWithTimeout timeoutMs={10000} className="flex flex-col space-y-8 mt-6 w-full">
       {/* Header with greeting and search */}
       <div className="flex items-center justify-between">
         <div className="space-y-2">
@@ -67,6 +70,6 @@ export const DashboardLoadingFallback = () => {
         <Skeleton className="h-7 w-32 rounded mb-4" />
         <ProjectsLoadingFallback quantity={3} />
       </div>
-    </div>
+    </SkeletonWithTimeout>
   );
 };

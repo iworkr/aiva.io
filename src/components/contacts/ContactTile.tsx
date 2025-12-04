@@ -21,6 +21,29 @@ interface ContactTileProps {
   onDelete?: (e: React.MouseEvent) => void;
 }
 
+/**
+ * Sanitize contact name - remove leading/trailing quotes and special chars
+ * @example '"Supabase Pte. Ltd."' -> 'Supabase Pte. Ltd.'
+ */
+const sanitizeContactName = (name: string): string => {
+  if (!name) return '';
+  // Remove leading/trailing quotes (single, double, curly) and trim whitespace
+  return name.replace(/^["'"'"']+|["'"'"']+$/g, '').trim();
+};
+
+/**
+ * Get the first letter for avatar display - finds first alphanumeric char
+ * @example '"Supabase"' -> 'S', '123Corp' -> '1'
+ */
+const getContactInitial = (name: string): string => {
+  const sanitized = sanitizeContactName(name);
+  if (!sanitized) return '?';
+  
+  // Find first alphanumeric character
+  const match = sanitized.match(/[a-zA-Z0-9]/);
+  return match ? match[0].toUpperCase() : sanitized.charAt(0).toUpperCase();
+};
+
 // Generate a subtle color based on contact name for avatar
 const getContactColor = (name: string) => {
   const colors = [
@@ -31,7 +54,10 @@ const getContactColor = (name: string) => {
     'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
     'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
   ];
-  const index = name.charCodeAt(0) % colors.length;
+  // Use sanitized name for color calculation
+  const sanitized = sanitizeContactName(name);
+  const initial = getContactInitial(sanitized);
+  const index = initial.charCodeAt(0) % colors.length;
   return colors[index];
 };
 
@@ -43,6 +69,9 @@ export const ContactTile = memo(function ContactTile({
   onEdit,
   onDelete,
 }: ContactTileProps) {
+  // Sanitize name for display and avatar
+  const displayName = sanitizeContactName(contact.full_name || '');
+  const contactInitial = getContactInitial(contact.full_name || 'A');
   const contactColor = getContactColor(contact.full_name || 'A');
   const displaySubtitle = contact.job_title || contact.company || '';
 
@@ -71,7 +100,7 @@ export const ContactTile = memo(function ContactTile({
                 contactColor
               )}
             >
-              {contact.full_name.charAt(0).toUpperCase()}
+              {contactInitial}
             </div>
           )}
 
@@ -79,7 +108,7 @@ export const ContactTile = memo(function ContactTile({
           <div className="w-40 flex-shrink-0">
             <div className="flex items-center gap-1.5">
               <h3 className="text-sm font-medium text-foreground truncate">
-                {contact.full_name}
+                {displayName || contact.full_name}
               </h3>
               {contact.is_favorite && (
                 <Star className="h-3 w-3 fill-yellow-500 text-yellow-500 flex-shrink-0" />
@@ -195,7 +224,7 @@ export const ContactTile = memo(function ContactTile({
               contactColor
             )}
           >
-            {contact.full_name.charAt(0).toUpperCase()}
+            {contactInitial}
           </div>
         )}
 
@@ -203,7 +232,7 @@ export const ContactTile = memo(function ContactTile({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-medium text-foreground truncate">
-              {contact.full_name}
+              {displayName || contact.full_name}
             </h3>
             {contact.is_favorite && (
               <Star className="h-3 w-3 fill-yellow-500 text-yellow-500 flex-shrink-0" />

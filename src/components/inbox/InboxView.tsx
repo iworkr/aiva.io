@@ -434,11 +434,11 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <Input
-                placeholder="Start typing to ask or search Aiva"
+                placeholder="Search messages by subject, sender, or content..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
-                aria-label="Search messages or ask Aiva"
+                aria-label="Search messages"
                 aria-describedby="search-description"
               />
               <span id="search-description" className="sr-only">

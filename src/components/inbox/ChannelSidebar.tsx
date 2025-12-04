@@ -101,36 +101,57 @@ export function ChannelSidebar({
 
   if (loading) {
     return (
-      <div className="w-20 flex flex-col items-center py-4 border-r space-y-3">
-        <Skeleton className="h-10 w-10 rounded-full" />
-        <Skeleton className="h-10 w-10 rounded-full" />
-        <Skeleton className="h-10 w-10 rounded-full" />
+      <div className="w-24 flex flex-col items-center py-4 border-r space-y-3 px-2">
+        <div className="flex flex-col items-center w-full py-2">
+          <Skeleton className="h-11 w-11 rounded-xl mb-1" />
+          <Skeleton className="h-3 w-8 rounded" />
+        </div>
+        <div className="flex flex-col items-center w-full py-2">
+          <Skeleton className="h-11 w-11 rounded-xl mb-1" />
+          <Skeleton className="h-3 w-10 rounded" />
+        </div>
+        <div className="flex flex-col items-center w-full py-2">
+          <Skeleton className="h-11 w-11 rounded-xl mb-1" />
+          <Skeleton className="h-3 w-6 rounded" />
+        </div>
       </div>
     );
   }
 
   return (
     <>
-      <div className="w-20 flex flex-col items-center py-4 border-r bg-muted/30">
+      <div className="w-24 flex flex-col items-center py-4 border-r bg-muted/30">
         {/* All Inboxes */}
         <button
           onClick={() => onChannelSelect(null)}
           className={cn(
-            'relative mb-4 flex items-center justify-center w-14 h-14 rounded-2xl transition-all',
+            'relative mb-4 flex flex-col items-center justify-center w-full px-2 py-2 rounded-xl transition-all group',
             selectedChannel === null
-              ? 'bg-primary text-primary-foreground shadow-lg ring-2 ring-primary/60 border-2 border-primary'
-              : 'bg-background hover:bg-muted text-muted-foreground border border-border/60'
+              ? 'bg-primary text-primary-foreground shadow-lg'
+              : 'bg-transparent hover:bg-muted text-muted-foreground'
           )}
-          title="All inboxes"
         >
-          <InboxIcon className="h-6 w-6" />
+          <div className={cn(
+            'flex items-center justify-center w-11 h-11 rounded-xl mb-1 transition-all',
+            selectedChannel === null 
+              ? 'bg-primary-foreground/10' 
+              : 'bg-muted group-hover:bg-muted-foreground/10'
+          )}>
+            <InboxIcon className="h-5 w-5" />
+          </div>
+          <span className={cn(
+            'text-[10px] font-medium truncate max-w-full',
+            selectedChannel === null ? 'text-primary-foreground' : 'text-muted-foreground'
+          )}>
+            All
+          </span>
           {selectedChannel === null && (
-            <div className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-primary-foreground" />
+            <div className="absolute top-1 right-2 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-primary" />
           )}
         </button>
 
         {/* Channel Icons + Add Channel (tiles in a single list) */}
-        <div className="flex flex-col gap-3 flex-1">
+        <div className="flex flex-col gap-2 flex-1 w-full">
           {channels.map((channel) => {
             const Icon = getProviderIcon(channel.provider);
             const isSelected = selectedChannel === channel.id;
@@ -152,37 +173,44 @@ export function ChannelSidebar({
                 key={channel.id}
                 onClick={() => onChannelSelect(channel.id)}
                 className={cn(
-                  'relative flex items-center justify-center w-14 h-14 rounded-2xl transition-all',
+                  'relative flex flex-col items-center justify-center w-full px-2 py-2 rounded-xl transition-all group',
                   isSelected
-                    ? 'bg-background text-foreground shadow-lg ring-2 ring-primary border-2 border-primary'
-                    : 'bg-background/80 hover:bg-muted text-muted-foreground border border-border/60'
+                    ? 'bg-muted text-foreground shadow-md ring-2 ring-primary/50'
+                    : 'bg-transparent hover:bg-muted/60 text-muted-foreground'
                 )}
                 title={tooltip}
               >
-                {integration?.logoUrl ? (
-                  <div
-                    className={cn(
-                      'flex items-center justify-center rounded-full h-8 w-8',
-                      isSelected ? 'bg-white' : 'bg-muted'
-                    )}
-                  >
+                <div className={cn(
+                  'flex items-center justify-center w-11 h-11 rounded-xl mb-1 transition-all',
+                  isSelected ? 'bg-background shadow-sm' : 'bg-muted/50 group-hover:bg-muted'
+                )}>
+                  {integration?.logoUrl ? (
                     <Image
                       src={integration.logoUrl}
                       alt={providerName}
-                      width={20}
-                      height={20}
+                      width={22}
+                      height={22}
                       className="object-contain"
                       loading="lazy"
                       unoptimized={integration.logoUrl?.startsWith('http')}
                     />
-                  </div>
-                ) : (
-                  <Icon className="h-6 w-6" />
-                )}
+                  ) : (
+                    <Icon className="h-5 w-5" />
+                  )}
+                </div>
+                <span className={cn(
+                  'text-[10px] font-medium truncate max-w-full',
+                  isSelected ? 'text-foreground' : 'text-muted-foreground'
+                )}>
+                  {providerName}
+                </span>
                 {unreadCount > 0 && (
-                  <div className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold">
+                  <div className="absolute top-1 right-2 flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] font-semibold">
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </div>
+                )}
+                {isSelected && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-8 bg-primary rounded-r" />
                 )}
               </button>
             );
@@ -191,12 +219,15 @@ export function ChannelSidebar({
           <button
             onClick={() => setConnectDialogOpen(true)}
             className={cn(
-              'relative flex items-center justify-center w-14 h-14 rounded-2xl transition-all border-2 border-dashed',
-              'bg-primary/5 hover:bg-primary/10 text-primary border-primary/40 hover:border-primary/60'
+              'relative flex flex-col items-center justify-center w-full px-2 py-2 rounded-xl transition-all group',
+              'bg-transparent hover:bg-primary/5 text-primary'
             )}
             title="Connect new channel"
           >
-            <Plus className="h-6 w-6" />
+            <div className="flex items-center justify-center w-11 h-11 rounded-xl border-2 border-dashed border-primary/40 group-hover:border-primary/60 mb-1 transition-all">
+              <Plus className="h-5 w-5" />
+            </div>
+            <span className="text-[10px] font-medium">Add</span>
           </button>
         </div>
       </div>

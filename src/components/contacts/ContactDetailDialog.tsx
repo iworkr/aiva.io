@@ -94,6 +94,20 @@ export function ContactDetailDialog({
     },
   });
 
+  // Sanitize contact name - remove leading/trailing quotes
+  const sanitizeContactName = (name: string): string => {
+    if (!name) return '';
+    return name.replace(/^["'"'"']+|["'"'"']+$/g, '').trim();
+  };
+
+  // Get the first letter for avatar display - finds first alphanumeric char
+  const getContactInitial = (name: string): string => {
+    const sanitized = sanitizeContactName(name);
+    if (!sanitized) return '?';
+    const match = sanitized.match(/[a-zA-Z0-9]/);
+    return match ? match[0].toUpperCase() : sanitized.charAt(0).toUpperCase();
+  };
+
   // Generate a subtle color based on contact name for avatar
   const getContactColor = (name: string) => {
     const colors = [
@@ -104,7 +118,8 @@ export function ContactDetailDialog({
       'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
       'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
     ];
-    const index = name.charCodeAt(0) % colors.length;
+    const initial = getContactInitial(name);
+    const index = initial.charCodeAt(0) % colors.length;
     return colors[index];
   };
 
@@ -122,6 +137,9 @@ export function ContactDetailDialog({
     });
   };
 
+  // Sanitized display values
+  const displayName = sanitizeContactName(contact.full_name || '');
+  const contactInitial = getContactInitial(contact.full_name || 'A');
   const contactColor = getContactColor(contact.full_name || 'A');
   const displayTitle = contact.job_title || '';
   const displayLocation = contact.company || contact.location || '';
@@ -137,7 +155,7 @@ export function ContactDetailDialog({
               {contact.avatar_url ? (
                 <Image
                   src={contact.avatar_url}
-                  alt={contact.full_name}
+                  alt={displayName || contact.full_name}
                   width={56}
                   height={56}
                   className="h-14 w-14 rounded-full object-cover flex-shrink-0"
@@ -150,14 +168,14 @@ export function ContactDetailDialog({
                     contactColor
                   )}
                 >
-                  {contact.full_name.charAt(0).toUpperCase()}
+                  {contactInitial}
                 </div>
               )}
 
               {/* Name and Title */}
               <div className="min-w-0">
                 <DialogTitle className="text-lg font-semibold truncate">
-                  {contact.full_name}
+                  {displayName || contact.full_name}
                 </DialogTitle>
                 {(displayTitle || displayLocation) && (
                   <p className="text-sm text-muted-foreground truncate">

@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   ChevronLeft,
   ChevronRight,
@@ -834,7 +835,13 @@ function LeftSidebar({
           </div>
           <div className="flex items-center gap-2 p-2">
             <Checkbox id="holidays" />
-            <label htmlFor="holidays" className="text-sm text-muted-foreground cursor-pointer">Holidays in United King...</label>
+            <label 
+              htmlFor="holidays" 
+              className="text-sm text-muted-foreground cursor-pointer truncate"
+              title="Holidays in United Kingdom"
+            >
+              Holidays (UK)
+            </label>
           </div>
         </div>
       </div>
@@ -871,13 +878,22 @@ function RightSidebar({
             <p className="text-sm font-medium text-yellow-600">
               1 task scheduled past deadline
             </p>
-            <Button 
-              size="sm" 
-              className="mt-2 w-full bg-yellow-600 text-white hover:bg-yellow-700"
-              onClick={onResolveOverdue}
-            >
-              Resolve
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    size="sm" 
+                    className="mt-2 w-full bg-yellow-600 text-white hover:bg-yellow-700"
+                    onClick={onResolveOverdue}
+                  >
+                    Resolve
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Reschedule, mark as complete, or dismiss this overdue task</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
       </Card>

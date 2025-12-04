@@ -18,8 +18,29 @@ import { BriefingSection } from './BriefingSection';
 import { AivaChatInput } from './AivaChatInput';
 import { TodaysBriefingButton } from './TodaysBriefingButton';
 
-function getGreeting() {
-  const hour = new Date().getHours();
+function getGreeting(timezone?: string) {
+  // Use Intl to get the hour in the user's timezone, with UTC fallback
+  const now = new Date();
+  let hour: number;
+  
+  try {
+    if (timezone) {
+      // Format to get 24-hour time in the user's timezone
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        hour: 'numeric',
+        hour12: false,
+        timeZone: timezone,
+      });
+      hour = parseInt(formatter.format(now), 10);
+    } else {
+      // Fallback to server time
+      hour = now.getHours();
+    }
+  } catch (error) {
+    // If timezone is invalid, fall back to server time
+    hour = now.getHours();
+  }
+  
   if (hour < 12) return 'Good Morning';
   if (hour < 17) return 'Good Afternoon';
   return 'Good Evening';
@@ -83,6 +104,16 @@ export async function MorningBrief() {
 
   const workspaceId = workspace.id;
   const userId = user.id;
+
+  // Get workspace settings for timezone
+  const { data: workspaceSettings } = await supabase
+    .from('workspace_settings')
+    .select('workspace_settings')
+    .eq('workspace_id', workspaceId)
+    .single();
+
+  // Extract timezone from settings (stored in JSON)
+  const userTimezone = (workspaceSettings?.workspace_settings as any)?.timezone || undefined;
 
   // Get user profile for display name
   const { data: userProfile } = await supabase
@@ -250,7 +281,7 @@ export async function MorningBrief() {
       {/* Greeting and Summary */}
       <div className="text-center space-y-3">
         <h1 className="text-3xl font-bold">
-          {getGreeting()}, {displayName}
+          {getGreeting(userTimezone)}, {displayName}
         </h1>
         <p className="text-base text-muted-foreground">
           You've got{' '}
