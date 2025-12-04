@@ -46,7 +46,6 @@ export default async function Page(props0: {
 }) {
   const params = await props0.params;
   const page = getPage(params.slug);
-  console.log(defaultMdxComponents);
   if (!page) {
     notFound();
   }

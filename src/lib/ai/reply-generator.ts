@@ -3,10 +3,10 @@
  * Generates reply drafts for messages using OpenAI
  */
 
-'use server';
+"use server";
 
-import { OpenAI } from 'openai';
-import { createSupabaseUserServerActionClient } from '@/supabase-clients/user/createSupabaseUserServerActionClient';
+import { createSupabaseUserServerActionClient } from "@/supabase-clients/user/createSupabaseUserServerActionClient";
+import { OpenAI } from "openai";
 
 // Lazy-load OpenAI client to avoid crashes on missing API key
 let openaiClient: OpenAI | null = null;
@@ -15,7 +15,9 @@ function getOpenAIClient(): OpenAI | null {
   if (!openaiClient) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      console.warn('[AI Reply] OPENAI_API_KEY not configured - AI features disabled');
+      console.warn(
+        "[AI Reply] OPENAI_API_KEY not configured - AI features disabled",
+      );
       return null;
     }
     openaiClient = new OpenAI({ apiKey });
@@ -24,7 +26,7 @@ function getOpenAIClient(): OpenAI | null {
 }
 
 interface ReplyOptions {
-  tone?: 'formal' | 'casual' | 'friendly' | 'professional';
+  tone?: "formal" | "casual" | "friendly" | "professional";
   includeQuote?: boolean;
   maxLength?: number;
   context?: string;
@@ -44,98 +46,116 @@ interface ReplyDraftResult {
 export async function generateReplyDraft(
   messageId: string,
   workspaceId: string,
-  options: ReplyOptions = {}
+  options: ReplyOptions = {},
 ): Promise<ReplyDraftResult> {
   try {
     // Check feature access - AI drafts require Pro plan
     // In development mode (no Stripe), this should return true
-    const { getHasFeature } = await import('@/rsc-data/user/subscriptions');
-    
+    const { getHasFeature } = await import("@/rsc-data/user/subscriptions");
+
     let hasAIDrafts = true;
     try {
-      hasAIDrafts = await getHasFeature(workspaceId, 'aiDrafts');
-      console.log('[AI Reply] Feature check result:', { workspaceId, hasAIDrafts });
+      hasAIDrafts = await getHasFeature(workspaceId, "aiDrafts");
+      console.log("[AI Reply] Feature check result:", {
+        workspaceId,
+        hasAIDrafts,
+      });
     } catch (featureError) {
       // If feature check fails, allow access in development
-      console.warn('[AI Reply] Feature check failed, defaulting to allowed:', featureError);
+      console.warn(
+        "[AI Reply] Feature check failed, defaulting to allowed:",
+        featureError,
+      );
       hasAIDrafts = true;
     }
-    
+
     if (!hasAIDrafts) {
       throw new Error(
-        'AI reply drafts are a Pro feature. Upgrade your plan to access AI-powered reply generation.'
+        "AI reply drafts are a Pro feature. Upgrade your plan to access AI-powered reply generation.",
       );
     }
 
-    console.log('[AI Reply] Creating Supabase client...');
+    console.log("[AI Reply] Creating Supabase client...");
     const supabase = await createSupabaseUserServerActionClient();
 
     // Get the message
-    console.log('[AI Reply] Fetching message:', { messageId, workspaceId });
+    console.log("[AI Reply] Fetching message:", { messageId, workspaceId });
     const { data: message, error } = await supabase
-      .from('messages')
+      .from("messages")
       .select(
         `
         *,
         channel_connection:channel_connections(provider, provider_account_name)
-      `
+      `,
       )
-      .eq('id', messageId)
-      .eq('workspace_id', workspaceId)
+      .eq("id", messageId)
+      .eq("workspace_id", workspaceId)
       .single();
 
-    console.log('[AI Reply] Message fetch result:', { found: !!message, error: error?.message });
-    
+    console.log("[AI Reply] Message fetch result:", {
+      found: !!message,
+      error: error?.message,
+    });
+
     if (error || !message) {
-      console.error('[AI Reply] Message not found:', { messageId, workspaceId, error });
-      throw new Error(`Message not found: ${error?.message || 'No data returned'}`);
+      console.error("[AI Reply] Message not found:", {
+        messageId,
+        workspaceId,
+        error,
+      });
+      throw new Error(
+        `Message not found: ${error?.message || "No data returned"}`,
+      );
     }
-    
-    console.log('[AI Reply] Message found:', { subject: message.subject, sender: message.sender_email });
+
+    console.log("[AI Reply] Message found:", {
+      subject: message.subject,
+      sender: message.sender_email,
+    });
 
     const {
-      tone = 'professional',
+      tone = "professional",
       includeQuote = false,
       maxLength = 500,
-      context = '',
+      context = "",
     } = options;
 
     // Prepare conversation context
-    let conversationContext = '';
+    let conversationContext = "";
     if (message.provider_thread_id) {
       // Get previous messages in thread
       const { data: threadMessages } = await supabase
-        .from('messages')
-        .select('sender_email, body, timestamp')
-        .eq('provider_thread_id', message.provider_thread_id)
-        .order('timestamp', { ascending: true })
+        .from("messages")
+        .select("sender_email, body, timestamp")
+        .eq("provider_thread_id", message.provider_thread_id)
+        .order("timestamp", { ascending: true })
         .limit(5);
 
       if (threadMessages && threadMessages.length > 0) {
         conversationContext = threadMessages
           .map(
             (m) =>
-              `From ${m.sender_email} at ${new Date(m.timestamp).toLocaleString()}:\n${m.body.substring(0, 200)}`
+              `From ${m.sender_email} at ${new Date(m.timestamp).toLocaleString()}:\n${m.body.substring(0, 200)}`,
           )
-          .join('\n\n');
+          .join("\n\n");
       }
     }
 
     // Build prompt
     const prompt = `Generate a ${tone} email reply to the following message:
 
-Subject: ${message.subject || '(no subject)'}
+Subject: ${message.subject || "(no subject)"}
 From: ${message.sender_name || message.sender_email}
 Body:
 ${message.body}
 
-${conversationContext ? `\n\nConversation Context:\n${conversationContext}` : ''}
-${context ? `\n\nAdditional Context: ${context}` : ''}
+${conversationContext ? `\n\nConversation Context:\n${conversationContext}` : ""}
+${context ? `\n\nAdditional Context: ${context}` : ""}
 
 REQUIREMENTS:
-1. Tone: ${tone} (${tone === 'formal' ? 'Professional language, avoid contractions' : tone === 'casual' ? 'Friendly, conversational' : tone === 'friendly' ? 'Warm and approachable' : 'Professional but approachable'})
+1. Tone: ${tone} (${tone === "formal" ? "Professional language, avoid contractions" : tone === "casual" ? "Friendly, conversational" : tone === "friendly" ? "Warm and approachable" : "Professional but approachable"})
 2. Length: ~${maxLength} characters
-3. ${includeQuote ? 'Include relevant quote' : 'No quoted text'}
+3. ${includeQuote ? "Include relevant quote" : "No quoted text"}
 4. Address main points from original
 5. Be helpful and clear
 6. End with appropriate closing
@@ -165,20 +185,21 @@ Format as JSON:
     // Call OpenAI
     const openai = getOpenAIClient();
     if (!openai) {
-      console.log('[AI Reply] OpenAI not configured, returning fallback');
+      console.log("[AI Reply] OpenAI not configured, returning fallback");
       return {
-        body: '',
+        body: "",
         confidenceScore: 0,
-        tone: options.tone || 'professional',
-        error: 'AI not configured. Please add OPENAI_API_KEY to enable AI features.',
+        tone: options.tone || "professional",
+        error:
+          "AI not configured. Please add OPENAI_API_KEY to enable AI features.",
       };
     }
-    
+
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: "gpt-4o-mini",
       messages: [
         {
-          role: 'system',
+          role: "system",
           content: `You are an expert email assistant. Generate contextually appropriate replies.
 
 CRITICAL: Confidence scores must be realistic and varied:
@@ -190,41 +211,50 @@ CRITICAL: Confidence scores must be realistic and varied:
 Be honest about uncertainty. Don't default to high confidence.`,
         },
         {
-          role: 'user',
+          role: "user",
           content: prompt,
         },
       ],
       temperature: 0.5, // Moderate creativity for replies
       max_tokens: Math.ceil(maxLength / 2),
-      response_format: { type: 'json_object' },
+      response_format: { type: "json_object" },
     });
 
     const processingTime = Date.now() - startTime;
 
-    const rawResult = JSON.parse(completion.choices[0].message.content || '{}');
-    
+    const rawResult = JSON.parse(completion.choices[0].message.content || "{}");
+
     // Post-process confidence score to ensure realistic values
     let confidence = rawResult.confidenceScore;
-    if (typeof confidence !== 'number' || isNaN(confidence)) {
+    if (typeof confidence !== "number" || isNaN(confidence)) {
       confidence = 0.65; // Default to moderate confidence
     }
-    confidence = Math.max(0.40, Math.min(1.0, confidence));
-    
+    confidence = Math.max(0.4, Math.min(1.0, confidence));
+
     // Adjust based on message characteristics
-    const messageBody = message.body || '';
+    const messageBody = message.body || "";
     const lowerBody = messageBody.toLowerCase();
-    
+
     // Sensitive topics should reduce confidence
-    const sensitiveKeywords = ['refund', 'complaint', 'legal', 'urgent', 'emergency', 'angry', 'disappointed', 'terrible'];
-    if (sensitiveKeywords.some(kw => lowerBody.includes(kw))) {
-      confidence = Math.min(confidence, 0.70);
+    const sensitiveKeywords = [
+      "refund",
+      "complaint",
+      "legal",
+      "urgent",
+      "emergency",
+      "angry",
+      "disappointed",
+      "terrible",
+    ];
+    if (sensitiveKeywords.some((kw) => lowerBody.includes(kw))) {
+      confidence = Math.min(confidence, 0.7);
     }
-    
+
     // Very short original messages are harder to respond to appropriately
     if (messageBody.length < 100) {
       confidence = Math.min(confidence, 0.75);
     }
-    
+
     const result = {
       ...rawResult,
       confidenceScore: Math.round(confidence * 100) / 100,
@@ -232,7 +262,7 @@ Be honest about uncertainty. Don't default to high confidence.`,
 
     // Store draft in database
     const { data: draft, error: draftError } = await supabase
-      .from('message_drafts')
+      .from("message_drafts")
       .insert({
         workspace_id: workspaceId,
         user_id: workspaceId, // Placeholder
@@ -247,23 +277,23 @@ Be honest about uncertainty. Don't default to high confidence.`,
       .single();
 
     if (draftError) {
-      console.error('Failed to store draft:', draftError);
+      console.error("Failed to store draft:", draftError);
     }
 
     // Update message to indicate draft exists
     await supabase
-      .from('messages')
+      .from("messages")
       .update({
         has_draft_reply: true,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', messageId);
+      .eq("id", messageId);
 
     // Log AI action
-    await supabase.from('ai_action_logs').insert({
+    await supabase.from("ai_action_logs").insert({
       workspace_id: workspaceId,
       user_id: workspaceId, // Placeholder
-      action_type: 'reply_draft',
+      action_type: "reply_draft",
       input_ref: messageId,
       output_ref: draft?.id,
       model_used: completion.model,
@@ -290,15 +320,17 @@ Be honest about uncertainty. Don't default to high confidence.`,
       tone,
     };
   } catch (error) {
-    console.error('[AI Reply] Generation error:', error);
+    console.error("[AI Reply] Generation error:", error);
     // Provide more specific error messages
     if (error instanceof Error) {
-      if (error.message.includes('OPENAI_API_KEY')) {
-        throw new Error('AI features are not configured. Please contact support.');
+      if (error.message.includes("OPENAI_API_KEY")) {
+        throw new Error(
+          "AI features are not configured. Please contact support.",
+        );
       }
       throw error;
     }
-    throw new Error('Failed to generate reply. Please try again.');
+    throw new Error("Failed to generate reply. Please try again.");
   }
 }
 
@@ -307,22 +339,22 @@ Be honest about uncertainty. Don't default to high confidence.`,
  */
 export async function generateReplyVariations(
   messageId: string,
-  workspaceId: string
+  workspaceId: string,
 ): Promise<ReplyDraftResult[]> {
   // Check feature access - AI drafts require Pro plan
-  const { getHasFeature } = await import('@/rsc-data/user/subscriptions');
-  const hasAIDrafts = await getHasFeature(workspaceId, 'aiDrafts');
-  
+  const { getHasFeature } = await import("@/rsc-data/user/subscriptions");
+  const hasAIDrafts = await getHasFeature(workspaceId, "aiDrafts");
+
   if (!hasAIDrafts) {
     throw new Error(
-      'AI reply drafts are a Pro feature. Upgrade your plan to access AI-powered reply generation.'
+      "AI reply drafts are a Pro feature. Upgrade your plan to access AI-powered reply generation.",
     );
   }
 
-  const tones: Array<'formal' | 'casual' | 'friendly' | 'professional'> = [
-    'professional',
-    'friendly',
-    'casual',
+  const tones: Array<"formal" | "casual" | "friendly" | "professional"> = [
+    "professional",
+    "friendly",
+    "casual",
   ];
 
   const results = [];
@@ -346,14 +378,14 @@ export async function generateReplyVariations(
 function isAutoSendable(
   confidenceScore: number,
   messageCategory?: string,
-  messagePriority?: string
+  messagePriority?: string,
 ): boolean {
   // Auto-send criteria
   const minConfidenceScore = 0.85;
 
   // Don't auto-send high priority or sales leads
-  const blockAutoSendCategories = ['sales_lead'];
-  const blockAutoSendPriorities = ['high'];
+  const blockAutoSendCategories = ["sales_lead"];
+  const blockAutoSendPriorities = ["high"];
 
   if (confidenceScore < minConfidenceScore) {
     return false;
@@ -375,26 +407,26 @@ function isAutoSendable(
  */
 export async function extractTasks(
   messageId: string,
-  workspaceId: string
+  workspaceId: string,
 ): Promise<Array<{ title: string; description?: string; dueDate?: string }>> {
   try {
     const supabase = await createSupabaseUserServerActionClient();
 
     // Get the message
     const { data: message, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('id', messageId)
-      .eq('workspace_id', workspaceId)
+      .from("messages")
+      .select("*")
+      .eq("id", messageId)
+      .eq("workspace_id", workspaceId)
       .single();
 
     if (error || !message) {
-      throw new Error('Message not found');
+      throw new Error("Message not found");
     }
 
     const prompt = `Analyze this email and extract any actionable tasks:
 
-Subject: ${message.subject || '(no subject)'}
+Subject: ${message.subject || "(no subject)"}
 From: ${message.sender_email}
 Body:
 ${message.body}
@@ -418,36 +450,38 @@ If no tasks found, return empty array: []`;
 
     const openai = getOpenAIClient();
     if (!openai) {
-      console.log('[AI Reply] OpenAI not configured for task extraction');
+      console.log("[AI Reply] OpenAI not configured for task extraction");
       return [];
     }
-    
+
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: "gpt-4o-mini",
       messages: [
         {
-          role: 'system',
+          role: "system",
           content:
-            'You are an expert at extracting actionable tasks from emails. Be precise and conservative - only extract clear, actionable items.',
+            "You are an expert at extracting actionable tasks from emails. Be precise and conservative - only extract clear, actionable items.",
         },
         {
-          role: 'user',
+          role: "user",
           content: prompt,
         },
       ],
       temperature: 0.3,
       max_tokens: 500,
-      response_format: { type: 'json_object' },
+      response_format: { type: "json_object" },
     });
 
-    const result = JSON.parse(completion.choices[0].message.content || '{"tasks": []}');
+    const result = JSON.parse(
+      completion.choices[0].message.content || '{"tasks": []}',
+    );
     const tasks = result.tasks || [];
 
     // Log AI action
-    await supabase.from('ai_action_logs').insert({
+    await supabase.from("ai_action_logs").insert({
       workspace_id: workspaceId,
       user_id: workspaceId, // Placeholder
-      action_type: 'task_extraction',
+      action_type: "task_extraction",
       input_ref: messageId,
       model_used: completion.model,
       prompt_tokens: completion.usage?.prompt_tokens,
@@ -460,7 +494,7 @@ If no tasks found, return empty array: []`;
 
     return tasks;
   } catch (error) {
-    console.error('Task extraction error:', error);
+    console.error("Task extraction error:", error);
     throw error;
   }
 }
@@ -470,7 +504,7 @@ If no tasks found, return empty array: []`;
  */
 export async function detectSchedulingIntent(
   messageId: string,
-  workspaceId: string
+  workspaceId: string,
 ): Promise<{
   hasIntent: boolean;
   proposedTimes?: string[];
@@ -481,19 +515,19 @@ export async function detectSchedulingIntent(
     const supabase = await createSupabaseUserServerActionClient();
 
     const { data: message, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('id', messageId)
-      .eq('workspace_id', workspaceId)
+      .from("messages")
+      .select("*")
+      .eq("id", messageId)
+      .eq("workspace_id", workspaceId)
       .single();
 
     if (error || !message) {
-      throw new Error('Message not found');
+      throw new Error("Message not found");
     }
 
     const prompt = `Analyze this email for scheduling or meeting intent:
 
-Subject: ${message.subject || '(no subject)'}
+Subject: ${message.subject || "(no subject)"}
 Body:
 ${message.body}
 
@@ -513,35 +547,35 @@ Respond with JSON:
 
     const openai = getOpenAIClient();
     if (!openai) {
-      console.log('[AI Reply] OpenAI not configured for scheduling detection');
+      console.log("[AI Reply] OpenAI not configured for scheduling detection");
       return { hasIntent: false };
     }
-    
+
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: "gpt-4o-mini",
       messages: [
         {
-          role: 'system',
+          role: "system",
           content:
-            'You are an expert at detecting scheduling intent in emails. Be accurate and extract specific details.',
+            "You are an expert at detecting scheduling intent in emails. Be accurate and extract specific details.",
         },
         {
-          role: 'user',
+          role: "user",
           content: prompt,
         },
       ],
       temperature: 0.2,
       max_tokens: 300,
-      response_format: { type: 'json_object' },
+      response_format: { type: "json_object" },
     });
 
-    const result = JSON.parse(completion.choices[0].message.content || '{}');
+    const result = JSON.parse(completion.choices[0].message.content || "{}");
 
     // Log AI action
-    await supabase.from('ai_action_logs').insert({
+    await supabase.from("ai_action_logs").insert({
       workspace_id: workspaceId,
       user_id: workspaceId,
-      action_type: 'scheduling_detection',
+      action_type: "scheduling_detection",
       input_ref: messageId,
       model_used: completion.model,
       input_data: { messageId },
@@ -551,8 +585,7 @@ Respond with JSON:
 
     return result;
   } catch (error) {
-    console.error('Scheduling detection error:', error);
+    console.error("Scheduling detection error:", error);
     throw error;
   }
 }
-

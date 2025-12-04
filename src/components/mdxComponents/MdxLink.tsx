@@ -7,7 +7,6 @@ interface MdxLinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
 }
 
 export function MdxLink({ children, href, ...props }: MdxLinkProps) {
-  console.log("MdxLink", children, href, props);
   if (!href) {
     return (
       <a href={href} {...props}>

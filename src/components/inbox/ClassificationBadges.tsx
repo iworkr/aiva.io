@@ -6,35 +6,35 @@
 'use client';
 
 import { Badge } from '@/components/ui/badge';
+import { getCategoryDisplay, getPriorityDisplay } from '@/lib/ai/priority-mapper';
+import { cn } from '@/lib/utils';
+import type { MessageCategory, MessagePriority } from '@/utils/zod-schemas/aiva-schemas';
 import {
   AlertTriangle,
-  TrendingUp,
-  Minus,
-  TrendingDown,
-  Flame,
   Ban,
-  HelpCircle,
-  MessageSquareWarning,
-  DollarSign,
-  Receipt,
-  CreditCard,
-  KeyRound,
-  LogIn,
-  ShieldAlert,
-  Megaphone,
-  Trash2,
-  Newspaper,
+  Bell,
   Building2,
   Calendar,
+  CircleDot,
+  CreditCard,
+  DollarSign,
+  Flame,
+  Headphones,
+  HelpCircle,
+  KeyRound,
+  LogIn,
+  Megaphone,
+  MessageSquareWarning,
+  Minus,
+  Newspaper,
+  Receipt,
+  ShieldAlert,
+  Trash2,
+  TrendingDown,
+  TrendingUp,
   User,
   Users,
-  Bell,
-  CircleDot,
-  Headphones,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { getPriorityDisplay, getCategoryDisplay } from '@/lib/ai/priority-mapper';
-import type { MessagePriority, MessageCategory } from '@/utils/zod-schemas/aiva-schemas';
 
 export function PriorityBadge({ priority }: { priority: string | null | undefined }) {
   if (!priority) return null;
@@ -80,10 +80,10 @@ const CATEGORY_CONFIG: Record<string, { icon: any; color: string; bgColor: strin
   other: { icon: CircleDot, color: 'text-gray-600 dark:text-gray-400', bgColor: 'bg-gray-50 dark:bg-gray-950' },
 };
 
-export function CategoryBadge({ 
-  category, 
-  confidenceScore 
-}: { 
+export function CategoryBadge({
+  category,
+  confidenceScore
+}: {
   category: string | null | undefined;
   confidenceScore?: number | null;
 }) {
@@ -92,15 +92,15 @@ export function CategoryBadge({
   const display = getCategoryDisplay(category as MessageCategory);
   const config = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.other;
   const Icon = config.icon;
-  
-  const confidence = confidenceScore !== null && confidenceScore !== undefined 
-    ? Math.round(confidenceScore * 100) 
+
+  const confidence = confidenceScore !== null && confidenceScore !== undefined
+    ? Math.round(confidenceScore * 100)
     : null;
 
   return (
-    <Badge 
-      variant="outline" 
-      className={cn('text-xs', config.color, config.bgColor)} 
+    <Badge
+      variant="outline"
+      className={cn('text-xs', config.color, config.bgColor)}
       title={confidence !== null ? `${display.description} (${confidence}% confidence)` : display.description}
     >
       <Icon className="mr-1 h-3 w-3" />

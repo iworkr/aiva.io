@@ -25,7 +25,6 @@ export function TiptapJSONContentToHTML({
 }: {
   jsonContent: DBTable<"marketing_blog_posts">["json_content"];
 }) {
-  console.log("jsonContent", jsonContent);
   const validContent =
     typeof jsonContent === "string"
       ? JSON.parse(jsonContent)

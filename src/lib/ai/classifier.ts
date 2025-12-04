@@ -3,17 +3,17 @@
  * Uses OpenAI to classify messages by priority, category, sentiment, etc.
  */
 
-'use server';
+"use server";
 
-import { OpenAI } from 'openai';
-import { createSupabaseUserServerActionClient } from '@/supabase-clients/user/createSupabaseUserServerActionClient';
+import { createSupabaseUserServerActionClient } from "@/supabase-clients/user/createSupabaseUserServerActionClient";
 import {
-  MessagePriority,
-  MessageCategory,
-  MessageSentiment,
   MessageActionability,
-} from '@/utils/zod-schemas/aiva-schemas';
-import { getPriorityFromCategory } from './priority-mapper';
+  MessageCategory,
+  MessagePriority,
+  MessageSentiment,
+} from "@/utils/zod-schemas/aiva-schemas";
+import { OpenAI } from "openai";
+import { getPriorityFromCategory } from "./priority-mapper";
 
 // Lazy-load OpenAI client to avoid crashes on missing API key
 let openaiClient: OpenAI | null = null;
@@ -23,7 +23,7 @@ function getOpenAIClient(): OpenAI {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       throw new Error(
-        'OPENAI_API_KEY is not configured. Please add it to your .env.local file to enable AI features.'
+        "OPENAI_API_KEY is not configured. Please add it to your .env.local file to enable AI features.",
       );
     }
     openaiClient = new OpenAI({ apiKey });
@@ -46,29 +46,29 @@ interface ClassificationResult {
  */
 export async function classifyMessage(
   messageId: string,
-  workspaceId: string
+  workspaceId: string,
 ): Promise<ClassificationResult> {
   try {
     const supabase = await createSupabaseUserServerActionClient();
 
     // Get the message
     const { data: message, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('id', messageId)
-      .eq('workspace_id', workspaceId)
+      .from("messages")
+      .select("*")
+      .eq("id", messageId)
+      .eq("workspace_id", workspaceId)
       .single();
 
     if (error || !message) {
-      throw new Error('Message not found');
+      throw new Error("Message not found");
     }
 
     // Prepare prompt for OpenAI
     const prompt = `Analyze this email message and classify it:
 
-Subject: ${message.subject || '(no subject)'}
+Subject: ${message.subject || "(no subject)"}
 From: ${message.sender_name || message.sender_email}
-Body: ${message.body?.substring(0, 1500) || ''} ${(message.body?.length || 0) > 1500 ? '...' : ''}
+Body: ${message.body?.substring(0, 1500) || ""} ${(message.body?.length || 0) > 1500 ? "..." : ""}
 
 CLASSIFICATION CATEGORIES (choose the MOST SPECIFIC match):
 
@@ -152,10 +152,10 @@ Respond with ONLY valid JSON:
     // Call OpenAI with low temperature for consistent results
     const openai = getOpenAIClient();
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: "gpt-4o-mini",
       messages: [
         {
-          role: 'system',
+          role: "system",
           content: `You are an expert email classifier. Analyze emails accurately and provide realistic confidence scores.
 
 CRITICAL: Confidence scores must reflect actual certainty:
@@ -168,50 +168,50 @@ Short test messages, single-word emails, or vague content should ALWAYS have con
 Be consistent: similar messages should get similar classifications.`,
         },
         {
-          role: 'user',
+          role: "user",
           content: prompt,
         },
       ],
       temperature: 0.1, // Very low for consistency
       max_tokens: 500,
-      response_format: { type: 'json_object' },
+      response_format: { type: "json_object" },
     });
 
     const processingTime = Date.now() - startTime;
 
     const rawResult = JSON.parse(
-      completion.choices[0].message.content || '{}'
+      completion.choices[0].message.content || "{}",
     ) as ClassificationResult;
-    
+
     // Post-process confidence score to ensure realistic values
     let confidence = rawResult.confidenceScore;
-    
+
     // Validate confidence is in range
-    if (typeof confidence !== 'number' || isNaN(confidence)) {
+    if (typeof confidence !== "number" || isNaN(confidence)) {
       confidence = 0.5;
     }
     confidence = Math.max(0.35, Math.min(1.0, confidence));
-    
+
     // Adjust confidence based on message characteristics
     const bodyLength = message.body?.length || 0;
-    const subjectLength = (message.subject || '').length;
-    
+    const subjectLength = (message.subject || "").length;
+
     // Very short messages should have lower confidence
     if (bodyLength < 50 && subjectLength < 20) {
-      confidence = Math.min(confidence, 0.60);
+      confidence = Math.min(confidence, 0.6);
     }
-    
+
     // Generic test-like messages should have low confidence
-    const lowerBody = (message.body || '').toLowerCase();
-    const lowerSubject = (message.subject || '').toLowerCase();
+    const lowerBody = (message.body || "").toLowerCase();
+    const lowerSubject = (message.subject || "").toLowerCase();
     if (
-      lowerSubject.includes('test') || 
-      lowerBody.includes('test message') ||
+      lowerSubject.includes("test") ||
+      lowerBody.includes("test message") ||
       lowerBody.match(/^test\s*\d*$/i)
     ) {
       confidence = Math.min(confidence, 0.55);
     }
-    
+
     const result: ClassificationResult = {
       ...rawResult,
       confidenceScore: Math.round(confidence * 100) / 100, // Round to 2 decimals
@@ -222,12 +222,12 @@ Be consistent: similar messages should get similar classifications.`,
     const finalPriority = getPriorityFromCategory(
       result.category,
       result.sentiment,
-      result.actionability
+      result.actionability,
     );
 
     // Update message with classification
     await supabase
-      .from('messages')
+      .from("messages")
       .update({
         priority: finalPriority, // Use mapped priority for consistency
         category: result.category,
@@ -238,13 +238,13 @@ Be consistent: similar messages should get similar classifications.`,
         confidence_score: result.confidenceScore,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', messageId);
+      .eq("id", messageId);
 
     // Log AI action
-    await supabase.from('ai_action_logs').insert({
+    await supabase.from("ai_action_logs").insert({
       workspace_id: workspaceId,
       user_id: message.workspace_id, // Placeholder - should be actual user
-      action_type: 'classification',
+      action_type: "classification",
       input_ref: messageId,
       model_used: completion.model,
       prompt_tokens: completion.usage?.prompt_tokens,
@@ -263,7 +263,7 @@ Be consistent: similar messages should get similar classifications.`,
 
     return result;
   } catch (error) {
-    console.error('Message classification error:', error);
+    console.error("Message classification error:", error);
     throw error;
   }
 }
@@ -273,7 +273,7 @@ Be consistent: similar messages should get similar classifications.`,
  */
 export async function batchClassifyMessages(
   messageIds: string[],
-  workspaceId: string
+  workspaceId: string,
 ): Promise<{ successful: number; failed: number; results: any[] }> {
   const results = [];
   let successful = 0;
@@ -288,7 +288,7 @@ export async function batchClassifyMessages(
       results.push({
         messageId,
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : "Unknown error",
       });
       failed++;
     }
@@ -302,23 +302,23 @@ export async function batchClassifyMessages(
  */
 export async function autoClassifyNewMessages(
   workspaceId: string,
-  limit: number = 10
+  limit: number = 10,
 ) {
   const supabase = await createSupabaseUserServerActionClient();
 
   // Get unclassified messages
   const { data: messages, error } = await supabase
-    .from('messages')
-    .select('id')
-    .eq('workspace_id', workspaceId)
-    .is('priority', null)
-    .order('created_at', { ascending: false })
+    .from("messages")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .is("priority", null)
+    .order("created_at", { ascending: false })
     .limit(limit);
 
   if (error || !messages || messages.length === 0) {
     return {
       success: true,
-      message: 'No unclassified messages found',
+      message: "No unclassified messages found",
       classifiedCount: 0,
     };
   }
@@ -331,4 +331,3 @@ export async function autoClassifyNewMessages(
     ...result,
   };
 }
-

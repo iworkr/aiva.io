@@ -7,7 +7,6 @@ const useLocationHash = () => {
 
   useEffect(() => {
     const onHashChange = () => {
-      console.log(window.location.hash);
       setHash(window.location.hash);
     };
     window.addEventListener("hashchange", onHashChange);
