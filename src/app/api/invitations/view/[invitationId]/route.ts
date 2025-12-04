@@ -11,7 +11,7 @@ const paramsSchema = z.object({
 export async function GET(
   _req: NextRequest,
   props: {
-    params: Promise<undefined>;
+    params: Promise<{ invitationId: string }>;
   },
 ) {
   const params = await props.params;

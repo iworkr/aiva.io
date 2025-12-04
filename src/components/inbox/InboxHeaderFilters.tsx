@@ -101,178 +101,161 @@ export function InboxHeaderFilters({
   };
 
   return (
-    <div className="flex flex-col gap-2 px-4 py-3 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      {/* Row 1: Quick status filters and sort */}
-      <div className="flex items-center justify-between gap-4">
-        {/* Status pills */}
-        <div className="flex items-center gap-1">
-          <Button
-            variant={statusFilter === 'all' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => onStatusFilterChange('all')}
-            className={cn(
-              'h-8 px-3 text-xs',
-              statusFilter === 'all' && 'bg-primary/10 text-primary hover:bg-primary/20'
-            )}
-          >
-            <MailOpen className="mr-1.5 h-3.5 w-3.5" />
-            All
-          </Button>
-
-          <Button
-            variant={statusFilter === 'unread' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => onStatusFilterChange('unread')}
-            className={cn(
-              'h-8 px-3 text-xs',
-              statusFilter === 'unread' && 'bg-primary/10 text-primary hover:bg-primary/20'
-            )}
-          >
-            <Mail className="mr-1.5 h-3.5 w-3.5" />
-            Unread
-            {unreadCount > 0 && (
-              <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px]">
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </Badge>
-            )}
-          </Button>
-
-          <Button
-            variant={statusFilter === 'starred' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => onStatusFilterChange('starred')}
-            className={cn(
-              'h-8 px-3 text-xs',
-              statusFilter === 'starred' && 'bg-primary/10 text-primary hover:bg-primary/20'
-            )}
-          >
-            <Star className="mr-1.5 h-3.5 w-3.5" />
-            Starred
-            {starredCount > 0 && (
-              <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px]">
-                {starredCount > 99 ? '99+' : starredCount}
-              </Badge>
-            )}
-          </Button>
-        </div>
-
-        {/* Sort dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
-              <ArrowUpDown className="h-3.5 w-3.5" />
-              {SORT_OPTIONS.find((o) => o.value === sortBy)?.label || 'Sort'}
-              <ChevronDown className="h-3 w-3 opacity-50" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel className="text-xs">Sort by</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {SORT_OPTIONS.map((option) => (
-              <DropdownMenuCheckboxItem
-                key={option.value}
-                checked={sortBy === option.value}
-                onCheckedChange={() => onSortChange(option.value as SortOption)}
-              >
-                {option.label}
-              </DropdownMenuCheckboxItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+    <div className="flex items-center gap-2 px-4 py-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      {/* Status pills */}
+      <div className="flex items-center">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onStatusFilterChange('all')}
+          className={cn(
+            'h-7 px-2.5 text-xs rounded-r-none border-r-0',
+            statusFilter === 'all' 
+              ? 'bg-primary/10 text-primary' 
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          All
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onStatusFilterChange('unread')}
+          className={cn(
+            'h-7 px-2.5 text-xs rounded-none',
+            statusFilter === 'unread' 
+              ? 'bg-primary/10 text-primary' 
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <Mail className="mr-1 h-3 w-3" />
+          Unread
+          {unreadCount > 0 && (
+            <span className="ml-1 text-[10px] opacity-70">({unreadCount > 99 ? '99+' : unreadCount})</span>
+          )}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onStatusFilterChange('starred')}
+          className={cn(
+            'h-7 px-2.5 text-xs rounded-l-none',
+            statusFilter === 'starred' 
+              ? 'bg-primary/10 text-primary' 
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          <Star className="mr-1 h-3 w-3" />
+          Starred
+        </Button>
       </div>
 
-      {/* Row 2: Advanced filters */}
-      <div className="flex items-center gap-2">
-        {/* Priority filter */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant={priorityFilter ? 'secondary' : 'outline'}
-              size="sm"
-              className={cn(
-                'h-7 gap-1.5 text-xs',
-                priorityFilter && 'bg-primary/10 text-primary border-primary/30'
-              )}
-            >
-              <Filter className="h-3 w-3" />
-              Priority
-              {priorityFilter && (
-                <Badge variant="secondary" className="h-4 px-1 text-[10px] bg-primary/20">
-                  1
-                </Badge>
-              )}
-              <ChevronDown className="h-3 w-3 opacity-50" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuLabel className="text-xs">Filter by priority</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {PRIORITY_OPTIONS.map((option) => (
-              <DropdownMenuCheckboxItem
-                key={option.value}
-                checked={priorityFilter === option.value}
-                onCheckedChange={(checked) =>
-                  onPriorityFilterChange(checked ? option.value : undefined)
-                }
-              >
-                <option.icon className="mr-2 h-3.5 w-3.5" />
-                {option.label}
-              </DropdownMenuCheckboxItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <div className="h-4 w-px bg-border mx-1" />
 
-        {/* Category filter */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant={categoryFilter ? 'secondary' : 'outline'}
-              size="sm"
-              className={cn(
-                'h-7 gap-1.5 text-xs',
-                categoryFilter && 'bg-primary/10 text-primary border-primary/30'
-              )}
-            >
-              <Filter className="h-3 w-3" />
-              Category
-              {categoryFilter && (
-                <Badge variant="secondary" className="h-4 px-1 text-[10px] bg-primary/20">
-                  1
-                </Badge>
-              )}
-              <ChevronDown className="h-3 w-3 opacity-50" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto">
-            <DropdownMenuLabel className="text-xs">Filter by category</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {CATEGORY_OPTIONS.map((option) => (
-              <DropdownMenuCheckboxItem
-                key={option.value}
-                checked={categoryFilter === option.value}
-                onCheckedChange={(checked) =>
-                  onCategoryFilterChange(checked ? option.value : undefined)
-                }
-              >
-                {option.label}
-              </DropdownMenuCheckboxItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Clear filters */}
-        {hasActiveFilters && (
+      {/* Priority filter */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
             size="sm"
-            onClick={handleClearFilters}
-            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+            className={cn(
+              'h-7 px-2 text-xs gap-1',
+              priorityFilter ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+            )}
           >
-            <X className="mr-1 h-3 w-3" />
-            Clear filters
+            Priority
+            {priorityFilter && <span className="text-[10px]">: {priorityFilter}</span>}
+            <ChevronDown className="h-3 w-3 opacity-50" />
           </Button>
-        )}
-      </div>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuLabel className="text-xs">Filter by priority</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {PRIORITY_OPTIONS.map((option) => (
+            <DropdownMenuCheckboxItem
+              key={option.value}
+              checked={priorityFilter === option.value}
+              onCheckedChange={(checked) =>
+                onPriorityFilterChange(checked ? option.value : undefined)
+              }
+            >
+              <option.icon className="mr-2 h-3.5 w-3.5" />
+              {option.label}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Category filter */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              'h-7 px-2 text-xs gap-1',
+              categoryFilter ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            Category
+            {categoryFilter && <span className="text-[10px] max-w-[60px] truncate">: {categoryFilter.replace(/_/g, ' ')}</span>}
+            <ChevronDown className="h-3 w-3 opacity-50" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto">
+          <DropdownMenuLabel className="text-xs">Filter by category</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {CATEGORY_OPTIONS.map((option) => (
+            <DropdownMenuCheckboxItem
+              key={option.value}
+              checked={categoryFilter === option.value}
+              onCheckedChange={(checked) =>
+                onCategoryFilterChange(checked ? option.value : undefined)
+              }
+            >
+              {option.label}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Clear filters */}
+      {hasActiveFilters && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleClearFilters}
+          className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+        >
+          <X className="h-3 w-3" />
+        </Button>
+      )}
+
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Sort dropdown */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground">
+            <ArrowUpDown className="h-3 w-3" />
+            {SORT_OPTIONS.find((o) => o.value === sortBy)?.label || 'Sort'}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuLabel className="text-xs">Sort by</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {SORT_OPTIONS.map((option) => (
+            <DropdownMenuCheckboxItem
+              key={option.value}
+              checked={sortBy === option.value}
+              onCheckedChange={() => onSortChange(option.value as SortOption)}
+            >
+              {option.label}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

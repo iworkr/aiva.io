@@ -10,9 +10,9 @@ import PosthogIdentify from "./PosthogIdentify";
 
 interface AuthenticatedLayoutProps {
   children: ReactNode;
-  params: {
+  params: Promise<{
     locale: string;
-  };
+  }>;
 }
 
 function buildLoginRedirectPath(locale: string) {
@@ -22,6 +22,7 @@ function buildLoginRedirectPath(locale: string) {
 }
 
 export default async function Layout({ children, params }: AuthenticatedLayoutProps) {
+  const { locale } = await params;
   let user: User | null = null;
 
   try {
@@ -31,7 +32,7 @@ export default async function Layout({ children, params }: AuthenticatedLayoutPr
   }
 
   if (!user) {
-    const loginUrl = buildLoginRedirectPath(params.locale);
+    const loginUrl = buildLoginRedirectPath(locale);
     redirect(loginUrl);
   }
 

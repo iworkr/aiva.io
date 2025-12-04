@@ -322,7 +322,7 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
 
       {/* Scrollable Content - Conversation Thread */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        <div className="mx-auto max-w-3xl p-4 pb-32">
+        <div className="mx-auto max-w-3xl p-4 pb-4">
           <ConversationThread
             currentMessageId={messageId}
             threadId={message.provider_thread_id}
@@ -332,7 +332,7 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
         </div>
       </div>
 
-      {/* Sticky Reply Composer */}
+      {/* Reply Composer - Fixed at bottom */}
       {provider && (provider === 'gmail' || provider === 'outlook') && (
         <InlineReplyComposer
           messageId={messageId}
