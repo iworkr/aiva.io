@@ -1,33 +1,38 @@
 /**
  * MessageDetailView Component
- * Full message display with AI insights
+ * Minimalist conversation view with thread display and inline reply
+ * Redesigned: No tabs, single scrollable view, sticky header
  */
 
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabaseUserClientComponent } from '@/supabase-clients/user/supabaseUserClientComponent';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Toggle } from '@/components/ui/toggle';
+import { Badge } from '@/components/ui/badge';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+  ArrowLeft,
+  Star,
+  Archive,
   Mail,
   Calendar,
-  User,
-  Sparkles,
-  MessageSquare,
-  Archive,
-  Star,
-  FileText,
-  Code,
+  Loader2,
+  MoreHorizontal,
 } from 'lucide-react';
-import { PriorityBadge, CategoryBadge, SentimentBadge } from './ClassificationBadges';
-import { AIReplyComposer } from './AIReplyComposer';
-import { format } from 'date-fns';
-import { toast } from 'sonner';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   markMessageAsReadAction,
   starMessageAction,
@@ -35,41 +40,15 @@ import {
   archiveMessageAction,
 } from '@/data/user/messages';
 import { useAction } from 'next-safe-action/hooks';
-import { autoCreateEventFromMessage } from '@/lib/ai/scheduling';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { getIntegrationById } from '@/lib/integrations/config';
+import Image from 'next/image';
 
-/**
- * Basic HTML sanitizer that removes dangerous tags and attributes
- * For production, consider using DOMPurify
- */
-function sanitizeHtml(html: string): string {
-  if (!html) return '';
-  
-  // Remove script tags and their content
-  let sanitized = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-  
-  // Remove event handlers (onclick, onerror, etc.)
-  sanitized = sanitized.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '');
-  sanitized = sanitized.replace(/\s*on\w+\s*=\s*[^\s>]+/gi, '');
-  
-  // Remove javascript: URLs
-  sanitized = sanitized.replace(/href\s*=\s*["']javascript:[^"']*["']/gi, 'href="#"');
-  sanitized = sanitized.replace(/src\s*=\s*["']javascript:[^"']*["']/gi, 'src=""');
-  
-  // Remove data: URLs in src (potential XSS vector)
-  sanitized = sanitized.replace(/src\s*=\s*["']data:[^"']*["']/gi, 'src=""');
-  
-  // Remove iframe, object, embed tags
-  sanitized = sanitized.replace(/<(iframe|object|embed|form|input|button)[^>]*>.*?<\/\1>/gi, '');
-  sanitized = sanitized.replace(/<(iframe|object|embed|form|input|button)[^>]*\/?>/gi, '');
-  
-  // Remove style tags (can contain expressions in older IE)
-  sanitized = sanitized.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
-  
-  // Add target="_blank" and rel="noopener noreferrer" to links for security
-  sanitized = sanitized.replace(/<a\s+([^>]*href\s*=)/gi, '<a target="_blank" rel="noopener noreferrer" $1');
-  
-  return sanitized;
-}
+// Components
+import { ConversationThread } from './ConversationThread';
+import { InlineReplyComposer } from './InlineReplyComposer';
+import { autoCreateEventFromMessage } from '@/lib/ai/scheduling';
 
 interface MessageDetailViewProps {
   messageId: string;
@@ -78,22 +57,22 @@ interface MessageDetailViewProps {
 }
 
 export function MessageDetailView({ messageId, workspaceId, userId }: MessageDetailViewProps) {
+  const router = useRouter();
   const [message, setMessage] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('message');
+  const [isStarred, setIsStarred] = useState(false);
   const [creatingEvent, setCreatingEvent] = useState(false);
-  const [showHtmlView, setShowHtmlView] = useState(false);
 
   // Fetch message
   useEffect(() => {
     const fetchMessage = async () => {
       const supabase = supabaseUserClientComponent;
-      
+
       const { data, error } = await supabase
         .from('messages')
         .select(`
           *,
-          channel_connections(provider, provider_account_name)
+          channel_connections(provider, provider_account_name, provider_account_email)
         `)
         .eq('id', messageId)
         .eq('workspace_id', workspaceId)
@@ -104,13 +83,14 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
         console.error(error);
       } else {
         setMessage(data);
-        
+        setIsStarred(data.is_starred || false);
+
         // Mark as read
         if (!data.is_read) {
           markAsRead({ id: messageId, workspaceId });
         }
       }
-      
+
       setLoading(false);
     };
 
@@ -129,66 +109,52 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
   // Star message
   const { execute: starMessage } = useAction(starMessageAction, {
     onSuccess: () => {
-      if (message) {
-        setMessage({ ...message, is_starred: true });
-        toast.success('Starred');
-      }
+      setIsStarred(true);
+      toast.success('Message starred');
+    },
+    onError: () => {
+      setIsStarred(false);
+      toast.error('Failed to star message');
     },
   });
 
   // Unstar message
   const { execute: unstarMessage } = useAction(unstarMessageAction, {
     onSuccess: () => {
-      if (message) {
-        setMessage({ ...message, is_starred: false });
-        toast.success('Unstarred');
-      }
+      setIsStarred(false);
+      toast.success('Message unstarred');
+    },
+    onError: () => {
+      setIsStarred(true);
+      toast.error('Failed to unstar message');
     },
   });
 
   // Archive message
   const { execute: archive } = useAction(archiveMessageAction, {
     onSuccess: () => {
-      toast.success('Archived');
-      window.history.back();
+      toast.success('Message archived');
+      router.push('/inbox');
+    },
+    onError: () => {
+      toast.error('Failed to archive message');
     },
   });
 
-  // Strip HTML utility
-  const stripHtml = (input: string | null | undefined) =>
-    input ? input.replace(/<[^>]+>/g, '').trim() : '';
-
-  // Determine if message has HTML content - MUST be before early returns
-  const hasHtmlContent = useMemo(() => {
-    if (!message) return false;
-    const body = message?.body_html || message?.body || '';
-    return /<[a-z][\s\S]*>/i.test(body);
-  }, [message]);
-
-  // Get sanitized HTML content - MUST be before early returns
-  const sanitizedHtmlContent = useMemo(() => {
-    if (!message) return '';
-    const body = message?.body_html || message?.body || '';
-    return sanitizeHtml(body);
-  }, [message]);
-
-  // Get plain text content - MUST be before early returns
-  const plainTextContent = useMemo(() => {
-    if (!message) return '';
-    const body = message?.body || message?.body_html || '';
-    return stripHtml(body);
-  }, [message]);
-
-  // Toggle star handler
   const handleToggleStar = () => {
-    if (message?.is_starred) {
+    // Optimistic update
+    setIsStarred(!isStarred);
+    if (isStarred) {
       unstarMessage({ id: messageId, workspaceId });
     } else {
       starMessage({ id: messageId, workspaceId });
     }
   };
 
-  // Create event from message
+  const handleArchive = () => {
+    archive({ id: messageId, workspaceId });
+  };
+
   const handleCreateEvent = async () => {
     setCreatingEvent(true);
     try {
@@ -206,235 +172,180 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
     }
   };
 
+  const handleBack = () => {
+    router.push('/inbox');
+  };
+
+  // Get provider info
+  const provider = message?.channel_connections?.provider;
+  const integration = provider ? getIntegrationById(provider) : null;
+  const userEmail = message?.channel_connections?.provider_account_email;
+
+  // Loading state
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="text-center">
-          <Mail className="mx-auto h-8 w-8 animate-pulse text-muted-foreground" />
-          <p className="mt-2 text-sm text-muted-foreground">Loading message...</p>
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Loading message...</p>
         </div>
       </div>
     );
   }
 
+  // Not found state
   if (!message) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
-          <Mail className="mx-auto h-12 w-12 text-muted-foreground" />
+          <Mail className="mx-auto h-12 w-12 text-muted-foreground/50" />
           <h3 className="mt-4 text-lg font-semibold">Message not found</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            This message may have been deleted or moved.
+          </p>
+          <Button variant="outline" className="mt-4" onClick={handleBack}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Inbox
+          </Button>
         </div>
       </div>
     );
   }
 
-  const timestamp = new Date(message.timestamp);
-
   return (
-    <div className="flex h-full">
-      {/* Main content */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-4xl p-6">
-          {/* Header */}
-          <div className="mb-6">
-            <div className="mb-4 flex items-start justify-between">
-              <div className="flex-1">
-                <div className="mb-2 flex items-center gap-2">
-                  {message.channel_connections?.provider && (
-                    <Badge variant="outline">
-                      {message.channel_connections.provider}
-                    </Badge>
-                  )}
-                  {message.priority && <PriorityBadge priority={message.priority} />}
-                  {message.category && <CategoryBadge category={message.category} />}
-                  {message.sentiment && <SentimentBadge sentiment={message.sentiment} />}
-                </div>
-                <h1 className="text-2xl font-bold">{message.subject || '(no subject)'}</h1>
-              </div>
-              
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleToggleStar}
-                  aria-label={message.is_starred ? 'Unstar message' : 'Star message'}
-                >
-                  <Star
-                    className={message.is_starred ? 'fill-yellow-400 text-yellow-400' : ''}
-                    aria-hidden="true"
-                  />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => archive({ id: messageId, workspaceId })}
-                  aria-label="Archive message"
-                >
-                  <Archive aria-hidden="true" />
-                </Button>
-              </div>
-            </div>
+    <div className="flex h-full flex-col">
+      {/* Sticky Header */}
+      <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex items-center justify-between px-4 py-3">
+          {/* Left: Back button + Subject */}
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={handleBack}>
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Back to Inbox</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
-            {/* Sender info */}
-            <div className="flex items-center gap-4 rounded-lg bg-muted/50 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10" aria-hidden="true">
-                <User className="h-5 w-5" />
-              </div>
-              <div className="flex-1">
-                <div className="font-semibold">
-                  {message.sender_name || message.sender_email}
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  {message.sender_email}
-                </div>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                {format(timestamp, 'MMM d, yyyy h:mm a')}
+            <div className="min-w-0 flex-1">
+              <h1 className="font-semibold truncate">
+                {message.subject || '(no subject)'}
+              </h1>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                {/* Provider badge */}
+                {integration && (
+                  <div className="flex items-center gap-1.5">
+                    {integration.logoUrl ? (
+                      <Image
+                        src={integration.logoUrl}
+                        alt={integration.name}
+                        width={14}
+                        height={14}
+                        className="object-contain"
+                        unoptimized={integration.logoUrl.startsWith('http')}
+                      />
+                    ) : (
+                      <Mail className="h-3.5 w-3.5" />
+                    )}
+                    <span className="text-xs">{integration.name}</span>
+                  </div>
+                )}
+                <span>•</span>
+                <span className="truncate">
+                  From: {message.sender_name || message.sender_email}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="mb-4" aria-label="Message view tabs">
-                <TabsTrigger value="message" aria-label="View message content">
-                  <Mail className="mr-2 h-4 w-4" aria-hidden="true" />
-                  Message
-                </TabsTrigger>
-                {message.ai_summary && (
-                  <TabsTrigger value="ai-insights" aria-label="View AI insights">
-                    <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
-                    AI Insights
-                  </TabsTrigger>
-                )}
-                <TabsTrigger value="reply" aria-label="Reply to message">
-                  <MessageSquare className="mr-2 h-4 w-4" aria-hidden="true" />
-                  Reply
-                </TabsTrigger>
-              </TabsList>
-
-            {/* Message content */}
-            <TabsContent value="message">
-              <Card>
-                {/* View toggle for HTML content */}
-                {hasHtmlContent && (
-                  <div className="flex items-center justify-end gap-2 p-3 border-b bg-muted/30">
-                    <span className="text-xs text-muted-foreground mr-2">View:</span>
-                    <Toggle
-                      size="sm"
-                      pressed={!showHtmlView}
-                      onPressedChange={() => setShowHtmlView(false)}
-                      aria-label="Plain text view"
-                      className="h-7 px-2 text-xs"
-                    >
-                      <FileText className="h-3 w-3 mr-1" />
-                      Plain Text
-                    </Toggle>
-                    <Toggle
-                      size="sm"
-                      pressed={showHtmlView}
-                      onPressedChange={() => setShowHtmlView(true)}
-                      aria-label="Formatted HTML view"
-                      className="h-7 px-2 text-xs"
-                    >
-                      <Code className="h-3 w-3 mr-1" />
-                      Formatted
-                    </Toggle>
-                  </div>
-                )}
-                <CardContent className="prose prose-sm max-w-none p-6 dark:prose-invert">
-                  {showHtmlView && hasHtmlContent ? (
-                    <div 
-                      className="message-html-content text-foreground"
-                      dangerouslySetInnerHTML={{ __html: sanitizedHtmlContent }}
+          {/* Right: Actions */}
+          <div className="flex items-center gap-1">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleToggleStar}
+                  >
+                    <Star
+                      className={cn(
+                        'h-4 w-4',
+                        isStarred && 'fill-yellow-400 text-yellow-400'
+                      )}
                     />
-                  ) : (
-                    <div className="whitespace-pre-wrap text-foreground">
-                      {plainTextContent || '(No message content)'}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {isStarred ? 'Unstar' : 'Star'}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
-              {/* Quick actions */}
-              <div className="mt-4 flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCreateEvent}
-                  disabled={creatingEvent}
-                >
-                  <Calendar className="mr-2 h-4 w-4" />
-                  {creatingEvent ? 'Creating...' : 'Create Event'}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={handleArchive}>
+                    <Archive className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Archive</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            {/* More actions dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <MoreHorizontal className="h-4 w-4" />
                 </Button>
-              </div>
-            </TabsContent>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleCreateEvent} disabled={creatingEvent}>
+                  <Calendar className="mr-2 h-4 w-4" />
+                  {creatingEvent ? 'Creating event...' : 'Create calendar event'}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleArchive}>
+                  <Archive className="mr-2 h-4 w-4" />
+                  Archive message
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </header>
 
-            {/* AI Insights */}
-            {message.ai_summary && (
-              <TabsContent value="ai-insights">
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-primary" />
-                      <h3 className="text-lg font-semibold">AI Analysis</h3>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* Summary */}
-                    <div>
-                      <h4 className="mb-2 font-semibold">Summary</h4>
-                      <p className="text-sm text-muted-foreground">{message.ai_summary}</p>
-                    </div>
-
-                    <Separator />
-
-                    {/* Key Points */}
-                    {message.ai_key_points && message.ai_key_points.length > 0 && (
-                      <>
-                        <div>
-                          <h4 className="mb-2 font-semibold">Key Points</h4>
-                          <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
-                            {message.ai_key_points.map((point: string, idx: number) => (
-                              <li key={idx}>{point}</li>
-                            ))}
-                          </ul>
-                        </div>
-                        <Separator />
-                      </>
-                    )}
-
-                    {/* Classifications */}
-                    <div>
-                      <h4 className="mb-2 font-semibold">Classifications</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {message.priority && <PriorityBadge priority={message.priority} />}
-                        {message.category && <CategoryBadge category={message.category} />}
-                        {message.sentiment && <SentimentBadge sentiment={message.sentiment} />}
-                        {message.actionability && (
-                          <Badge variant="outline">
-                            {message.actionability.replace(/_/g, ' ')}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            )}
-
-            {/* Reply composer */}
-            <TabsContent value="reply">
-              <AIReplyComposer
-                messageId={messageId}
-                workspaceId={workspaceId}
-                message={message}
-              />
-            </TabsContent>
-          </Tabs>
+      {/* Scrollable Content - Conversation Thread */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-3xl p-4 pb-6">
+          <ConversationThread
+            currentMessageId={messageId}
+            threadId={message.provider_thread_id}
+            workspaceId={workspaceId}
+            userEmail={userEmail}
+          />
         </div>
       </div>
+
+      {/* Sticky Reply Composer */}
+      {provider && (provider === 'gmail' || provider === 'outlook') && (
+        <InlineReplyComposer
+          messageId={messageId}
+          workspaceId={workspaceId}
+          messageSubject={message.subject || ''}
+          senderEmail={message.sender_email}
+          provider={provider}
+          providerMessageId={message.provider_message_id}
+          onSent={() => {
+            // Refresh the thread after sending
+            router.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }
-

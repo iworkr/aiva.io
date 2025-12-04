@@ -213,7 +213,7 @@ export const getMessagesSchema = z.object({
   isStarred: z.boolean().optional(),
   limit: z.number().min(1).max(100).default(50),
   offset: z.number().min(0).default(0),
-  orderBy: z.enum(['timestamp', 'priority']).default('timestamp'),
+  orderBy: z.enum(['timestamp', 'priority', 'sender_email']).default('timestamp'),
   orderDirection: z.enum(['asc', 'desc']).default('desc'),
 });
 
