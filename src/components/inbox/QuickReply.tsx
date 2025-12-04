@@ -151,30 +151,47 @@ export function QuickReply({
   // Generate AI reply when expanded and no reply text exists
   const triggerGeneration = useCallback(() => {
     if (!messageId || !workspaceId) {
-      console.error('[QuickReply] Missing messageId or workspaceId');
+      console.error('[QuickReply] Missing messageId or workspaceId:', { messageId, workspaceId });
       setGenerationError('Missing message or workspace information');
       return;
     }
     
-    console.log('[QuickReply] Triggering generation for:', { messageId, workspaceId });
+    console.log('[QuickReply] === TRIGGERING AI GENERATION ===');
+    console.log('[QuickReply] messageId:', messageId);
+    console.log('[QuickReply] workspaceId:', workspaceId);
+    
     setIsGenerating(true);
     setGenerationError(null);
     hasTriedGenerating.current = true;
     
+    // Call the server action
     generateDraft({
       messageId,
       workspaceId,
       tone: 'professional',
       maxLength: 300,
     });
+    
+    console.log('[QuickReply] generateDraft called');
   }, [messageId, workspaceId, generateDraft]);
   
   // Auto-generate when expanded and no reply exists
   useEffect(() => {
-    if (isExpanded && !replyText && !isGenerating && !hasTriedGenerating.current && !generationError) {
+    console.log('[QuickReply] useEffect check:', { 
+      isExpanded, 
+      replyText: !!replyText, 
+      isGenerating, 
+      hasTriedGenerating: hasTriedGenerating.current,
+      generationError: !!generationError,
+      renderMode 
+    });
+    
+    // Only trigger in content mode (not button mode)
+    if (renderMode !== 'button' && isExpanded && !replyText && !isGenerating && !hasTriedGenerating.current && !generationError) {
+      console.log('[QuickReply] Triggering generation from useEffect');
       triggerGeneration();
     }
-  }, [isExpanded, replyText, isGenerating, generationError, triggerGeneration]);
+  }, [isExpanded, replyText, isGenerating, generationError, triggerGeneration, renderMode]);
   
   // Reset generation flag when collapsed
   useEffect(() => {
@@ -194,7 +211,9 @@ export function QuickReply({
 
   const handleExpand = (e: React.MouseEvent) => {
     e.stopPropagation();
-    console.log('[QuickReply] Expand clicked');
+    console.log('[QuickReply] Expand clicked, renderMode:', renderMode);
+    // Just expand - don't trigger generation here
+    // Generation is handled by useEffect in the content component
     setIsExpanded(true);
   };
 

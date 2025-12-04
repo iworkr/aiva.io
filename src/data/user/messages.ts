@@ -891,8 +891,12 @@ export const generateReplyDraftAction = authActionClient
   .action(async ({ parsedInput, ctx: { userId } }) => {
     const { messageId, workspaceId, tone, maxLength } = parsedInput;
 
+    console.log('[generateReplyDraftAction] Starting:', { messageId, workspaceId, userId, tone });
+
     // Verify workspace membership
     const isMember = await isWorkspaceMember(userId, workspaceId);
+    console.log('[generateReplyDraftAction] Workspace membership check:', { isMember });
+    
     if (!isMember) {
       throw new Error('You are not a member of this workspace');
     }
@@ -900,9 +904,17 @@ export const generateReplyDraftAction = authActionClient
     const { generateReplyDraft } = await import('@/lib/ai/reply-generator');
     
     try {
+      console.log('[generateReplyDraftAction] Calling generateReplyDraft...');
       const draft = await generateReplyDraft(messageId, workspaceId, {
         tone: tone || 'professional',
         maxLength: maxLength || 300,
+      });
+
+      console.log('[generateReplyDraftAction] Draft generated:', { 
+        hasBody: !!draft.body, 
+        bodyLength: draft.body?.length,
+        confidence: draft.confidenceScore,
+        error: draft.error 
       });
 
       return {
@@ -910,6 +922,7 @@ export const generateReplyDraftAction = authActionClient
         data: draft,
       };
     } catch (error) {
+      console.error('[generateReplyDraftAction] Error:', error);
       throw new Error(
         error instanceof Error ? error.message : 'Failed to generate reply draft'
       );

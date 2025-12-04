@@ -67,9 +67,11 @@ export async function generateReplyDraft(
       );
     }
 
+    console.log('[AI Reply] Creating Supabase client...');
     const supabase = await createSupabaseUserServerActionClient();
 
     // Get the message
+    console.log('[AI Reply] Fetching message:', { messageId, workspaceId });
     const { data: message, error } = await supabase
       .from('messages')
       .select(
@@ -82,9 +84,14 @@ export async function generateReplyDraft(
       .eq('workspace_id', workspaceId)
       .single();
 
+    console.log('[AI Reply] Message fetch result:', { found: !!message, error: error?.message });
+    
     if (error || !message) {
-      throw new Error('Message not found');
+      console.error('[AI Reply] Message not found:', { messageId, workspaceId, error });
+      throw new Error(`Message not found: ${error?.message || 'No data returned'}`);
     }
+    
+    console.log('[AI Reply] Message found:', { subject: message.subject, sender: message.sender_email });
 
     const {
       tone = 'professional',
