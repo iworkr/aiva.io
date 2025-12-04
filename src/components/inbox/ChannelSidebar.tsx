@@ -198,17 +198,16 @@ export function ChannelSidebar({
                 onClick={() => onChannelSelect(channel.id)}
                 className={cn(
                   'relative flex flex-col items-center justify-center w-full px-2 py-2 rounded-xl transition-all group',
-                  isSelected
-                    ? 'bg-muted text-foreground'
-                    : 'bg-transparent hover:bg-muted/60 text-muted-foreground'
+                  'bg-transparent hover:bg-muted/40',
+                  isSelected ? 'text-foreground' : 'text-muted-foreground'
                 )}
                 title={tooltip}
               >
-                {/* Icon container - ring applied here, not on button */}
+                {/* Icon container - ring/selection applied here only */}
                 <div className={cn(
-                  'flex items-center justify-center w-11 h-11 rounded-xl mb-1 transition-all',
+                  'relative flex items-center justify-center w-11 h-11 rounded-xl mb-1 transition-all',
                   isSelected 
-                    ? 'bg-background shadow-sm ring-2 ring-primary/50' 
+                    ? 'bg-background shadow-md ring-2 ring-primary' 
                     : 'bg-muted/50 group-hover:bg-muted'
                 )}>
                   {integration?.logoUrl ? (
@@ -224,6 +223,12 @@ export function ChannelSidebar({
                   ) : (
                     <Icon className="h-5 w-5" />
                   )}
+                  {/* Notification badge - overlaps icon button corner, always visible */}
+                  {unreadCount > 0 && (
+                    <div className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold shadow-sm">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </div>
+                  )}
                 </div>
                 <span className={cn(
                   'text-[10px] font-medium truncate max-w-full',
@@ -231,14 +236,6 @@ export function ChannelSidebar({
                 )}>
                   {providerShortName}
                 </span>
-                {unreadCount > 0 && (
-                  <div className="absolute top-1 right-2 flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] font-semibold">
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </div>
-                )}
-                {isSelected && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-8 bg-primary rounded-r" />
-                )}
               </button>
             );
           })}
