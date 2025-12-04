@@ -198,7 +198,6 @@ export function ChannelSidebar({
                 onClick={() => onChannelSelect(channel.id)}
                 className={cn(
                   'relative flex flex-col items-center justify-center w-full px-2 py-2 rounded-xl transition-all group',
-                  'bg-transparent hover:bg-muted/40',
                   isSelected ? 'text-foreground' : 'text-muted-foreground'
                 )}
                 title={tooltip}
