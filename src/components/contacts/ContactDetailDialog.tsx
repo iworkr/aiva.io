@@ -13,6 +13,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,6 +38,7 @@ import {
   Loader2,
   BellOff,
   Bell,
+  AlertTriangle,
 } from 'lucide-react';
 import { ChannelLogo } from './ChannelLogo';
 import { toast } from 'sonner';
@@ -61,6 +72,7 @@ export function ContactDetailDialog({
 }: ContactDetailDialogProps) {
   const [showAddChannel, setShowAddChannel] = useState(false);
   const [newChannel, setNewChannel] = useState({ type: '', id: '', displayName: '' });
+  const [showUnsubscribeConfirm, setShowUnsubscribeConfirm] = useState(false);
 
   // Toggle favorite
   const { execute: toggleFavorite } = useAction(toggleContactFavoriteAction, {
@@ -463,7 +475,15 @@ export function ContactDetailDialog({
                   variant={contact.is_unsubscribed ? 'outline' : 'destructive'}
                   size="sm"
                   className="h-8 text-xs shrink-0"
-                  onClick={() => toggleUnsubscribe({ id: contact.id, workspaceId })}
+                  onClick={() => {
+                    if (contact.is_unsubscribed) {
+                      // Resubscribing - no confirmation needed
+                      toggleUnsubscribe({ id: contact.id, workspaceId });
+                    } else {
+                      // Unsubscribing - show confirmation
+                      setShowUnsubscribeConfirm(true);
+                    }
+                  }}
                   disabled={unsubscribeStatus === 'executing'}
                 >
                   {unsubscribeStatus === 'executing' && (
@@ -479,6 +499,38 @@ export function ContactDetailDialog({
               )}
             </div>
           </div>
+
+          {/* Unsubscribe Confirmation Dialog */}
+          <AlertDialog open={showUnsubscribeConfirm} onOpenChange={setShowUnsubscribeConfirm}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center">
+                    <AlertTriangle className="h-5 w-5 text-destructive" />
+                  </div>
+                  <div>
+                    <AlertDialogTitle>Unsubscribe from {displayName || contact.full_name}?</AlertDialogTitle>
+                    <AlertDialogDescription className="mt-1">
+                      You will no longer receive email notifications from this contact. Their messages will still appear in your inbox but won&apos;t trigger notifications.
+                    </AlertDialogDescription>
+                  </div>
+                </div>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    toggleUnsubscribe({ id: contact.id, workspaceId });
+                    setShowUnsubscribeConfirm(false);
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  <BellOff className="h-4 w-4 mr-2" />
+                  Unsubscribe
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {/* Activity Summary */}
           {contact.interaction_count > 0 && (

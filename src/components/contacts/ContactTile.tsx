@@ -6,11 +6,21 @@
 
 'use client';
 
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import Image from 'next/image';
-import { Star, Trash2, Edit, Mail, Phone, BellOff, Bell } from 'lucide-react';
+import { Star, Trash2, Edit, Mail, Phone, BellOff, Bell, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ChannelLogo } from './ChannelLogo';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface ContactTileProps {
   contact: any;
@@ -71,12 +81,33 @@ export const ContactTile = memo(function ContactTile({
   onEdit,
   onDelete,
 }: ContactTileProps) {
+  const [showUnsubscribeConfirm, setShowUnsubscribeConfirm] = useState(false);
+  
   // Sanitize name for display and avatar
   const displayName = sanitizeContactName(contact.full_name || '');
   const contactInitial = getContactInitial(contact.full_name || 'A');
   const contactColor = getContactColor(contact.full_name || 'A');
   const displaySubtitle = contact.job_title || contact.company || '';
   const isUnsubscribed = contact.is_unsubscribed;
+
+  // Handle unsubscribe with confirmation (only for unsubscribing, not resubscribing)
+  const handleUnsubscribeClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isUnsubscribed) {
+      // Resubscribing - no confirmation needed
+      onUnsubscribe?.(e);
+    } else {
+      // Unsubscribing - show confirmation
+      setShowUnsubscribeConfirm(true);
+    }
+  };
+
+  const confirmUnsubscribe = () => {
+    // Create a synthetic event for the callback
+    const syntheticEvent = { stopPropagation: () => {} } as React.MouseEvent;
+    onUnsubscribe?.(syntheticEvent);
+    setShowUnsubscribeConfirm(false);
+  };
 
   // List view - full-width row with more details
   if (variant === 'list') {
@@ -151,13 +182,13 @@ export const ContactTile = memo(function ContactTile({
           {/* Spacer */}
           <div className="flex-1" />
 
-          {/* Channel Icons */}
+          {/* Channel Icons - Hidden on hover when actions appear */}
           {contact.contact_channels && contact.contact_channels.length > 0 && (
-            <div className="flex items-center gap-1 flex-shrink-0">
+            <div className="flex items-center gap-1 flex-shrink-0 group-hover:hidden">
               {contact.contact_channels.slice(0, 4).map((channel: any) => (
                 <div
                   key={channel.id}
-                  className="opacity-50 group-hover:opacity-80 transition-opacity"
+                  className="opacity-50 transition-opacity"
                   title={`${channel.channel_type}: ${channel.channel_display_name || channel.channel_id}`}
                 >
                   <ChannelLogo channelType={channel.channel_type} size={14} />
@@ -171,7 +202,7 @@ export const ContactTile = memo(function ContactTile({
             </div>
           )}
 
-          {/* Actions */}
+          {/* Actions - Appear on hover */}
           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={onToggleFavorite}
@@ -189,7 +220,7 @@ export const ContactTile = memo(function ContactTile({
             </button>
             {onUnsubscribe && (
               <button
-                onClick={onUnsubscribe}
+                onClick={handleUnsubscribeClick}
                 className="p-1.5 rounded hover:bg-background/80 transition-colors"
                 aria-label={isUnsubscribed ? 'Resubscribe to this contact' : 'Unsubscribe from this contact'}
                 title={isUnsubscribed ? 'Resubscribe' : 'Unsubscribe'}
@@ -278,13 +309,13 @@ export const ContactTile = memo(function ContactTile({
           )}
         </div>
 
-        {/* Channel Icons - Inline small */}
+        {/* Channel Icons - Hidden on hover when actions appear */}
         {contact.contact_channels && contact.contact_channels.length > 0 && (
-          <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="flex items-center gap-1 flex-shrink-0 group-hover:hidden">
             {contact.contact_channels.slice(0, 3).map((channel: any) => (
               <div
                 key={channel.id}
-                className="opacity-50 group-hover:opacity-80 transition-opacity"
+                className="opacity-50 transition-opacity"
                 title={`${channel.channel_type}: ${channel.channel_display_name || channel.channel_id}`}
               >
                 <ChannelLogo channelType={channel.channel_type} size={14} />
@@ -300,10 +331,10 @@ export const ContactTile = memo(function ContactTile({
       </div>
 
       {/* Hover Actions - Positioned absolute */}
-      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 bg-background/90 rounded-lg p-0.5 backdrop-blur-sm">
         <button
           onClick={onToggleFavorite}
-          className="p-1.5 rounded hover:bg-background/80 transition-colors"
+          className="p-1.5 rounded hover:bg-muted transition-colors"
           aria-label={contact.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
         >
           <Star
@@ -317,8 +348,8 @@ export const ContactTile = memo(function ContactTile({
         </button>
         {onUnsubscribe && (
           <button
-            onClick={onUnsubscribe}
-            className="p-1.5 rounded hover:bg-background/80 transition-colors"
+            onClick={handleUnsubscribeClick}
+            className="p-1.5 rounded hover:bg-muted transition-colors"
             aria-label={isUnsubscribed ? 'Resubscribe to this contact' : 'Unsubscribe from this contact'}
             title={isUnsubscribed ? 'Resubscribe' : 'Unsubscribe'}
           >
@@ -332,7 +363,7 @@ export const ContactTile = memo(function ContactTile({
         {onEdit && (
           <button
             onClick={onEdit}
-            className="p-1.5 rounded hover:bg-background/80 transition-colors"
+            className="p-1.5 rounded hover:bg-muted transition-colors"
             aria-label="Edit contact"
           >
             <Edit className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
@@ -341,13 +372,42 @@ export const ContactTile = memo(function ContactTile({
         {onDelete && (
           <button
             onClick={onDelete}
-            className="p-1.5 rounded hover:bg-background/80 transition-colors"
+            className="p-1.5 rounded hover:bg-muted transition-colors"
             aria-label="Delete contact"
           >
             <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
           </button>
         )}
       </div>
+
+      {/* Unsubscribe Confirmation Dialog */}
+      <AlertDialog open={showUnsubscribeConfirm} onOpenChange={setShowUnsubscribeConfirm}>
+        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+              </div>
+              <div>
+                <AlertDialogTitle>Unsubscribe from {displayName || contact.full_name}?</AlertDialogTitle>
+                <AlertDialogDescription className="mt-1">
+                  You will no longer receive email notifications from this contact. Their messages will still appear in your inbox but won&apos;t trigger notifications.
+                </AlertDialogDescription>
+              </div>
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmUnsubscribe}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              <BellOff className="h-4 w-4 mr-2" />
+              Unsubscribe
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 });
