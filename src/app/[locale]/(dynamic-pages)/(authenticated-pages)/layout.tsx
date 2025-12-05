@@ -43,8 +43,13 @@ export default async function Layout({ children, params }: AuthenticatedLayoutPr
       <LoggedInUserProvider user={user}>
         <NotificationsProvider>
           <SyncStatusProvider>
-            <SyncStatusBanner />
-            {children}
+            {/* Flex column layout: banner on top pushes content down */}
+            <div className="flex flex-col min-h-screen">
+              <SyncStatusBanner />
+              <div className="flex-1 flex flex-col">
+                {children}
+              </div>
+            </div>
             <NotificationsDialog />
             <PosthogIdentify />
           </SyncStatusProvider>
