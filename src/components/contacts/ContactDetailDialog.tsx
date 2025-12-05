@@ -86,7 +86,8 @@ export function ContactDetailDialog({
     },
   });
 
-  // Toggle unsubscribe
+  // Toggle unsubscribe - no onUpdate call to avoid full page refresh
+  // ContactsView uses optimistic updates to reflect the change immediately
   const { execute: toggleUnsubscribe, status: unsubscribeStatus } = useAction(toggleContactUnsubscribeAction, {
     onSuccess: ({ data }) => {
       if (data?.isUnsubscribed) {
@@ -94,7 +95,7 @@ export function ContactDetailDialog({
       } else {
         toast.success('Resubscribed to this contact');
       }
-      onUpdate();
+      // Don't call onUpdate() - parent handles optimistic update
     },
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to toggle unsubscribe');

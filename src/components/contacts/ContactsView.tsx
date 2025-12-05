@@ -76,7 +76,8 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
   const [optimisticUpdates, setOptimisticUpdates] = useState<{
     toggledFavorites: Set<string>;
     deletedIds: Set<string>;
-  }>({ toggledFavorites: new Set(), deletedIds: new Set() });
+    toggledUnsubscribed: Set<string>;
+  }>({ toggledFavorites: new Set(), deletedIds: new Set(), toggledUnsubscribed: new Set() });
 
   // Debounce search query for better performance
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
@@ -107,7 +108,7 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
         setHasMore(data.length === CONTACTS_PER_PAGE);
         setTotalCount(data.length);
         // Clear optimistic updates when fresh data arrives
-        setOptimisticUpdates({ toggledFavorites: new Set(), deletedIds: new Set() });
+        setOptimisticUpdates({ toggledFavorites: new Set(), deletedIds: new Set(), toggledUnsubscribed: new Set() });
       },
     }
   );
@@ -120,12 +121,21 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
     // Apply optimistic updates
     return combined
       .filter(c => !optimisticUpdates.deletedIds.has(c.id))
-      .map(c => ({
-        ...c,
-        is_favorite: optimisticUpdates.toggledFavorites.has(c.id) 
-          ? !c.is_favorite 
-          : c.is_favorite,
-      }));
+      .map(c => {
+        const isOptimisticallyUnsubscribed = optimisticUpdates.toggledUnsubscribed.has(c.id);
+        return {
+          ...c,
+          is_favorite: optimisticUpdates.toggledFavorites.has(c.id) 
+            ? !c.is_favorite 
+            : c.is_favorite,
+          is_unsubscribed: isOptimisticallyUnsubscribed
+            ? !c.is_unsubscribed
+            : c.is_unsubscribed,
+          unsubscribed_at: isOptimisticallyUnsubscribed
+            ? (c.is_unsubscribed ? null : new Date().toISOString())
+            : c.unsubscribed_at,
+        };
+      });
   }, [cachedContacts, additionalContacts, optimisticUpdates]);
 
   // Legacy fetchContacts for backward compatibility
@@ -197,18 +207,17 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
   // Toggle favorite with optimistic update
   const { execute: toggleFavorite } = useAction(toggleContactFavoriteAction, {
     onSuccess: () => {
-      // Silently refetch in background
-      refreshContacts();
+      // Just clear the optimistic update for this item - no refresh needed
+      // The optimistic update already shows the correct state
     },
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to toggle favorite');
       // Revert optimistic update by clearing
-      setOptimisticUpdates({ toggledFavorites: new Set(), deletedIds: new Set() });
-      refreshContacts();
+      setOptimisticUpdates(prev => ({ ...prev, toggledFavorites: new Set() }));
     },
   });
 
-  // Toggle unsubscribe
+  // Toggle unsubscribe with optimistic update
   const { execute: toggleUnsubscribe } = useAction(toggleContactUnsubscribeAction, {
     onSuccess: ({ data }) => {
       if (data?.isUnsubscribed) {
@@ -216,17 +225,29 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
       } else {
         toast.success('Resubscribed to this contact');
       }
-      refreshContacts();
+      // No refresh needed - optimistic update already shows correct state
     },
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to toggle unsubscribe');
-      refreshContacts();
+      // Revert optimistic update by clearing
+      setOptimisticUpdates(prev => ({ ...prev, toggledUnsubscribed: new Set() }));
     },
   });
 
-  // Handle unsubscribe
+  // Handle unsubscribe with optimistic update
   const handleUnsubscribe = useCallback((contact: any, e: React.MouseEvent) => {
     e.stopPropagation();
+    // Apply optimistic update first
+    setOptimisticUpdates(prev => {
+      const newToggles = new Set(prev.toggledUnsubscribed);
+      if (newToggles.has(contact.id)) {
+        newToggles.delete(contact.id);
+      } else {
+        newToggles.add(contact.id);
+      }
+      return { ...prev, toggledUnsubscribed: newToggles };
+    });
+    // Execute actual update
     toggleUnsubscribe({ id: contact.id, workspaceId });
   }, [toggleUnsubscribe, workspaceId]);
 
@@ -255,7 +276,7 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to delete contact');
       // Revert optimistic delete
-      setOptimisticUpdates({ toggledFavorites: new Set(), deletedIds: new Set() });
+      setOptimisticUpdates({ toggledFavorites: new Set(), deletedIds: new Set(), toggledUnsubscribed: new Set() });
       refreshContacts();
     },
   });
@@ -489,7 +510,11 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
               setShowDetailDialog(false);
               setShowCreateDialog(true);
             }}
-            onUpdate={fetchContacts}
+            onUpdate={() => {
+              // Only refresh for non-unsubscribe updates (like linking channels)
+              // Unsubscribe uses optimistic updates and doesn't trigger this
+              fetchContacts();
+            }}
           />
         </Suspense>
       )}
