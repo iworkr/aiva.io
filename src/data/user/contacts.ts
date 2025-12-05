@@ -250,6 +250,51 @@ export const toggleContactFavoriteAction = authActionClient
   });
 
 /**
+ * Toggle contact unsubscribe status
+ * Marks a contact as unsubscribed to mute notifications/emails from them
+ */
+export const toggleContactUnsubscribeAction = authActionClient
+  .schema(z.object({ id: z.string().uuid(), workspaceId: z.string().uuid() }))
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    const { id, workspaceId } = parsedInput;
+
+    const isMember = await isWorkspaceMember(userId, workspaceId);
+    if (!isMember) throw new Error('Not a workspace member');
+
+    const supabase = await createSupabaseUserServerActionClient();
+
+    // Get current unsubscribe status
+    const { data: current } = await supabase
+      .from('contacts')
+      .select('is_unsubscribed')
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .single();
+
+    if (!current) throw new Error('Contact not found');
+
+    const newUnsubscribedStatus = !current.is_unsubscribed;
+
+    // Toggle unsubscribe status
+    const { data, error } = await supabase
+      .from('contacts')
+      .update({ 
+        is_unsubscribed: newUnsubscribedStatus,
+        unsubscribed_at: newUnsubscribedStatus ? new Date().toISOString() : null,
+      })
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    revalidatePath(`/workspace/${workspaceId}/contacts`);
+    revalidatePath(`/contacts`);
+    return { success: true, data, isUnsubscribed: newUnsubscribedStatus };
+  });
+
+/**
  * Link a channel to a contact (or create if contact doesn't exist)
  */
 export const linkChannelToContactAction = authActionClient

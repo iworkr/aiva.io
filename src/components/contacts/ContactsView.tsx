@@ -24,6 +24,7 @@ import {
   getContacts,
   deleteContactAction,
   toggleContactFavoriteAction,
+  toggleContactUnsubscribeAction,
 } from '@/data/user/contacts';
 import { LazyCreateEditContactDialog, LazyContactDetailDialog } from '@/components/lazy/LazyDialogs';
 import { ContactTile } from './ContactTile';
@@ -206,6 +207,28 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
       refreshContacts();
     },
   });
+
+  // Toggle unsubscribe
+  const { execute: toggleUnsubscribe } = useAction(toggleContactUnsubscribeAction, {
+    onSuccess: ({ data }) => {
+      if (data?.isUnsubscribed) {
+        toast.success('Unsubscribed from this contact');
+      } else {
+        toast.success('Resubscribed to this contact');
+      }
+      refreshContacts();
+    },
+    onError: ({ error }) => {
+      toast.error(error.serverError || 'Failed to toggle unsubscribe');
+      refreshContacts();
+    },
+  });
+
+  // Handle unsubscribe
+  const handleUnsubscribe = useCallback((contact: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggleUnsubscribe({ id: contact.id, workspaceId });
+  }, [toggleUnsubscribe, workspaceId]);
 
   // Optimistic toggle favorite
   const handleToggleFavorite = useCallback((contact: any) => {
@@ -393,12 +416,13 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
               <ContactTile
                 key={contact.id}
                 contact={contact}
-                  variant={viewMode}
+                variant={viewMode}
                 onClick={() => handleContactClick(contact)}
                 onToggleFavorite={(e) => {
                   e.stopPropagation();
                   handleToggleFavorite(contact);
                 }}
+                onUnsubscribe={(e) => handleUnsubscribe(contact, e)}
                 onEdit={(e) => handleEditContact(contact, e)}
                 onDelete={(e) => handleDeleteContact(contact, e)}
               />

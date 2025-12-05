@@ -8,7 +8,7 @@
 
 import React, { memo } from 'react';
 import Image from 'next/image';
-import { Star, Trash2, Edit, Mail, Phone } from 'lucide-react';
+import { Star, Trash2, Edit, Mail, Phone, BellOff, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ChannelLogo } from './ChannelLogo';
 
@@ -17,6 +17,7 @@ interface ContactTileProps {
   variant?: 'grid' | 'list';
   onClick: () => void;
   onToggleFavorite: (e: React.MouseEvent) => void;
+  onUnsubscribe?: (e: React.MouseEvent) => void;
   onEdit?: (e: React.MouseEvent) => void;
   onDelete?: (e: React.MouseEvent) => void;
 }
@@ -66,6 +67,7 @@ export const ContactTile = memo(function ContactTile({
   variant = 'grid',
   onClick,
   onToggleFavorite,
+  onUnsubscribe,
   onEdit,
   onDelete,
 }: ContactTileProps) {
@@ -74,13 +76,17 @@ export const ContactTile = memo(function ContactTile({
   const contactInitial = getContactInitial(contact.full_name || 'A');
   const contactColor = getContactColor(contact.full_name || 'A');
   const displaySubtitle = contact.job_title || contact.company || '';
+  const isUnsubscribed = contact.is_unsubscribed;
 
   // List view - full-width row with more details
   if (variant === 'list') {
     return (
       <div
         onClick={onClick}
-        className="group relative rounded-lg p-3 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0"
+        className={cn(
+          "group relative rounded-lg p-3 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/30 last:border-b-0",
+          isUnsubscribed && "opacity-60"
+        )}
       >
         <div className="flex items-center gap-4">
           {/* Avatar */}
@@ -112,6 +118,11 @@ export const ContactTile = memo(function ContactTile({
               </h3>
               {contact.is_favorite && (
                 <Star className="h-3 w-3 fill-yellow-500 text-yellow-500 flex-shrink-0" />
+              )}
+              {isUnsubscribed && (
+                <span title="Unsubscribed">
+                  <BellOff className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                </span>
               )}
             </div>
             {displaySubtitle && (
@@ -176,6 +187,20 @@ export const ContactTile = memo(function ContactTile({
                 )}
               />
             </button>
+            {onUnsubscribe && (
+              <button
+                onClick={onUnsubscribe}
+                className="p-1.5 rounded hover:bg-background/80 transition-colors"
+                aria-label={isUnsubscribed ? 'Resubscribe to this contact' : 'Unsubscribe from this contact'}
+                title={isUnsubscribed ? 'Resubscribe' : 'Unsubscribe'}
+              >
+                {isUnsubscribed ? (
+                  <Bell className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                ) : (
+                  <BellOff className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                )}
+              </button>
+            )}
             {onEdit && (
               <button
                 onClick={onEdit}
@@ -204,7 +229,10 @@ export const ContactTile = memo(function ContactTile({
   return (
     <div
       onClick={onClick}
-      className="group relative rounded-lg p-3 hover:bg-muted/50 cursor-pointer transition-colors"
+      className={cn(
+        "group relative rounded-lg p-3 hover:bg-muted/50 cursor-pointer transition-colors",
+        isUnsubscribed && "opacity-60"
+      )}
     >
       <div className="flex items-center gap-3">
         {/* Compact Avatar */}
@@ -236,6 +264,11 @@ export const ContactTile = memo(function ContactTile({
             </h3>
             {contact.is_favorite && (
               <Star className="h-3 w-3 fill-yellow-500 text-yellow-500 flex-shrink-0" />
+            )}
+            {isUnsubscribed && (
+              <span title="Unsubscribed">
+                <BellOff className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+              </span>
             )}
           </div>
           {(displaySubtitle || contact.email) && (
@@ -282,6 +315,20 @@ export const ContactTile = memo(function ContactTile({
             )}
           />
         </button>
+        {onUnsubscribe && (
+          <button
+            onClick={onUnsubscribe}
+            className="p-1.5 rounded hover:bg-background/80 transition-colors"
+            aria-label={isUnsubscribed ? 'Resubscribe to this contact' : 'Unsubscribe from this contact'}
+            title={isUnsubscribed ? 'Resubscribe' : 'Unsubscribe'}
+          >
+            {isUnsubscribed ? (
+              <Bell className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+            ) : (
+              <BellOff className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+            )}
+          </button>
+        )}
         {onEdit && (
           <button
             onClick={onEdit}

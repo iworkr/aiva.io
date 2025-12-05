@@ -899,12 +899,14 @@ export type Database = {
           id: string
           interaction_count: number | null
           is_favorite: boolean | null
+          is_unsubscribed: boolean | null
           job_title: string | null
           last_interaction_at: string | null
           last_name: string | null
           notes: string | null
           phone: string | null
           tags: string[] | null
+          unsubscribed_at: string | null
           updated_at: string | null
           workspace_id: string
         }
@@ -920,12 +922,14 @@ export type Database = {
           id?: string
           interaction_count?: number | null
           is_favorite?: boolean | null
+          is_unsubscribed?: boolean | null
           job_title?: string | null
           last_interaction_at?: string | null
           last_name?: string | null
           notes?: string | null
           phone?: string | null
           tags?: string[] | null
+          unsubscribed_at?: string | null
           updated_at?: string | null
           workspace_id: string
         }
@@ -941,12 +945,14 @@ export type Database = {
           id?: string
           interaction_count?: number | null
           is_favorite?: boolean | null
+          is_unsubscribed?: boolean | null
           job_title?: string | null
           last_interaction_at?: string | null
           last_name?: string | null
           notes?: string | null
           phone?: string | null
           tags?: string[] | null
+          unsubscribed_at?: string | null
           updated_at?: string | null
           workspace_id?: string
         }

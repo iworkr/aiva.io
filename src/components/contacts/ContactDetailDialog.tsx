@@ -26,6 +26,8 @@ import {
   Trash2,
   Plus,
   Loader2,
+  BellOff,
+  Bell,
 } from 'lucide-react';
 import { ChannelLogo } from './ChannelLogo';
 import { toast } from 'sonner';
@@ -34,6 +36,7 @@ import {
   linkChannelToContactAction,
   deleteContactChannelAction,
   toggleContactFavoriteAction,
+  toggleContactUnsubscribeAction,
 } from '@/data/user/contacts';
 import { cn } from '@/lib/utils';
 
@@ -67,6 +70,21 @@ export function ContactDetailDialog({
     },
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to toggle favorite');
+    },
+  });
+
+  // Toggle unsubscribe
+  const { execute: toggleUnsubscribe, status: unsubscribeStatus } = useAction(toggleContactUnsubscribeAction, {
+    onSuccess: ({ data }) => {
+      if (data?.isUnsubscribed) {
+        toast.success('Unsubscribed from this contact');
+      } else {
+        toast.success('Resubscribed to this contact');
+      }
+      onUpdate();
+    },
+    onError: ({ error }) => {
+      toast.error(error.serverError || 'Failed to toggle unsubscribe');
     },
   });
 
@@ -411,6 +429,56 @@ export function ContactDetailDialog({
               </p>
             </div>
           )}
+
+          {/* Unsubscribe Section */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">Notifications</p>
+            <div 
+              className={cn(
+                "rounded-lg border p-3 transition-colors",
+                contact.is_unsubscribed 
+                  ? "bg-muted/50 border-border" 
+                  : "bg-background border-border/50"
+              )}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  {contact.is_unsubscribed ? (
+                    <BellOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Bell className="h-4 w-4 text-foreground" />
+                  )}
+                  <div>
+                    <p className="text-sm font-medium">
+                      {contact.is_unsubscribed ? 'Unsubscribed' : 'Subscribed'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {contact.is_unsubscribed 
+                        ? "You won't receive notifications from this contact" 
+                        : 'Receiving emails and notifications'}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant={contact.is_unsubscribed ? 'outline' : 'destructive'}
+                  size="sm"
+                  className="h-8 text-xs shrink-0"
+                  onClick={() => toggleUnsubscribe({ id: contact.id, workspaceId })}
+                  disabled={unsubscribeStatus === 'executing'}
+                >
+                  {unsubscribeStatus === 'executing' && (
+                    <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                  )}
+                  {contact.is_unsubscribed ? 'Resubscribe' : 'Unsubscribe'}
+                </Button>
+              </div>
+              {contact.is_unsubscribed && contact.unsubscribed_at && (
+                <p className="text-[11px] text-muted-foreground mt-2">
+                  Unsubscribed on {new Date(contact.unsubscribed_at).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+          </div>
 
           {/* Activity Summary */}
           {contact.interaction_count > 0 && (
