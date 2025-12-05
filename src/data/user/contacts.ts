@@ -244,8 +244,7 @@ export const toggleContactFavoriteAction = authActionClient
 
     if (error) throw new Error(error.message);
 
-    revalidatePath(`/workspace/${workspaceId}/contacts`);
-    revalidatePath(`/contacts`);
+    // No revalidatePath - client uses optimistic updates
     return { success: true, data };
   });
 
@@ -289,8 +288,8 @@ export const toggleContactUnsubscribeAction = authActionClient
 
     if (error) throw new Error(error.message);
 
-    revalidatePath(`/workspace/${workspaceId}/contacts`);
-    revalidatePath(`/contacts`);
+    // No revalidatePath - client uses optimistic updates for instant feedback
+    // without triggering a full page refresh
     return { success: true, data, isUnsubscribed: newUnsubscribedStatus };
   });
 
