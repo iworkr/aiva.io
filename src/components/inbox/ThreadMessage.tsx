@@ -200,8 +200,8 @@ export const ThreadMessage = memo(function ThreadMessage({
         </div>
       </div>
 
-      {/* Message Content */}
-      <div className="px-4 pb-3 pl-[52px] overflow-hidden">
+      {/* Message Content - Full width, not indented under avatar */}
+      <div className="px-4 pb-3 overflow-hidden">
         {isCurrentMessage && hasHtmlContent ? (
           /* Use EmailHtmlRenderer for proper HTML email rendering with DOMPurify sanitization */
           <EmailHtmlRenderer 
