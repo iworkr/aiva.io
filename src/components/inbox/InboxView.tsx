@@ -172,18 +172,51 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
           setUnreadCount(unread);
           setStarredCount(starred);
 
-          // Cache the result
+          // Cache the result (with size limit to prevent quota errors)
           try {
+            // Only cache first 30 messages to stay under quota
+            const messagesToCache = messagesArray.slice(0, 30).map((msg: any) => ({
+              id: msg.id,
+              subject: msg.subject,
+              sender_name: msg.sender_name,
+              sender_email: msg.sender_email,
+              snippet: msg.snippet?.substring(0, 100),
+              is_read: msg.is_read,
+              is_starred: msg.is_starred,
+              priority: msg.priority,
+              category: msg.category,
+              created_at: msg.created_at,
+              channel_connection_id: msg.channel_connection_id,
+              ai_summary_short: msg.ai_summary_short,
+            }));
+            
+            // Clear old inbox caches first to free space
+            const keysToRemove: string[] = [];
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i);
+              if (key && key.startsWith('inbox-cache-') && key !== cacheKey) {
+                keysToRemove.push(key);
+              }
+            }
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+            
             localStorage.setItem(
               cacheKey,
               JSON.stringify({
-                messages: messagesArray,
+                messages: messagesToCache,
                 messageCounts: counts,
                 timestamp: Date.now(),
               })
             );
           } catch (error) {
-            console.error('Failed to cache messages:', error);
+            // If still fails, clear all inbox caches and skip caching
+            console.warn('Cache quota exceeded, clearing inbox caches');
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+              const key = localStorage.key(i);
+              if (key && key.startsWith('inbox-cache-')) {
+                localStorage.removeItem(key);
+              }
+            }
           }
 
           // Update last sync timestamp based on newest message

@@ -18,6 +18,7 @@ interface UseSyncProgressOptions {
 interface UseSyncProgressReturn {
   progress: SyncProgress | null;
   isActive: boolean;
+  displayProgress: number;
   reset: () => void;
 }
 
@@ -37,13 +38,77 @@ export function useSyncProgress(
 ): UseSyncProgressReturn {
   const [progress, setProgress] = useState<SyncProgress | null>(null);
   const [isActive, setIsActive] = useState(false);
+  const [displayProgress, setDisplayProgress] = useState(0);
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const animationRef = useRef<NodeJS.Timeout | null>(null);
   const { onComplete, onError } = options;
 
   const reset = useCallback(() => {
     setProgress(null);
     setIsActive(false);
+    setDisplayProgress(0);
+    if (animationRef.current) {
+      clearInterval(animationRef.current);
+      animationRef.current = null;
+    }
   }, []);
+
+  // Smooth progress interpolation
+  useEffect(() => {
+    const targetProgress = calculateSyncPercentage(progress);
+    
+    // Clear any existing animation
+    if (animationRef.current) {
+      clearInterval(animationRef.current);
+    }
+
+    // Animate towards target progress
+    animationRef.current = setInterval(() => {
+      setDisplayProgress(current => {
+        const diff = targetProgress - current;
+        
+        // If we're very close, snap to target
+        if (Math.abs(diff) < 0.5) {
+          return targetProgress;
+        }
+        
+        // Ease towards target (faster when far, slower when close)
+        const step = diff * 0.12;
+        
+        // Ensure minimum step size for visible movement
+        const minStep = diff > 0 ? 0.3 : -0.3;
+        const actualStep = Math.abs(step) < Math.abs(minStep) ? minStep : step;
+        
+        return current + actualStep;
+      });
+    }, 50);
+
+    return () => {
+      if (animationRef.current) {
+        clearInterval(animationRef.current);
+      }
+    };
+  }, [progress]);
+
+  // Slow creep forward when active but no updates (prevents appearing frozen)
+  useEffect(() => {
+    if (!isActive) return;
+
+    const creepInterval = setInterval(() => {
+      const targetProgress = calculateSyncPercentage(progress);
+      
+      setDisplayProgress(current => {
+        // Only creep if we're behind the target and not at certain thresholds
+        if (current < targetProgress - 2 && current < 95) {
+          // Very slow creep to show activity
+          return current + 0.1;
+        }
+        return current;
+      });
+    }, 200);
+
+    return () => clearInterval(creepInterval);
+  }, [isActive, progress]);
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -96,7 +161,7 @@ export function useSyncProgress(
     };
   }, [workspaceId, onComplete, onError]);
 
-  return { progress, isActive, reset };
+  return { progress, isActive, displayProgress, reset };
 }
 
 /**

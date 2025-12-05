@@ -118,6 +118,9 @@ export async function syncChannelConnection(
 
   try {
     let syncResult: any;
+    
+    console.log(`🚀 Starting sync for ${connection.provider} (${connection.provider_account_name})`);
+    console.log(`   Options: autoClassify=${options.autoClassify}, maxMessages=${options.maxMessages}`);
 
     // Broadcast fetching phase
     await broadcastProgress(workspaceId, {
@@ -196,57 +199,74 @@ export async function syncChannelConnection(
       classifiedMessages: 0,
     });
 
-    // Auto-classify new messages if enabled
+    // Auto-classify messages if enabled
     let classifiedCount = 0;
-    if (options.autoClassify && syncResult.newCount && syncResult.newCount > 0) {
+    if (options.autoClassify) {
       try {
-        // Get newly synced messages that haven't been classified yet
-        const { data: newMessages } = await supabase
+        // Get ALL unclassified messages in the workspace (not just from this connection)
+        // This ensures existing unclassified messages also get processed
+        // Check for EITHER priority OR category being null (some messages might have partial classification)
+        const { data: unclassifiedMessages, error: queryError } = await supabase
           .from('messages')
-          .select('id, subject')
-          .eq('channel_connection_id', connectionId)
-          .is('priority', null)
+          .select('id, subject, priority, category')
+          .eq('workspace_id', workspaceId)
+          .or('priority.is.null,category.is.null') // Either priority OR category is null
           .order('created_at', { ascending: false })
-          .limit(syncResult.newCount);
+          .limit(100); // Limit to prevent timeout on large backlogs
 
-        if (newMessages && newMessages.length > 0) {
-          console.log(`🤖 Classifying ${newMessages.length} new messages...`);
+        console.log(`🔍 Querying for unclassified messages in workspace ${workspaceId}...`);
+        if (queryError) {
+          console.error('❌ Query error:', queryError);
+        }
+        console.log(`📊 Found ${unclassifiedMessages?.length || 0} unclassified messages`);
+
+        if (unclassifiedMessages && unclassifiedMessages.length > 0) {
+          const totalToClassify = unclassifiedMessages.length;
+          console.log(`🤖 Found ${totalToClassify} unclassified messages to process...`);
           
           // Broadcast classifying phase
           await broadcastProgress(workspaceId, {
             phase: 'classifying',
             connectionName: connection.provider_account_name || '',
             provider: connection.provider,
-            totalMessages: syncResult.syncedCount || 0,
+            totalMessages: totalToClassify,
             syncedMessages: syncResult.newCount || 0,
             classifiedMessages: 0,
           });
           
           // Classify messages one by one with progress updates
-          for (let i = 0; i < newMessages.length; i++) {
-            const msg = newMessages[i];
+          for (let i = 0; i < unclassifiedMessages.length; i++) {
+            const msg = unclassifiedMessages[i];
+            // Indicate if this is an existing message vs newly synced
+            const isExisting = i >= (syncResult.newCount || 0);
+            const displaySubject = isExisting 
+              ? `Fixing: ${msg.subject || 'Untitled'}` 
+              : msg.subject || 'Processing...';
+            
             try {
-              await classifyMessage(msg.id, workspaceId);
+              console.log(`   🏷️ Classifying message ${i + 1}/${totalToClassify}: ${msg.subject?.substring(0, 40) || 'No subject'}...`);
+              const result = await classifyMessage(msg.id, workspaceId);
+              console.log(`   ✅ Classified as: priority=${result.priority}, category=${result.category}`);
               classifiedCount++;
               
-              // Broadcast progress every message (or every 3 for performance)
-              if (i % 3 === 0 || i === newMessages.length - 1) {
+              // Broadcast progress every message (or every 2 for performance)
+              if (i % 2 === 0 || i === unclassifiedMessages.length - 1) {
                 await broadcastProgress(workspaceId, {
                   phase: 'classifying',
                   connectionName: connection.provider_account_name || '',
                   provider: connection.provider,
-                  totalMessages: syncResult.syncedCount || 0,
+                  totalMessages: totalToClassify,
                   syncedMessages: syncResult.newCount || 0,
                   classifiedMessages: classifiedCount,
-                  currentMessage: msg.subject || 'Processing...',
+                  currentMessage: displaySubject,
                 });
               }
-            } catch (classifyError) {
-              console.error(`Classification failed for message ${msg.id}:`, classifyError);
+            } catch (classifyError: any) {
+              console.error(`   ❌ Classification failed for message ${msg.id}:`, classifyError?.message || classifyError);
             }
           }
           
-          console.log(`✅ Classification complete: ${classifiedCount}/${newMessages.length} successful`);
+          console.log(`✅ Classification complete: ${classifiedCount}/${totalToClassify} successful`);
         }
       } catch (error) {
         console.error('Auto-classify error:', error);
@@ -258,7 +278,7 @@ export async function syncChannelConnection(
       phase: 'complete',
       connectionName: connection.provider_account_name || '',
       provider: connection.provider,
-      totalMessages: syncResult.syncedCount || 0,
+      totalMessages: classifiedCount > 0 ? classifiedCount : (syncResult.syncedCount || 0),
       syncedMessages: syncResult.newCount || 0,
       classifiedMessages: classifiedCount,
     });

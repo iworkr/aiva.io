@@ -46,7 +46,7 @@ export function SyncProgressDialog({
 }: SyncProgressDialogProps) {
   const [showComplete, setShowComplete] = useState(false);
   
-  const { progress, isActive, reset } = useSyncProgress(workspaceId, {
+  const { progress, isActive, displayProgress, reset } = useSyncProgress(workspaceId, {
     onComplete: () => {
       setShowComplete(true);
       onSyncComplete?.();
@@ -69,7 +69,8 @@ export function SyncProgressDialog({
     }
   }, [isOpen]);
 
-  const percentage = calculateSyncPercentage(progress);
+  // Use the smooth interpolated progress instead of raw percentage
+  const percentage = displayProgress;
   const phaseDescription = progress ? getPhaseDescription(progress.phase) : 'Starting sync...';
 
   // Get provider logo
@@ -116,10 +117,13 @@ export function SyncProgressDialog({
             </div>
           )}
 
-          {/* Progress Bar */}
+          {/* Progress Bar - with smooth CSS transition */}
           <div className="space-y-2">
-            <Progress value={percentage} className="h-2" />
-            <p className="text-xs text-muted-foreground text-center">
+            <Progress 
+              value={percentage} 
+              className="h-2 [&>div]:transition-all [&>div]:duration-300 [&>div]:ease-out" 
+            />
+            <p className="text-xs text-muted-foreground text-center tabular-nums">
               {Math.round(percentage)}%
             </p>
           </div>
@@ -140,13 +144,13 @@ export function SyncProgressDialog({
             <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
               <div className="text-center">
                 <p className="text-2xl font-semibold tabular-nums">
-                  {progress.syncedMessages}/{progress.totalMessages}
+                  {progress.syncedMessages}
                 </p>
-                <p className="text-xs text-muted-foreground">Messages synced</p>
+                <p className="text-xs text-muted-foreground">New messages</p>
               </div>
               <div className="text-center">
                 <p className="text-2xl font-semibold tabular-nums">
-                  {progress.classifiedMessages}/{progress.syncedMessages || 0}
+                  {progress.classifiedMessages}/{progress.totalMessages || progress.syncedMessages || 0}
                 </p>
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                   <Sparkles className="h-3 w-3" />
