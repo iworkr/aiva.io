@@ -428,6 +428,89 @@ export async function getContactRecentMessages(
 }
 
 /**
+ * Generate AI description for a contact
+ * Creates a natural, friendly summary based on interactions
+ */
+export async function generateContactAIDescription(
+  contact: any,
+  recentMessages: any[],
+  workspaceId: string,
+  userId: string
+): Promise<string | null> {
+  const isMember = await isWorkspaceMember(userId, workspaceId);
+  if (!isMember) return null;
+
+  // Build context for the AI
+  const contextParts: string[] = [];
+  
+  // Contact info
+  if (contact.full_name) contextParts.push(`Contact name: ${contact.full_name}`);
+  if (contact.job_title) contextParts.push(`Job: ${contact.job_title}`);
+  if (contact.company) contextParts.push(`Company: ${contact.company}`);
+  if (contact.bio) contextParts.push(`Bio: ${contact.bio}`);
+  
+  // Recent messages summary
+  if (recentMessages.length > 0) {
+    const subjects = recentMessages.map(m => m.subject).filter(Boolean);
+    const snippets = recentMessages.slice(0, 3).map(m => m.snippet).filter(Boolean);
+    if (subjects.length > 0) {
+      contextParts.push(`Recent email subjects: ${subjects.join('; ')}`);
+    }
+    if (snippets.length > 0) {
+      contextParts.push(`Recent snippets: ${snippets.join(' | ')}`);
+    }
+    contextParts.push(`Total messages from this contact: ${recentMessages.length}`);
+  }
+  
+  // Interaction stats
+  if (contact.interaction_count) {
+    contextParts.push(`Total interactions: ${contact.interaction_count}`);
+  }
+  if (contact.last_interaction_at) {
+    contextParts.push(`Last interaction: ${new Date(contact.last_interaction_at).toLocaleDateString()}`);
+  }
+
+  if (contextParts.length < 2) return null; // Not enough context
+
+  try {
+    const { OpenAI } = await import('openai');
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a helpful assistant that writes brief, natural descriptions of contacts based on interaction history. 
+Write in second person ("you" and "your") addressing the user.
+Be warm and friendly, like you're describing a person to a friend.
+Keep it to 1-2 short sentences maximum.
+Focus on the relationship and communication patterns, not just listing facts.
+If it's clearly a business/newsletter contact, describe it that way naturally.
+Examples:
+- "Sarah is a close colleague you chat with regularly about project updates."
+- "This is your weekly newsletter from TechCrunch - they send you the latest tech news."
+- "David from accounting - you usually discuss invoices and expense reports."
+- "A friend you catch up with occasionally. Last chatted about weekend plans."
+Do NOT start with the contact's name - dive right into the description.`
+        },
+        {
+          role: 'user',
+          content: `Write a brief, natural description of this contact based on the following information:\n\n${contextParts.join('\n')}`
+        }
+      ],
+      max_tokens: 100,
+      temperature: 0.7,
+    });
+
+    return response.choices[0]?.message?.content?.trim() || null;
+  } catch (error) {
+    console.error('Failed to generate AI description:', error);
+    return null;
+  }
+}
+
+/**
  * Delete a contact channel
  */
 export const deleteContactChannelAction = authActionClient

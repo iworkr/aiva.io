@@ -76,6 +76,7 @@ import {
   toggleContactUnsubscribeAction,
   getChannelSuggestions,
   getContactRecentMessages,
+  generateContactAIDescription,
 } from '@/data/user/contacts';
 import { cn } from '@/lib/utils';
 
@@ -158,39 +159,32 @@ export function ContactDetailDialog({
     fetchActivity();
   }, [open, contact?.email, workspaceId, userId]);
 
-  // Generate AI description based on activity
+  // Generate AI description using OpenAI
   useEffect(() => {
     if (!open || !contact || generatingDescription || aiDescription) return;
-    if (recentMessages.length === 0 && !contact.bio) return;
+    if (recentMessages.length === 0 && !contact.bio && !contact.job_title && !contact.company) return;
     
     const generateDescription = async () => {
       setGeneratingDescription(true);
       try {
-        // Create a brief AI description based on available data
-        const contextParts: string[] = [];
-        
-        if (contact.job_title) contextParts.push(`Works as ${contact.job_title}`);
-        if (contact.company) contextParts.push(`at ${contact.company}`);
-        if (recentMessages.length > 0) {
-          const topics = recentMessages.map(m => m.subject).filter(Boolean).slice(0, 3);
-          if (topics.length > 0) {
-            contextParts.push(`Recent topics: ${topics.join(', ')}`);
-          }
+        const description = await generateContactAIDescription(
+          contact,
+          recentMessages,
+          workspaceId,
+          userId
+        );
+        if (description) {
+          setAiDescription(description);
         }
-        if (contact.interaction_count) {
-          contextParts.push(`${contact.interaction_count} interactions`);
-        }
-        
-        if (contextParts.length > 0) {
-          setAiDescription(contextParts.join('. ') + '.');
-        }
+      } catch (error) {
+        console.error('Failed to generate AI description:', error);
       } finally {
         setGeneratingDescription(false);
       }
     };
     
     generateDescription();
-  }, [open, contact, recentMessages, generatingDescription, aiDescription]);
+  }, [open, contact, recentMessages, generatingDescription, aiDescription, workspaceId, userId]);
 
   // Reset AI description when contact changes
   useEffect(() => {
@@ -300,7 +294,7 @@ export function ContactDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto p-0">
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto overflow-x-hidden p-0">
         {/* Minimal Header */}
         <div className="px-6 py-5 border-b border-border/50">
           <div className="flex items-start justify-between gap-4">
@@ -389,7 +383,7 @@ export function ContactDetailDialog({
         </div>
 
         {/* Content Area */}
-        <div className="px-6 py-5 space-y-5">
+        <div className="px-6 py-5 space-y-5 overflow-hidden">
 
           {/* AI-Generated Description */}
           {(aiDescription || generatingDescription) && (
@@ -794,8 +788,8 @@ export function ContactDetailDialog({
             </AlertDialogContent>
           </AlertDialog>
 
-          {/* Recent Activity Log */}
-          <div className="space-y-3">
+          {/* Recent Activity Log - Compact */}
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Clock className="h-3 w-3 text-muted-foreground" />
@@ -803,64 +797,59 @@ export function ContactDetailDialog({
               </div>
               {contact.interaction_count > 0 && (
                 <span className="text-[10px] text-muted-foreground">
-                  {contact.interaction_count} total interaction{contact.interaction_count !== 1 ? 's' : ''}
+                  {contact.interaction_count} total
                 </span>
               )}
             </div>
             
             {loadingActivity ? (
-              <div className="flex items-center gap-2 py-4 justify-center text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading activity...
+              <div className="flex items-center gap-2 py-2 justify-center text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Loading...
               </div>
             ) : recentMessages.length > 0 ? (
-              <div className="space-y-2">
-                {recentMessages.map((message: any) => (
+              <div className="space-y-1">
+                {recentMessages.slice(0, 2).map((message: any) => (
                   <Link
                     key={message.id}
                     href={`/inbox/${message.id}`}
                     onClick={() => onOpenChange(false)}
-                    className="group flex items-start gap-3 p-2.5 rounded-lg hover:bg-muted/50 transition-colors border border-transparent hover:border-border/50"
+                    className="group flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors"
                   >
-                    <div className="flex-shrink-0 mt-0.5">
-                      <MessageSquare className={cn(
-                        "h-4 w-4",
-                        message.is_read ? "text-muted-foreground" : "text-primary"
-                      )} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className={cn(
-                          "text-sm truncate",
-                          !message.is_read && "font-medium"
-                        )}>
-                          {message.subject || '(No subject)'}
-                        </p>
-                        {message.priority === 'high' && (
-                          <span className="px-1.5 py-0.5 text-[10px] bg-destructive/10 text-destructive rounded">
-                            High
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">
-                        {message.snippet}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground mt-1">
-                        {new Date(message.timestamp).toLocaleDateString(undefined, {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: 'numeric',
-                          minute: '2-digit'
-                        })}
+                    <MessageSquare className={cn(
+                      "h-3.5 w-3.5 flex-shrink-0",
+                      message.is_read ? "text-muted-foreground" : "text-primary"
+                    )} />
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <p className={cn(
+                        "text-xs truncate",
+                        !message.is_read && "font-medium"
+                      )}>
+                        {message.subject || '(No subject)'}
                       </p>
                     </div>
-                    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1" />
+                    <span className="text-[10px] text-muted-foreground flex-shrink-0">
+                      {new Date(message.timestamp).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric'
+                      })}
+                    </span>
                   </Link>
                 ))}
+                {recentMessages.length > 2 && (
+                  <Link
+                    href={`/inbox?search=${encodeURIComponent(contact.email || contact.full_name)}`}
+                    onClick={() => onOpenChange(false)}
+                    className="flex items-center justify-center gap-1 py-1.5 text-xs text-primary hover:underline"
+                  >
+                    See all {recentMessages.length} messages
+                    <ExternalLink className="h-3 w-3" />
+                  </Link>
+                )}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground py-3 text-center">
-                No recent messages from this contact
+              <p className="text-xs text-muted-foreground py-2 text-center">
+                No recent messages
               </p>
             )}
           </div>
