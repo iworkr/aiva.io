@@ -277,9 +277,9 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
   };
 
   // Priority: AI summary > snippet > body
-  // Show shimmer if summary is being generated (no summary yet, but has body)
+  // We only show AI summary if it exists - no shimmer/loading state since summaries
+  // are generated asynchronously in the background after message sync
   const hasAISummary = Boolean(message.ai_summary_short);
-  const isPendingSummary = !hasAISummary && Boolean(message.body);
   
   // Apply HTML stripping to both snippet and body, then mask sensitive content
   const rawSnippet = message.ai_summary_short || message.snippet || message.body || '';
@@ -406,21 +406,10 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
           </div>
 
           {/* Snippet/AI Summary with markdown formatting */}
-          {isPendingSummary ? (
-            <div className="mt-1.5 space-y-1.5">
-              <div className="h-4 w-full rounded bg-muted/60 overflow-hidden relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-muted-foreground/10 to-transparent animate-shimmer" />
-              </div>
-              <div className="h-4 w-3/4 rounded bg-muted/60 overflow-hidden relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-muted-foreground/10 to-transparent animate-shimmer" style={{ animationDelay: '0.2s' }} />
-              </div>
-            </div>
-          ) : (
           <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">
-              {hasAISummary && <Sparkles className="inline h-3 w-3 mr-1 text-primary/60" aria-hidden="true" />}
+            {hasAISummary && <Sparkles className="inline h-3 w-3 mr-1 text-primary/60" aria-hidden="true" />}
             {parseMarkdown(displaySnippet)}
           </p>
-          )}
 
           {/* AI Classifications & Quick Actions Row */}
           <div className="mt-3 flex items-center justify-between gap-2">
