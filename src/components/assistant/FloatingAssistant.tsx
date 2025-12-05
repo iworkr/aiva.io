@@ -558,11 +558,11 @@ export function FloatingAssistant() {
       >
         <div className="relative">
           <Image
-            src="/logos/aiva-mark.svg"
+            src="/aiva-logo/SVG/Asset 83.svg"
             alt="Aiva"
-            width={28}
-            height={28}
-            className="object-contain brightness-0 invert group-hover:scale-110 transition-transform"
+            width={30}
+            height={30}
+            className="object-contain group-hover:scale-110 transition-transform"
           />
           {/* Slow pulse animation ring */}
           <span className="absolute inset-0 rounded-full bg-white/15 animate-[ping_3s_ease-in-out_infinite]" />

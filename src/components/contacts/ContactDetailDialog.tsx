@@ -504,8 +504,8 @@ export function ContactDetailDialog({
           <AlertDialog open={showUnsubscribeConfirm} onOpenChange={setShowUnsubscribeConfirm}>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center">
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0">
                     <AlertTriangle className="h-5 w-5 text-destructive" />
                   </div>
                   <div>
