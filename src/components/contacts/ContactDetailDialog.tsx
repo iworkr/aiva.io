@@ -99,10 +99,20 @@ export function ContactDetailDialog({
   onEdit,
   onUpdate,
 }: ContactDetailDialogProps) {
+  // Local contact state for instant updates
+  const [localContact, setLocalContact] = useState<typeof contact>(contact);
+  
+  // Sync local state when contact prop changes
+  useEffect(() => {
+    setLocalContact(contact);
+  }, [contact]);
+  
   const [showAddChannel, setShowAddChannel] = useState(false);
   const [newChannel, setNewChannel] = useState({ type: '', id: '', displayName: '' });
   const [showUnsubscribeConfirm, setShowUnsubscribeConfirm] = useState(false);
   const [showResubscribeConfirm, setShowResubscribeConfirm] = useState(false);
+  const [showDeleteChannelConfirm, setShowDeleteChannelConfirm] = useState(false);
+  const [channelToDelete, setChannelToDelete] = useState<any>(null);
   
   // Channel suggestions state
   const [channelSuggestions, setChannelSuggestions] = useState<Array<{channel_id: string; channel_display_name: string | null}>>([]);
@@ -191,56 +201,105 @@ export function ContactDetailDialog({
     setAiDescription(null);
   }, [contact?.id]);
 
-  // Toggle favorite
+  // Toggle favorite - instant update
   const { execute: toggleFavorite } = useAction(toggleContactFavoriteAction, {
     onSuccess: () => {
-      toast.success('Favorite updated');
-      onUpdate();
+      toast.success(localContact.is_favorite ? 'Removed from favorites' : 'Added to favorites');
     },
     onError: ({ error }) => {
+      // Revert on error
+      setLocalContact((prev: any) => ({ ...prev, is_favorite: !prev.is_favorite }));
       toast.error(error.serverError || 'Failed to toggle favorite');
     },
   });
 
-  // Toggle unsubscribe - no onUpdate call to avoid full page refresh
-  // ContactsView uses optimistic updates to reflect the change immediately
+  const handleToggleFavorite = useCallback(() => {
+    // Instant optimistic update
+    setLocalContact((prev: any) => ({ ...prev, is_favorite: !prev.is_favorite }));
+    toggleFavorite({ id: localContact.id, workspaceId });
+  }, [localContact.id, workspaceId, toggleFavorite]);
+
+  // Toggle unsubscribe - instant update
   const { execute: toggleUnsubscribe, status: unsubscribeStatus } = useAction(toggleContactUnsubscribeAction, {
     onSuccess: ({ data }) => {
-      if (data?.isUnsubscribed) {
-        toast.success('Unsubscribed from this contact');
-      } else {
-        toast.success('Resubscribed to this contact');
-      }
-      // Don't call onUpdate() - parent handles optimistic update
+      toast.success(data?.isUnsubscribed ? 'Unsubscribed from this contact' : 'Resubscribed to this contact');
     },
     onError: ({ error }) => {
+      // Revert on error
+      setLocalContact((prev: any) => ({ 
+        ...prev, 
+        is_unsubscribed: !prev.is_unsubscribed,
+        unsubscribed_at: prev.is_unsubscribed ? new Date().toISOString() : null
+      }));
       toast.error(error.serverError || 'Failed to toggle unsubscribe');
     },
   });
 
-  // Link channel
+  const handleToggleUnsubscribe = useCallback(() => {
+    // Instant optimistic update
+    const newStatus = !localContact.is_unsubscribed;
+    setLocalContact((prev: any) => ({ 
+      ...prev, 
+      is_unsubscribed: newStatus,
+      unsubscribed_at: newStatus ? new Date().toISOString() : null
+    }));
+    toggleUnsubscribe({ id: localContact.id, workspaceId });
+    setShowUnsubscribeConfirm(false);
+    setShowResubscribeConfirm(false);
+  }, [localContact.id, localContact.is_unsubscribed, workspaceId, toggleUnsubscribe]);
+
+  // Link channel - instant update
   const { execute: linkChannel, status: linkStatus } = useAction(linkChannelToContactAction, {
-    onSuccess: () => {
-      toast.success('Channel linked successfully');
+    onSuccess: ({ data }) => {
+      toast.success('Channel linked');
+      // Add to local channels list
+      if (data?.data) {
+        setLocalContact((prev: any) => ({
+          ...prev,
+          contact_channels: [...(prev.contact_channels || []), data.data]
+        }));
+      }
       setShowAddChannel(false);
       setNewChannel({ type: '', id: '', displayName: '' });
-      onUpdate();
     },
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to link channel');
     },
   });
 
-  // Delete channel
+  // Delete channel - instant update
   const { execute: deleteChannel } = useAction(deleteContactChannelAction, {
     onSuccess: () => {
       toast.success('Channel removed');
-      onUpdate();
     },
     onError: ({ error }) => {
+      // Revert on error - add channel back
+      if (channelToDelete) {
+        setLocalContact((prev: any) => ({
+          ...prev,
+          contact_channels: [...(prev.contact_channels || []), channelToDelete]
+        }));
+      }
       toast.error(error.serverError || 'Failed to remove channel');
     },
   });
+
+  const handleDeleteChannel = useCallback((channel: any) => {
+    setChannelToDelete(channel);
+    setShowDeleteChannelConfirm(true);
+  }, []);
+
+  const confirmDeleteChannel = useCallback(() => {
+    if (!channelToDelete) return;
+    // Instant optimistic update - remove from list
+    setLocalContact((prev: any) => ({
+      ...prev,
+      contact_channels: (prev.contact_channels || []).filter((c: any) => c.id !== channelToDelete.id)
+    }));
+    deleteChannel({ id: channelToDelete.id, workspaceId });
+    setShowDeleteChannelConfirm(false);
+    setChannelToDelete(null);
+  }, [channelToDelete, workspaceId, deleteChannel]);
 
   // Sanitize contact name - remove leading/trailing quotes
   const sanitizeContactName = (name: string): string => {
@@ -278,19 +337,19 @@ export function ContactDetailDialog({
     }
     linkChannel({
       workspaceId,
-      contactId: contact.id,
+      contactId: localContact.id,
       channelType: newChannel.type,
       channelId: newChannel.id,
       channelDisplayName: newChannel.displayName || newChannel.id,
     });
   };
 
-  // Sanitized display values
-  const displayName = sanitizeContactName(contact.full_name || '');
-  const contactInitial = getContactInitial(contact.full_name || 'A');
-  const contactColor = getContactColor(contact.full_name || 'A');
-  const displayTitle = contact.job_title || '';
-  const displayLocation = contact.company || contact.location || '';
+  // Sanitized display values - use localContact for reactive updates
+  const displayName = sanitizeContactName(localContact.full_name || '');
+  const contactInitial = getContactInitial(localContact.full_name || 'A');
+  const contactColor = getContactColor(localContact.full_name || 'A');
+  const displayTitle = localContact.job_title || '';
+  const displayLocation = localContact.company || localContact.location || '';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -300,10 +359,10 @@ export function ContactDetailDialog({
           {/* Avatar + Name Row */}
           <div className="flex items-center gap-3 pr-8">
             {/* Compact Avatar */}
-            {contact.avatar_url ? (
+            {localContact.avatar_url ? (
               <Image
-                src={contact.avatar_url}
-                alt={displayName || contact.full_name}
+                src={localContact.avatar_url}
+                alt={displayName || localContact.full_name}
                 width={48}
                 height={48}
                 className="h-12 w-12 rounded-full object-cover flex-shrink-0"
@@ -323,7 +382,7 @@ export function ContactDetailDialog({
             {/* Name and Title */}
             <div className="flex-1 min-w-0 overflow-hidden">
               <DialogTitle className="text-base font-semibold truncate pr-2">
-                {displayName || contact.full_name}
+                {displayName || localContact.full_name}
               </DialogTitle>
               {(displayTitle || displayLocation) && (
                 <p className="text-xs text-muted-foreground truncate">
@@ -338,20 +397,20 @@ export function ContactDetailDialog({
           {/* Action Buttons Row - Below name, clearly separated */}
           <div className="flex items-center gap-2 mt-3">
             <Button
-              variant={contact.is_favorite ? "secondary" : "outline"}
+              variant={localContact.is_favorite ? "secondary" : "outline"}
               size="sm"
-              onClick={() => toggleFavorite({ id: contact.id, workspaceId })}
+              onClick={handleToggleFavorite}
               className="h-7 text-xs gap-1.5"
-              aria-label={contact.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
+              aria-label={localContact.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
             >
               <Star
                 className={cn(
                   'h-3 w-3',
-                  contact.is_favorite && 'fill-yellow-500 text-yellow-500'
+                  localContact.is_favorite && 'fill-yellow-500 text-yellow-500'
                 )}
                 aria-hidden="true"
               />
-              {contact.is_favorite ? 'Favorited' : 'Favorite'}
+              {localContact.is_favorite ? 'Favorited' : 'Favorite'}
             </Button>
             <Button variant="outline" size="sm" onClick={onEdit} className="h-7 text-xs gap-1.5" aria-label="Edit contact">
               <Edit className="h-3 w-3" aria-hidden="true" />
@@ -360,9 +419,9 @@ export function ContactDetailDialog({
           </div>
 
           {/* Channel Icons Row - Inline small */}
-          {contact.contact_channels && contact.contact_channels.length > 0 && (
+          {localContact.contact_channels && localContact.contact_channels.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 mt-3">
-              {contact.contact_channels.slice(0, 6).map((channel: any) => (
+              {localContact.contact_channels.slice(0, 6).map((channel: any) => (
                 <div
                   key={channel.id}
                   className="opacity-60 hover:opacity-100 transition-opacity"
@@ -371,9 +430,9 @@ export function ContactDetailDialog({
                   <ChannelLogo channelType={channel.channel_type} size={16} />
                 </div>
               ))}
-              {contact.contact_channels.length > 6 && (
+              {localContact.contact_channels.length > 6 && (
                 <span className="text-[10px] text-muted-foreground">
-                  +{contact.contact_channels.length - 6}
+                  +{localContact.contact_channels.length - 6}
                 </span>
               )}
             </div>
@@ -406,11 +465,11 @@ export function ContactDetailDialog({
           )}
 
           {/* Bio - Full Text */}
-          {contact.bio && (
+          {localContact.bio && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground">About</p>
               <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-                {contact.bio}
+                {localContact.bio}
               </p>
             </div>
           )}
@@ -552,9 +611,9 @@ export function ContactDetailDialog({
             )}
 
             {/* Channels List */}
-            {contact.contact_channels && contact.contact_channels.length > 0 ? (
+            {localContact.contact_channels && localContact.contact_channels.length > 0 ? (
               <div className="space-y-1">
-                {contact.contact_channels.map((channel: any) => {
+                {localContact.contact_channels.map((channel: any) => {
                   // Show display name with ID, or just ID if no display name
                   const hasDisplayName = channel.channel_display_name && 
                     channel.channel_display_name !== channel.channel_id;
@@ -587,11 +646,7 @@ export function ContactDetailDialog({
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                        onClick={() => {
-                          if (confirm(`Remove ${channel.channel_type} channel?`)) {
-                            deleteChannel({ id: channel.id, workspaceId });
-                          }
-                        }}
+                        onClick={() => handleDeleteChannel(channel)}
                         aria-label={`Remove ${channel.channel_type} channel`}
                       >
                         <Trash2 className="h-3 w-3" aria-hidden="true" />
@@ -608,11 +663,11 @@ export function ContactDetailDialog({
           </div>
 
           {/* Tags */}
-          {contact.tags && contact.tags.length > 0 && (
+          {localContact.tags && localContact.tags.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground">Tags</p>
               <div className="flex flex-wrap gap-1.5">
-                {contact.tags.map((tag: string, idx: number) => (
+                {localContact.tags.map((tag: string, idx: number) => (
                   <span key={idx} className="text-xs bg-muted px-2 py-0.5 rounded">
                     {tag}
                   </span>
@@ -622,11 +677,11 @@ export function ContactDetailDialog({
           )}
 
           {/* Notes */}
-          {contact.notes && (
+          {localContact.notes && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground">Notes</p>
               <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-                {contact.notes}
+                {localContact.notes}
               </p>
             </div>
           )}
@@ -637,35 +692,35 @@ export function ContactDetailDialog({
             <div 
               className={cn(
                 "rounded-lg border p-3 transition-colors",
-                contact.is_unsubscribed 
+                localContact.is_unsubscribed 
                   ? "bg-muted/50 border-border" 
                   : "bg-background border-border/50"
               )}
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
-                  {contact.is_unsubscribed ? (
+                  {localContact.is_unsubscribed ? (
                     <BellOff className="h-4 w-4 text-muted-foreground" />
                   ) : (
                     <Bell className="h-4 w-4 text-foreground" />
                   )}
                   <div>
                     <p className="text-sm font-medium">
-                      {contact.is_unsubscribed ? 'Unsubscribed' : 'Subscribed'}
+                      {localContact.is_unsubscribed ? 'Unsubscribed' : 'Subscribed'}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {contact.is_unsubscribed 
+                      {localContact.is_unsubscribed 
                         ? "Emails from this contact are hidden from your inbox" 
                         : 'Emails appear in your inbox'}
                     </p>
                   </div>
                 </div>
                 <Button
-                  variant={contact.is_unsubscribed ? 'outline' : 'destructive'}
+                  variant={localContact.is_unsubscribed ? 'outline' : 'destructive'}
                   size="sm"
                   className="h-8 text-xs shrink-0"
                   onClick={() => {
-                    if (contact.is_unsubscribed) {
+                    if (localContact.is_unsubscribed) {
                       // Resubscribing - show confirmation
                       setShowResubscribeConfirm(true);
                     } else {
@@ -678,12 +733,12 @@ export function ContactDetailDialog({
                   {unsubscribeStatus === 'executing' && (
                     <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
                   )}
-                  {contact.is_unsubscribed ? 'Resubscribe' : 'Unsubscribe'}
+                  {localContact.is_unsubscribed ? 'Resubscribe' : 'Unsubscribe'}
                 </Button>
               </div>
-              {contact.is_unsubscribed && contact.unsubscribed_at && (
+              {localContact.is_unsubscribed && localContact.unsubscribed_at && (
                 <p className="text-[11px] text-muted-foreground mt-2">
-                  Unsubscribed on {new Date(contact.unsubscribed_at).toLocaleDateString()}
+                  Unsubscribed on {new Date(localContact.unsubscribed_at).toLocaleDateString()}
                 </p>
               )}
             </div>
@@ -698,7 +753,7 @@ export function ContactDetailDialog({
                     <AlertTriangle className="h-5 w-5 text-destructive" />
                   </div>
                   <div>
-                    <AlertDialogTitle>Unsubscribe from {displayName || contact.full_name}?</AlertDialogTitle>
+                    <AlertDialogTitle>Unsubscribe from {displayName || localContact.full_name}?</AlertDialogTitle>
                     <AlertDialogDescription className="mt-1">
                       Emails from this contact will be automatically filtered out of your inbox. You can resubscribe anytime to see their messages again.
                     </AlertDialogDescription>
@@ -708,10 +763,7 @@ export function ContactDetailDialog({
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
-                  onClick={() => {
-                    toggleUnsubscribe({ id: contact.id, workspaceId });
-                    setShowUnsubscribeConfirm(false);
-                  }}
+                  onClick={handleToggleUnsubscribe}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
                   <BellOff className="h-4 w-4 mr-2" />
@@ -730,7 +782,7 @@ export function ContactDetailDialog({
                     <Bell className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <AlertDialogTitle>Resubscribe to {displayName || contact.full_name}?</AlertDialogTitle>
+                    <AlertDialogTitle>Resubscribe to {displayName || localContact.full_name}?</AlertDialogTitle>
                     <AlertDialogDescription className="mt-1">
                       Emails from this contact will appear in your inbox again. You&apos;ll see all their messages as normal.
                     </AlertDialogDescription>
@@ -740,14 +792,40 @@ export function ContactDetailDialog({
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
-                  onClick={() => {
-                    toggleUnsubscribe({ id: contact.id, workspaceId });
-                    setShowResubscribeConfirm(false);
-                  }}
+                  onClick={handleToggleUnsubscribe}
                   className="bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   <Bell className="h-4 w-4 mr-2" />
                   Resubscribe
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          {/* Delete Channel Confirmation Dialog */}
+          <AlertDialog open={showDeleteChannelConfirm} onOpenChange={setShowDeleteChannelConfirm}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0">
+                    <Trash2 className="h-5 w-5 text-destructive" />
+                  </div>
+                  <div>
+                    <AlertDialogTitle>Remove {channelToDelete?.channel_type} channel?</AlertDialogTitle>
+                    <AlertDialogDescription className="mt-1">
+                      This will remove the {channelToDelete?.channel_display_name || channelToDelete?.channel_id} channel from this contact.
+                    </AlertDialogDescription>
+                  </div>
+                </div>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={confirmDeleteChannel}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Remove Channel
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -760,9 +838,9 @@ export function ContactDetailDialog({
                 <Clock className="h-3 w-3 text-muted-foreground" />
                 <p className="text-xs font-medium text-muted-foreground">Recent Activity</p>
               </div>
-              {contact.interaction_count > 0 && (
+              {localContact.interaction_count > 0 && (
                 <span className="text-[10px] text-muted-foreground">
-                  {contact.interaction_count} total
+                  {localContact.interaction_count} total
                 </span>
               )}
             </div>
@@ -805,7 +883,7 @@ export function ContactDetailDialog({
                 })}
                 {recentMessages.length > 2 && (
                   <Link
-                    href={`/inbox?search=${encodeURIComponent(contact.email || contact.full_name)}`}
+                    href={`/inbox?search=${encodeURIComponent(localContact.email || localContact.full_name)}`}
                     onClick={() => onOpenChange(false)}
                     className="flex items-center justify-center gap-1 py-1.5 text-xs text-primary hover:underline"
                   >
@@ -823,7 +901,7 @@ export function ContactDetailDialog({
 
           {/* Metadata */}
           <div className="pt-3 border-t border-border/50 text-[11px] text-muted-foreground">
-            Added {new Date(contact.created_at).toLocaleDateString()}
+            Added {new Date(localContact.created_at).toLocaleDateString()}
           </div>
         </div>
       </DialogContent>
