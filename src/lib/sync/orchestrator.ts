@@ -314,7 +314,9 @@ export async function syncChannelConnection(
 }
 
 /**
- * Sync all connections for a workspace
+ * Sync all connections for a workspace with cumulative progress tracking
+ * Progress is calculated as: (completed connections + current connection progress) / total connections
+ * This ensures smooth progress from 0-100% across all accounts
  */
 export async function syncAllWorkspaceConnections(
   workspaceId: string,
@@ -347,16 +349,51 @@ export async function syncAllWorkspaceConnections(
   }
 
   const results: SyncResult[] = [];
+  const totalConnections = connections.length;
+  let completedConnections = 0;
+  let totalSyncedMessages = 0;
+  let totalClassifiedMessages = 0;
 
-  // Sync each connection
-  for (const connection of connections) {
-    const result = await syncChannelConnection(connection.id, workspaceId, {
-      maxMessages: options.maxMessagesPerConnection || 50,
-      autoClassify: options.autoClassify,
-    });
+  // Sync each connection with cumulative progress
+  for (let i = 0; i < connections.length; i++) {
+    const connection = connections[i];
+    
+    // Calculate base progress (completed connections)
+    const baseProgress = (completedConnections / totalConnections) * 100;
+    const connectionWeight = 100 / totalConnections;
+    
+    const result = await syncChannelConnectionWithProgress(
+      connection.id, 
+      workspaceId, 
+      {
+        maxMessages: options.maxMessagesPerConnection || 50,
+        autoClassify: options.autoClassify,
+      },
+      {
+        baseProgress,
+        connectionWeight,
+        connectionIndex: i + 1,
+        totalConnections,
+        cumulativeSynced: totalSyncedMessages,
+        cumulativeClassified: totalClassifiedMessages,
+      }
+    );
 
     results.push(result);
+    completedConnections++;
+    totalSyncedMessages += result.syncedCount || 0;
+    totalClassifiedMessages += result.classifiedCount || 0;
   }
+
+  // Broadcast final complete
+  await broadcastProgress(workspaceId, {
+    phase: 'complete',
+    connectionName: `${totalConnections} accounts`,
+    provider: 'all',
+    totalMessages: totalSyncedMessages,
+    syncedMessages: totalSyncedMessages,
+    classifiedMessages: totalClassifiedMessages,
+  });
 
   const totalNewMessages = results.reduce(
     (sum, r) => sum + (r.newCount || 0),
@@ -369,6 +406,215 @@ export async function syncAllWorkspaceConnections(
     totalNewMessages,
     results,
   };
+}
+
+/**
+ * Sync single connection with cumulative progress reporting
+ */
+async function syncChannelConnectionWithProgress(
+  connectionId: string,
+  workspaceId: string,
+  options: {
+    maxMessages?: number;
+    autoClassify?: boolean;
+  },
+  progressContext: {
+    baseProgress: number;
+    connectionWeight: number;
+    connectionIndex: number;
+    totalConnections: number;
+    cumulativeSynced: number;
+    cumulativeClassified: number;
+  }
+): Promise<SyncResult> {
+  const supabase = await createSupabaseUserServerActionClient();
+  const { baseProgress, connectionWeight, connectionIndex, totalConnections, cumulativeSynced, cumulativeClassified } = progressContext;
+
+  // Helper to calculate and broadcast progress within this connection's weight
+  const broadcastConnectionProgress = async (
+    phase: SyncPhase,
+    connectionProgress: number, // 0-100 within this connection
+    extraData: Partial<SyncProgress> = {}
+  ) => {
+    const overallProgress = baseProgress + (connectionProgress / 100) * connectionWeight;
+    await broadcastProgress(workspaceId, {
+      phase,
+      // Show overall progress in the progress field
+      totalMessages: Math.round(overallProgress),
+      syncedMessages: cumulativeSynced + (extraData.syncedMessages || 0),
+      classifiedMessages: cumulativeClassified + (extraData.classifiedMessages || 0),
+      ...extraData,
+    });
+  };
+
+  // Get connection details
+  const { data: connection, error } = await supabase
+    .from('channel_connections')
+    .select('provider, provider_account_name')
+    .eq('id', connectionId)
+    .single();
+
+  if (error || !connection) {
+    return {
+      provider: 'gmail',
+      connectionId,
+      accountName: null,
+      success: false,
+      error: 'Connection not found',
+    };
+  }
+
+  const accountLabel = `${connection.provider_account_name} (${connectionIndex}/${totalConnections})`;
+
+  // Broadcast connecting phase (0-5% of this connection)
+  await broadcastConnectionProgress(
+    'connecting',
+    5,
+    { connectionName: accountLabel, provider: connection.provider }
+  );
+
+  try {
+    let syncResult: any;
+    
+    console.log(`🚀 Starting sync for ${connection.provider} (${connection.provider_account_name}) [${connectionIndex}/${totalConnections}]`);
+
+    // Broadcast fetching phase (5-20% of this connection)
+    await broadcastConnectionProgress(
+      'fetching',
+      20,
+      { connectionName: accountLabel, provider: connection.provider }
+    );
+
+    // Route to appropriate sync function
+    switch (connection.provider as any) {
+      case 'gmail':
+        syncResult = await syncGmailMessages(connectionId, workspaceId, {
+          maxMessages: options.maxMessages || 50,
+        });
+        break;
+
+      case 'outlook':
+        syncResult = await syncOutlookMessages(connectionId, workspaceId, {
+          maxMessages: options.maxMessages || 50,
+        });
+        break;
+
+      case 'twitter':
+        syncResult = await syncTwitterMessages(connectionId, workspaceId, {
+          maxMessages: options.maxMessages || 50,
+        });
+        break;
+
+      case 'telegram':
+        syncResult = await syncTelegramMessages(connectionId, workspaceId, {
+          maxMessages: options.maxMessages || 50,
+        });
+        break;
+
+      case 'linkedin':
+        syncResult = await syncLinkedInMessages(connectionId, workspaceId, {
+          maxMessages: options.maxMessages || 50,
+        });
+        break;
+
+      default:
+        return {
+          provider: connection.provider,
+          connectionId,
+          accountName: connection.provider_account_name,
+          success: false,
+          error: `Sync not supported for ${connection.provider}`,
+        };
+    }
+
+    // Broadcast syncing complete (20-50% of this connection)
+    await broadcastConnectionProgress(
+      'syncing',
+      50,
+      { 
+        connectionName: accountLabel, 
+        provider: connection.provider,
+        syncedMessages: syncResult.newCount || 0,
+      }
+    );
+
+    // Auto-classify messages if enabled (50-100% of this connection)
+    let classifiedCount = 0;
+    if (options.autoClassify) {
+      try {
+        const { data: unclassifiedMessages } = await supabase
+          .from('messages')
+          .select('id, subject, priority, category')
+          .eq('workspace_id', workspaceId)
+          .or('priority.is.null,category.is.null')
+          .order('created_at', { ascending: false })
+          .limit(100);
+
+        if (unclassifiedMessages && unclassifiedMessages.length > 0) {
+          const totalToClassify = unclassifiedMessages.length;
+          console.log(`🤖 Found ${totalToClassify} unclassified messages to process...`);
+          
+          for (let i = 0; i < unclassifiedMessages.length; i++) {
+            const msg = unclassifiedMessages[i];
+            
+            try {
+              await classifyMessage(msg.id, workspaceId);
+              classifiedCount++;
+              
+              // Calculate progress within classifying phase (50-100% of connection)
+              const classifyProgress = 50 + ((i + 1) / totalToClassify) * 50;
+              
+              // Broadcast every message for smooth progress
+              await broadcastConnectionProgress(
+                'classifying',
+                classifyProgress,
+                { 
+                  connectionName: accountLabel, 
+                  provider: connection.provider,
+                  syncedMessages: syncResult.newCount || 0,
+                  classifiedMessages: classifiedCount,
+                  currentMessage: msg.subject || 'Processing...',
+                }
+              );
+            } catch (classifyError: any) {
+              console.error(`Classification failed for message ${msg.id}:`, classifyError?.message);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Auto-classify error:', error);
+      }
+    }
+
+    // Final progress for this connection (100%)
+    await broadcastConnectionProgress(
+      'syncing', // Use syncing phase to indicate this connection is done but not the whole job
+      100,
+      { 
+        connectionName: accountLabel, 
+        provider: connection.provider,
+        syncedMessages: syncResult.newCount || 0,
+        classifiedMessages: classifiedCount,
+      }
+    );
+
+    return {
+      provider: connection.provider,
+      connectionId,
+      accountName: connection.provider_account_name,
+      ...syncResult,
+      classifiedCount,
+      success: true,
+    };
+  } catch (error) {
+    return {
+      provider: connection.provider,
+      connectionId,
+      accountName: connection.provider_account_name,
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
 }
 
 /**

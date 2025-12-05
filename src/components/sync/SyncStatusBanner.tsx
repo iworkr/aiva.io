@@ -1,17 +1,19 @@
 /**
  * SyncStatusBanner
  * Slim top banner showing sync progress at a glance
- * Pushes content down instead of overlaying
+ * Uses fixed positioning + CSS variable to push down sidebar & content
  */
 
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { RefreshCw, Sparkles, CheckCircle2, XCircle, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useSyncStatus } from './SyncStatusProvider';
 import { getPhaseDescription } from '@/hooks/useSyncProgress';
+
+const BANNER_HEIGHT = '41px'; // Height of banner including progress bar
 
 export function SyncStatusBanner() {
   const { 
@@ -21,7 +23,23 @@ export function SyncStatusBanner() {
     setDialogOpen,
   } = useSyncStatus();
 
-  // Don't render if not syncing - return empty div to avoid layout shift
+  // Set CSS variable for banner height when visible
+  useEffect(() => {
+    if (isSyncing) {
+      document.documentElement.style.setProperty('--sync-banner-height', BANNER_HEIGHT);
+      document.body.classList.add('sync-banner-visible');
+    } else {
+      document.documentElement.style.setProperty('--sync-banner-height', '0px');
+      document.body.classList.remove('sync-banner-visible');
+    }
+    
+    return () => {
+      document.documentElement.style.setProperty('--sync-banner-height', '0px');
+      document.body.classList.remove('sync-banner-visible');
+    };
+  }, [isSyncing]);
+
+  // Don't render if not syncing
   if (!isSyncing) return null;
 
   const isComplete = progress?.phase === 'complete';
@@ -35,7 +53,7 @@ export function SyncStatusBanner() {
   return (
     <div
       className={cn(
-        "w-full transition-all duration-300 ease-out",
+        "fixed top-0 left-0 right-0 z-[60] transition-all duration-300 ease-out",
         "animate-in slide-in-from-top-2",
         isComplete && "bg-emerald-600",
         isError && "bg-destructive",
