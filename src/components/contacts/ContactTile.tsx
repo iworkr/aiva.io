@@ -82,6 +82,7 @@ export const ContactTile = memo(function ContactTile({
   onDelete,
 }: ContactTileProps) {
   const [showUnsubscribeConfirm, setShowUnsubscribeConfirm] = useState(false);
+  const [showResubscribeConfirm, setShowResubscribeConfirm] = useState(false);
   
   // Sanitize name for display and avatar
   const displayName = sanitizeContactName(contact.full_name || '');
@@ -90,12 +91,12 @@ export const ContactTile = memo(function ContactTile({
   const displaySubtitle = contact.job_title || contact.company || '';
   const isUnsubscribed = contact.is_unsubscribed;
 
-  // Handle unsubscribe with confirmation (only for unsubscribing, not resubscribing)
+  // Handle unsubscribe/resubscribe with confirmation
   const handleUnsubscribeClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isUnsubscribed) {
-      // Resubscribing - no confirmation needed
-      onUnsubscribe?.(e);
+      // Resubscribing - show confirmation
+      setShowResubscribeConfirm(true);
     } else {
       // Unsubscribing - show confirmation
       setShowUnsubscribeConfirm(true);
@@ -103,10 +104,15 @@ export const ContactTile = memo(function ContactTile({
   };
 
   const confirmUnsubscribe = () => {
-    // Create a synthetic event for the callback
     const syntheticEvent = { stopPropagation: () => {} } as React.MouseEvent;
     onUnsubscribe?.(syntheticEvent);
     setShowUnsubscribeConfirm(false);
+  };
+
+  const confirmResubscribe = () => {
+    const syntheticEvent = { stopPropagation: () => {} } as React.MouseEvent;
+    onUnsubscribe?.(syntheticEvent);
+    setShowResubscribeConfirm(false);
   };
 
   // List view - full-width row with more details
@@ -404,6 +410,35 @@ export const ContactTile = memo(function ContactTile({
             >
               <BellOff className="h-4 w-4 mr-2" />
               Unsubscribe
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Resubscribe Confirmation Dialog */}
+      <AlertDialog open={showResubscribeConfirm} onOpenChange={setShowResubscribeConfirm}>
+        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+          <AlertDialogHeader>
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Bell className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <AlertDialogTitle>Resubscribe to {displayName || contact.full_name}?</AlertDialogTitle>
+                <AlertDialogDescription className="mt-1">
+                  Emails from this contact will appear in your inbox again. You&apos;ll see all their messages as normal.
+                </AlertDialogDescription>
+              </div>
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmResubscribe}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              <Bell className="h-4 w-4 mr-2" />
+              Resubscribe
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

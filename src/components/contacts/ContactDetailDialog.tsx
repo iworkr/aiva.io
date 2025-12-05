@@ -73,6 +73,7 @@ export function ContactDetailDialog({
   const [showAddChannel, setShowAddChannel] = useState(false);
   const [newChannel, setNewChannel] = useState({ type: '', id: '', displayName: '' });
   const [showUnsubscribeConfirm, setShowUnsubscribeConfirm] = useState(false);
+  const [showResubscribeConfirm, setShowResubscribeConfirm] = useState(false);
 
   // Toggle favorite
   const { execute: toggleFavorite } = useAction(toggleContactFavoriteAction, {
@@ -477,8 +478,8 @@ export function ContactDetailDialog({
                   className="h-8 text-xs shrink-0"
                   onClick={() => {
                     if (contact.is_unsubscribed) {
-                      // Resubscribing - no confirmation needed
-                      toggleUnsubscribe({ id: contact.id, workspaceId });
+                      // Resubscribing - show confirmation
+                      setShowResubscribeConfirm(true);
                     } else {
                       // Unsubscribing - show confirmation
                       setShowUnsubscribeConfirm(true);
@@ -527,6 +528,38 @@ export function ContactDetailDialog({
                 >
                   <BellOff className="h-4 w-4 mr-2" />
                   Unsubscribe
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          {/* Resubscribe Confirmation Dialog */}
+          <AlertDialog open={showResubscribeConfirm} onOpenChange={setShowResubscribeConfirm}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <Bell className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <AlertDialogTitle>Resubscribe to {displayName || contact.full_name}?</AlertDialogTitle>
+                    <AlertDialogDescription className="mt-1">
+                      Emails from this contact will appear in your inbox again. You&apos;ll see all their messages as normal.
+                    </AlertDialogDescription>
+                  </div>
+                </div>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    toggleUnsubscribe({ id: contact.id, workspaceId });
+                    setShowResubscribeConfirm(false);
+                  }}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  <Bell className="h-4 w-4 mr-2" />
+                  Resubscribe
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
