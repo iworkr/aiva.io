@@ -466,8 +466,8 @@ export function ContactDetailDialog({
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {contact.is_unsubscribed 
-                        ? "You won't receive notifications from this contact" 
-                        : 'Receiving emails and notifications'}
+                        ? "Emails from this contact are hidden from your inbox" 
+                        : 'Emails appear in your inbox'}
                     </p>
                   </div>
                 </div>
@@ -511,7 +511,7 @@ export function ContactDetailDialog({
                   <div>
                     <AlertDialogTitle>Unsubscribe from {displayName || contact.full_name}?</AlertDialogTitle>
                     <AlertDialogDescription className="mt-1">
-                      You will no longer receive email notifications from this contact. Their messages will still appear in your inbox but won&apos;t trigger notifications.
+                      Emails from this contact will be automatically filtered out of your inbox. You can resubscribe anytime to see their messages again.
                     </AlertDialogDescription>
                   </div>
                 </div>

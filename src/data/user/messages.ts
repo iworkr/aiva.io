@@ -47,6 +47,17 @@ export const getMessagesAction = authActionClient
 
     const supabase = await createSupabaseUserServerActionClient();
 
+    // Get list of unsubscribed contact emails to filter out
+    const { data: unsubscribedContacts } = await supabase
+      .from('contacts')
+      .select('email')
+      .eq('workspace_id', workspaceId)
+      .eq('is_unsubscribed', true);
+
+    const unsubscribedEmails = (unsubscribedContacts || [])
+      .map((c: any) => c.email?.toLowerCase().trim())
+      .filter(Boolean) as string[];
+
     let query = supabase
       .from('messages')
       .select(
@@ -67,6 +78,14 @@ export const getMessagesAction = authActionClient
         { count: 'exact' }
       )
       .eq('workspace_id', workspaceId);
+
+    // Filter out messages from unsubscribed contacts
+    if (unsubscribedEmails.length > 0) {
+      // Use NOT IN filter for sender emails
+      for (const email of unsubscribedEmails) {
+        query = query.neq('sender_email', email);
+      }
+    }
 
     // Apply filters
     if (channelConnectionId) {
@@ -197,6 +216,17 @@ export const getNewMessagesAction = authActionClient
 
     const supabase = await createSupabaseUserServerActionClient();
 
+    // Get list of unsubscribed contact emails to filter out
+    const { data: unsubscribedContacts } = await supabase
+      .from('contacts')
+      .select('email')
+      .eq('workspace_id', workspaceId)
+      .eq('is_unsubscribed', true);
+
+    const unsubscribedEmails = (unsubscribedContacts || [])
+      .map((c: any) => c.email?.toLowerCase().trim())
+      .filter(Boolean) as string[];
+
     let query = supabase
       .from('messages')
       .select(
@@ -217,6 +247,13 @@ export const getNewMessagesAction = authActionClient
       )
       .eq('workspace_id', workspaceId)
       .gt('created_at', afterTimestamp); // Only messages created after timestamp
+
+    // Filter out messages from unsubscribed contacts
+    if (unsubscribedEmails.length > 0) {
+      for (const email of unsubscribedEmails) {
+        query = query.neq('sender_email', email);
+      }
+    }
 
     // Apply filters
     if (channelConnectionId) {

@@ -391,7 +391,7 @@ export const ContactTile = memo(function ContactTile({
               <div>
                 <AlertDialogTitle>Unsubscribe from {displayName || contact.full_name}?</AlertDialogTitle>
                 <AlertDialogDescription className="mt-1">
-                  You will no longer receive email notifications from this contact. Their messages will still appear in your inbox but won&apos;t trigger notifications.
+                  Emails from this contact will be automatically filtered out of your inbox. You can resubscribe anytime to see their messages again.
                 </AlertDialogDescription>
               </div>
             </div>
