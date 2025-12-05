@@ -27,6 +27,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Mail,
   Phone,
   Building,
@@ -41,6 +48,20 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { ChannelLogo } from './ChannelLogo';
+
+// Available channel integrations
+const AVAILABLE_CHANNELS = [
+  { type: 'gmail', label: 'Gmail', placeholder: 'email@gmail.com' },
+  { type: 'outlook', label: 'Outlook', placeholder: 'email@outlook.com' },
+  { type: 'slack', label: 'Slack', placeholder: '@username or email' },
+  { type: 'instagram', label: 'Instagram', placeholder: '@username' },
+  { type: 'whatsapp', label: 'WhatsApp', placeholder: '+1234567890' },
+  { type: 'telegram', label: 'Telegram', placeholder: '@username' },
+  { type: 'linkedin', label: 'LinkedIn', placeholder: 'profile URL or username' },
+  { type: 'twitter', label: 'X (Twitter)', placeholder: '@handle' },
+  { type: 'facebook', label: 'Facebook', placeholder: 'profile URL or username' },
+  { type: 'teams', label: 'Microsoft Teams', placeholder: 'email@company.com' },
+] as const;
 import { toast } from 'sonner';
 import { useAction } from 'next-safe-action/hooks';
 import {
@@ -327,49 +348,68 @@ export function ContactDetailDialog({
 
             {/* Add Channel Form */}
             {showAddChannel && (
-              <div className="rounded-lg bg-muted/30 p-3 space-y-2.5">
-                <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-lg bg-muted/30 p-3 space-y-3">
+                {/* Channel Type Selection */}
+                <div>
+                  <Label className="text-xs mb-1.5 block">Select Channel</Label>
+                  <Select
+                    value={newChannel.type}
+                    onValueChange={(value) => setNewChannel({ ...newChannel, type: value, id: '' })}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Choose a channel..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {AVAILABLE_CHANNELS.map((channel) => (
+                        <SelectItem key={channel.type} value={channel.type}>
+                          <div className="flex items-center gap-2">
+                            <ChannelLogo channelType={channel.type} size={16} />
+                            <span>{channel.label}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Channel ID Input - Only show after type is selected */}
+                {newChannel.type && (
                   <div>
-                    <Label htmlFor="channelType" className="text-xs">Type</Label>
-                    <Input
-                      id="channelType"
-                      placeholder="instagram, whatsapp..."
-                      value={newChannel.type}
-                      onChange={(e) =>
-                        setNewChannel({ ...newChannel, type: e.target.value })
-                      }
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="channelId" className="text-xs">ID</Label>
+                    <Label htmlFor="channelId" className="text-xs mb-1.5 block">
+                      {AVAILABLE_CHANNELS.find(c => c.type === newChannel.type)?.label} ID
+                    </Label>
                     <Input
                       id="channelId"
-                      placeholder="@username"
+                      placeholder={AVAILABLE_CHANNELS.find(c => c.type === newChannel.type)?.placeholder || '@username'}
                       value={newChannel.id}
                       onChange={(e) =>
                         setNewChannel({ ...newChannel, id: e.target.value })
                       }
-                      className="h-8 text-sm"
+                      className="h-9 text-sm"
+                      autoFocus
                     />
                   </div>
-                </div>
-                <div className="flex gap-2">
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 pt-1">
                   <Button
                     onClick={handleAddChannel}
-                    disabled={linkStatus === 'executing'}
+                    disabled={linkStatus === 'executing' || !newChannel.type || !newChannel.id}
                     size="sm"
-                    className="h-7 text-xs"
+                    className="h-8 text-xs flex-1"
                   >
-                    {linkStatus === 'executing' && (
+                    {linkStatus === 'executing' ? (
                       <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                    ) : (
+                      <Plus className="h-3 w-3 mr-1.5" />
                     )}
-                    Link
+                    Link Channel
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 text-xs"
+                    className="h-8 text-xs"
                     onClick={() => {
                       setShowAddChannel(false);
                       setNewChannel({ type: '', id: '', displayName: '' });

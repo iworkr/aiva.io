@@ -10,6 +10,16 @@ import React, { useEffect, useState, useMemo, useCallback, useTransition, memo, 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   UserCircle,
   Plus,
   Search,
@@ -17,6 +27,8 @@ import {
   Loader2,
   LayoutGrid,
   List,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAction } from 'next-safe-action/hooks';
@@ -62,6 +74,8 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedContact, setSelectedContact] = useState<any>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [contactToDelete, setContactToDelete] = useState<any>(null);
   const [isPending, startTransition] = useTransition();
   
   // Pagination state
@@ -281,21 +295,28 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
     },
   });
 
-  // Optimistic delete
+  // Show delete confirmation dialog
   const handleDeleteContact = useCallback((contact: any, e: React.MouseEvent) => {
     e.stopPropagation();
-    const displayName = sanitizeContactName(contact.full_name) || contact.full_name;
-    if (!confirm(`Are you sure you want to delete ${displayName}?`)) return;
+    setContactToDelete(contact);
+    setShowDeleteConfirm(true);
+  }, []);
+
+  // Execute delete after confirmation
+  const confirmDelete = useCallback(() => {
+    if (!contactToDelete) return;
     
     // Apply optimistic delete
     setOptimisticUpdates(prev => {
       const newDeleted = new Set(prev.deletedIds);
-      newDeleted.add(contact.id);
+      newDeleted.add(contactToDelete.id);
       return { ...prev, deletedIds: newDeleted };
     });
     // Execute actual delete
-    deleteContact({ id: contact.id, workspaceId });
-  }, [deleteContact, workspaceId]);
+    deleteContact({ id: contactToDelete.id, workspaceId });
+    setShowDeleteConfirm(false);
+    setContactToDelete(null);
+  }, [contactToDelete, deleteContact, workspaceId]);
 
   const handleContactClick = useCallback((contact: any) => {
     setSelectedContact(contact);
@@ -518,6 +539,37 @@ export const ContactsView = memo(function ContactsView({ workspaceId, userId }: 
           />
         </Suspense>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0">
+                <Trash2 className="h-5 w-5 text-destructive" />
+              </div>
+              <div>
+                <AlertDialogTitle>
+                  Delete {contactToDelete ? sanitizeContactName(contactToDelete.full_name) || contactToDelete.full_name : 'contact'}?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="mt-1">
+                  This action cannot be undone. This will permanently delete the contact and remove all associated channel links.
+                </AlertDialogDescription>
+              </div>
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setContactToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Contact
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 });
