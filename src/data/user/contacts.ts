@@ -417,7 +417,10 @@ export async function getContactRecentMessages(
 
   const { data, error } = await supabase
     .from('messages')
-    .select('id, subject, snippet, timestamp, sender_email, sender_name, is_read, priority, category')
+    .select(`
+      id, subject, snippet, timestamp, sender_email, sender_name, is_read, priority, category,
+      channel_connection:channel_connections(provider)
+    `)
     .eq('workspace_id', workspaceId)
     .eq('sender_email', contactEmail)
     .order('timestamp', { ascending: false })

@@ -335,8 +335,8 @@ export function ContactDetailDialog({
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center gap-1 flex-shrink-0">
+            {/* Action Buttons - extra margin-right for dialog close button */}
+            <div className="flex items-center gap-1 flex-shrink-0 mr-8">
               <Button
                 variant="ghost"
                 size="icon"
@@ -414,39 +414,6 @@ export function ContactDetailDialog({
               <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
                 {contact.bio}
               </p>
-            </div>
-          )}
-
-          {/* Contact Information */}
-          {(contact.email || contact.phone || contact.company || contact.job_title) && (
-            <div className="space-y-3">
-              <p className="text-xs font-medium text-muted-foreground">Details</p>
-              <div className="space-y-2">
-                {contact.email && (
-                  <div className="flex items-center gap-2.5">
-                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-sm">{contact.email}</span>
-                  </div>
-                )}
-                {contact.phone && (
-                  <div className="flex items-center gap-2.5">
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-sm">{contact.phone}</span>
-                  </div>
-                )}
-                {contact.company && (
-                  <div className="flex items-center gap-2.5">
-                    <Building className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-sm">{contact.company}</span>
-                  </div>
-                )}
-                {contact.job_title && (
-                  <div className="flex items-center gap-2.5">
-                    <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-sm">{contact.job_title}</span>
-                  </div>
-                )}
-              </div>
             </div>
           )}
 
@@ -809,33 +776,35 @@ export function ContactDetailDialog({
               </div>
             ) : recentMessages.length > 0 ? (
               <div className="space-y-1">
-                {recentMessages.slice(0, 2).map((message: any) => (
-                  <Link
-                    key={message.id}
-                    href={`/inbox/${message.id}`}
-                    onClick={() => onOpenChange(false)}
-                    className="group flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors"
-                  >
-                    <MessageSquare className={cn(
-                      "h-3.5 w-3.5 flex-shrink-0",
-                      message.is_read ? "text-muted-foreground" : "text-primary"
-                    )} />
-                    <div className="flex-1 min-w-0 overflow-hidden">
-                      <p className={cn(
-                        "text-xs truncate",
-                        !message.is_read && "font-medium"
-                      )}>
-                        {message.subject || '(No subject)'}
-                      </p>
-                    </div>
-                    <span className="text-[10px] text-muted-foreground flex-shrink-0">
-                      {new Date(message.timestamp).toLocaleDateString(undefined, {
-                        month: 'short',
-                        day: 'numeric'
-                      })}
-                    </span>
-                  </Link>
-                ))}
+                {recentMessages.slice(0, 2).map((message: any) => {
+                  const provider = message.channel_connection?.provider || 'gmail';
+                  return (
+                    <Link
+                      key={message.id}
+                      href={`/inbox/${message.id}`}
+                      onClick={() => onOpenChange(false)}
+                      className="group flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex-shrink-0">
+                        <ChannelLogo channelType={provider} size={14} />
+                      </div>
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <p className={cn(
+                          "text-xs truncate",
+                          !message.is_read && "font-medium"
+                        )}>
+                          {message.subject || '(No subject)'}
+                        </p>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground flex-shrink-0">
+                        {new Date(message.timestamp).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric'
+                        })}
+                      </span>
+                    </Link>
+                  );
+                })}
                 {recentMessages.length > 2 && (
                   <Link
                     href={`/inbox?search=${encodeURIComponent(contact.email || contact.full_name)}`}
