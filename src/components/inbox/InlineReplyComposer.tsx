@@ -60,13 +60,13 @@ export function InlineReplyComposer({
   // Send reply action
   const { execute: sendReply } = useAction(sendReplyAction, {
     onSuccess: () => {
-      toast.success('Reply sent successfully');
+      toast.success("Your message is on its way! ✈️");
       setReplyText('');
       setConfidenceScore(null);
       onSent?.();
     },
     onError: ({ error }) => {
-      toast.error(error.serverError || 'Failed to send reply');
+      toast.error(error.serverError || "Couldn't send your reply. Let's try that again.");
       setIsSending(false);
     },
   });
@@ -82,17 +82,17 @@ export function InlineReplyComposer({
       if (body && body.trim()) {
         setReplyText(body);
         setConfidenceScore(confidence || null);
-        toast.success('AI draft generated');
+        toast.success("Here's what I came up with — feel free to tweak it!");
       } else if (aiError) {
-        toast.error('AI not available', { description: aiError });
+        toast.error("AI features unavailable right now", { description: aiError });
       } else {
-        toast.warning('Could not generate reply');
+        toast.warning("Hmm, I couldn't craft a reply for this one. Want to write it yourself?");
       }
       setIsGenerating(false);
       setTimeout(() => textareaRef.current?.focus(), 100);
     },
     onError: ({ error }) => {
-      toast.error(error.serverError || 'Failed to generate reply');
+      toast.error(error.serverError || "Something went wrong generating the reply. Try again?");
       setIsGenerating(false);
     },
   });
@@ -111,7 +111,7 @@ export function InlineReplyComposer({
 
   const handleSendClick = () => {
     if (!replyText.trim()) {
-      toast.error('Please enter a reply');
+      toast.error("Looks like your reply is empty — type something first!");
       return;
     }
     setShowConfirmDialog(true);
@@ -219,12 +219,12 @@ export function InlineReplyComposer({
                 {isGenerating ? (
                   <>
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Generating...
+                    Working on it...
                   </>
                 ) : (
                   <>
                     <Sparkles className="h-3.5 w-3.5" />
-                    AI Draft
+                    Draft with AI
                   </>
                 )}
               </Button>
@@ -240,8 +240,8 @@ export function InlineReplyComposer({
             onChange={(e) => setReplyText(e.target.value)}
             placeholder={
               isGenerating
-                ? 'Generating AI reply...'
-                : `Reply to ${senderEmail}...`
+                ? 'Drafting a reply for you...'
+                : `Write your reply to ${senderEmail}...`
             }
             disabled={isGenerating}
             className={cn(
@@ -255,7 +255,7 @@ export function InlineReplyComposer({
             <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-md">
               <div className="flex items-center gap-2">
                 <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                <span className="text-sm text-muted-foreground">Generating...</span>
+                <span className="text-sm text-muted-foreground">Thinking of the perfect reply...</span>
               </div>
             </div>
           )}
@@ -296,23 +296,23 @@ export function InlineReplyComposer({
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Send Reply?</AlertDialogTitle>
+            <AlertDialogTitle>Ready to send?</AlertDialogTitle>
             <AlertDialogDescription>
               {confidenceScore !== null ? (
                 <span>
-                  This AI-generated reply has {Math.round(confidenceScore * 100)}% confidence.
-                  Please confirm you've reviewed it before sending.
+                  I'm {Math.round(confidenceScore * 100)}% confident about this reply.
+                  Take a quick look and hit send when you're ready!
                 </span>
               ) : (
-                <span>Please confirm you want to send this reply.</span>
+                <span>Just making sure — ready to send this reply?</span>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Not yet</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmSend}>
               <Send className="mr-2 h-4 w-4" />
-              Send Reply
+              Send it!
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

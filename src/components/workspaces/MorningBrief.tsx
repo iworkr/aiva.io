@@ -281,12 +281,19 @@ export async function MorningBrief() {
       {/* Greeting and Summary */}
       <div className="text-center space-y-3">
         <h1 className="text-3xl font-bold">
-          {getGreeting(userTimezone)}, {displayName}
+          {getGreeting(userTimezone)}, {displayName}!
         </h1>
         <p className="text-base text-muted-foreground">
-          You've got{' '}
-          <span className="font-semibold text-foreground">{newMessages}</span> new and{' '}
-          <span className="font-semibold text-foreground">{activeConversations}</span> active conversations
+          {newMessages === 0 && activeConversations === 0 ? (
+            "Your inbox is clear — nice work! 🎉"
+          ) : newMessages === 0 ? (
+            <>You're all caught up! <span className="font-semibold text-foreground">{activeConversations}</span> conversation{activeConversations !== 1 ? 's' : ''} waiting.</>
+          ) : (
+            <>
+              <span className="font-semibold text-foreground">{newMessages}</span> new message{newMessages !== 1 ? 's' : ''} and{' '}
+              <span className="font-semibold text-foreground">{activeConversations}</span> active conversation{activeConversations !== 1 ? 's' : ''} to catch up on
+            </>
+          )}
         </p>
       </div>
 
@@ -322,7 +329,7 @@ export async function MorningBrief() {
               <Card className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:border-primary/30 ${newMessages === 0 ? 'opacity-60' : 'border-primary/10'}`}>
                 <CardContent className="p-4 text-center">
                   {newMessages === 0 ? (
-                    <div className="text-sm font-medium text-muted-foreground">No new messages yet</div>
+                    <div className="text-sm font-medium text-muted-foreground">Inbox zero! 🎉</div>
                   ) : (
                     <div className="text-2xl font-bold text-primary">{newMessages}</div>
                   )}
@@ -331,7 +338,7 @@ export async function MorningBrief() {
               </Card>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Unread messages across all connected channels</p>
+              <p>Unread messages across all your channels</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -342,7 +349,7 @@ export async function MorningBrief() {
               <Card className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:border-primary/30 ${(todayEventsCount || 0) === 0 ? 'opacity-60' : 'border-primary/10'}`}>
                 <CardContent className="p-4 text-center">
                   {(todayEventsCount || 0) === 0 ? (
-                    <div className="text-sm font-medium text-muted-foreground">No events today</div>
+                    <div className="text-sm font-medium text-muted-foreground">Clear schedule today</div>
                   ) : (
                     <div className="text-2xl font-bold text-primary">{todayEventsCount || 0}</div>
                   )}
@@ -351,7 +358,7 @@ export async function MorningBrief() {
               </Card>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Calendar events scheduled for today</p>
+              <p>Your calendar events for today</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -362,16 +369,16 @@ export async function MorningBrief() {
               <Card className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-[1.02] hover:border-primary/30 ${(upcomingEvents?.length || 0) === 0 ? 'opacity-60' : 'border-primary/10'}`}>
                 <CardContent className="p-4 text-center">
                   {(upcomingEvents?.length || 0) === 0 ? (
-                    <div className="text-sm font-medium text-muted-foreground">No upcoming events</div>
+                    <div className="text-sm font-medium text-muted-foreground">Nothing scheduled</div>
                   ) : (
                     <div className="text-2xl font-bold text-primary">{upcomingEvents?.length || 0}</div>
                   )}
-                  <div className="text-xs text-muted-foreground mt-1">Upcoming Events</div>
+                  <div className="text-xs text-muted-foreground mt-1">Coming Up</div>
                 </CardContent>
               </Card>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Events scheduled in the next 48 hours</p>
+              <p>Events in the next 48 hours</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

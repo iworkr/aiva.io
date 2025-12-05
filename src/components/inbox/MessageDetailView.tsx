@@ -78,7 +78,7 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
         .single();
 
       if (error) {
-        toast.error('Failed to load message');
+        toast.error("Oops — couldn't load this message. Please try refreshing.");
         console.error(error);
       } else {
         setMessage(data);
@@ -109,11 +109,11 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
   const { execute: starMessage } = useAction(starMessageAction, {
     onSuccess: () => {
       setIsStarred(true);
-      toast.success('Message starred');
+      toast.success("Got it — I'll keep this one handy for you ⭐");
     },
     onError: () => {
       setIsStarred(false);
-      toast.error('Failed to star message');
+      toast.error("Hmm, couldn't star that. Let's try again.");
     },
   });
 
@@ -121,22 +121,22 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
   const { execute: unstarMessage } = useAction(unstarMessageAction, {
     onSuccess: () => {
       setIsStarred(false);
-      toast.success('Message unstarred');
+      toast.success("Removed from starred messages");
     },
     onError: () => {
       setIsStarred(true);
-      toast.error('Failed to unstar message');
+      toast.error("Couldn't remove star. Please try again.");
     },
   });
 
   // Archive message
   const { execute: archive } = useAction(archiveMessageAction, {
     onSuccess: () => {
-      toast.success('Message archived');
+      toast.success("All done — archived and out of sight!");
       router.push('/inbox');
     },
     onError: () => {
-      toast.error('Failed to archive message');
+      toast.error("Couldn't archive this one. Give it another shot?");
     },
   });
 
@@ -159,12 +159,12 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
     try {
       const result = await autoCreateEventFromMessage(messageId, workspaceId, userId);
       if (result.success) {
-        toast.success(result.message);
+        toast.success("Perfect — I've added that to your calendar!");
       } else {
-        toast.info(result.message);
+        toast.info(result.message || "No scheduling details found in this message");
       }
     } catch (error) {
-      toast.error('Failed to create event');
+      toast.error("Couldn't create the event. Want to try again?");
       console.error(error);
     } finally {
       setCreatingEvent(false);

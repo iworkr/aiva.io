@@ -307,3 +307,128 @@ export async function getOutlookProfile(accessToken: string) {
   return await response.json();
 }
 
+// ============================================================================
+// ATTACHMENT FUNCTIONS
+// ============================================================================
+
+export interface OutlookAttachment {
+  id: string;
+  messageId: string;
+  name: string;
+  contentType: string;
+  size: number;
+  isInline: boolean;
+}
+
+/**
+ * List attachments from an Outlook message
+ */
+export async function listOutlookAttachments(
+  accessToken: string,
+  messageId: string
+): Promise<OutlookAttachment[]> {
+  const response = await fetch(
+    `https://graph.microsoft.com/v1.0/me/messages/${messageId}/attachments`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Outlook API error: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  
+  return (data.value || []).map((att: any) => ({
+    id: att.id,
+    messageId,
+    name: att.name,
+    contentType: att.contentType || 'application/octet-stream',
+    size: att.size || 0,
+    isInline: att.isInline || false,
+  }));
+}
+
+/**
+ * Get attachment content from Outlook
+ */
+export async function getOutlookAttachment(
+  accessToken: string,
+  messageId: string,
+  attachmentId: string
+): Promise<{ contentBytes: string; contentType: string; name: string; size: number }> {
+  const response = await fetch(
+    `https://graph.microsoft.com/v1.0/me/messages/${messageId}/attachments/${attachmentId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Outlook API error: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return {
+    contentBytes: data.contentBytes, // Base64 encoded
+    contentType: data.contentType,
+    name: data.name,
+    size: data.size,
+  };
+}
+
+/**
+ * Get attachment as Buffer (decoded)
+ */
+export async function getOutlookAttachmentBuffer(
+  accessToken: string,
+  messageId: string,
+  attachmentId: string
+): Promise<Buffer> {
+  const { contentBytes } = await getOutlookAttachment(accessToken, messageId, attachmentId);
+  return Buffer.from(contentBytes, 'base64');
+}
+
+/**
+ * Extract text content from attachment for preview/search
+ */
+export function extractTextFromAttachment(
+  buffer: Buffer,
+  contentType: string
+): string | null {
+  // Only handle text-based files
+  if (contentType.startsWith('text/')) {
+    return buffer.toString('utf-8').substring(0, 500);
+  }
+  
+  // For other types, return null
+  return null;
+}
+
+/**
+ * Determine content type category from mime type
+ */
+export function getContentTypeFromMime(mimeType: string): string {
+  const mimeMap: Record<string, string> = {
+    'application/pdf': 'pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'document',
+    'application/msword': 'document',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'spreadsheet',
+    'application/vnd.ms-excel': 'spreadsheet',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'presentation',
+    'application/vnd.ms-powerpoint': 'presentation',
+    'text/plain': 'document',
+    'text/csv': 'spreadsheet',
+  };
+
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('text/')) return 'document';
+  
+  return mimeMap[mimeType] || 'other';
+}
+

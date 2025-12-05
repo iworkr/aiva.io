@@ -32,11 +32,25 @@ interface ReplyOptions {
   context?: string;
 }
 
+interface ToneReason {
+  factor: string;
+  description: string;
+  weight: number;
+}
+
+interface ToneReasoning {
+  tone: string;
+  reasons: ToneReason[];
+  previousInteractionCount: number;
+  confidenceInTone: number;
+}
+
 interface ReplyDraftResult {
   body: string;
   bodyHtml?: string;
   confidenceScore: number;
   tone: string;
+  toneReasoning?: ToneReasoning;
   error?: string;
 }
 
@@ -120,8 +134,19 @@ export async function generateReplyDraft(
       context = "",
     } = options;
 
-    // Prepare conversation context
+    // Prepare conversation context and count previous interactions
     let conversationContext = "";
+    let previousInteractionCount = 0;
+    
+    // Count previous interactions with this sender
+    const { count: interactionCount } = await supabase
+      .from("messages")
+      .select("*", { count: "exact", head: true })
+      .eq("workspace_id", workspaceId)
+      .eq("sender_email", message.sender_email);
+    
+    previousInteractionCount = interactionCount || 0;
+
     if (message.provider_thread_id) {
       // Get previous messages in thread
       const { data: threadMessages } = await supabase
@@ -173,11 +198,27 @@ AUTO-SEND CRITERIA (isAutoSendable):
 - true: Simple acknowledgments, routine responses, non-sensitive
 - false: Sensitive topics, financial matters, complaints, anything requiring human review
 
+TONE REASONING:
+Explain why you chose this tone based on:
+- Sender relationship (is this a repeat contact or first-time?)
+- Message content (what kind of request is it?)
+- Context (what's the appropriate formality level?)
+
 Format as JSON:
 {
   "body": "<reply text>",
   "confidenceScore": <number 0.40-1.0>,
-  "isAutoSendable": <boolean>
+  "isAutoSendable": <boolean>,
+  "toneReasoning": {
+    "tone": "${tone}",
+    "reasons": [
+      { "factor": "sender_relationship", "description": "<why this tone fits the relationship>", "weight": <0.0-1.0> },
+      { "factor": "message_content", "description": "<why this tone fits the content>", "weight": <0.0-1.0> },
+      { "factor": "context", "description": "<why this tone fits the context>", "weight": <0.0-1.0> }
+    ],
+    "previousInteractionCount": ${previousInteractionCount},
+    "confidenceInTone": <number 0.40-1.0>
+  }
 }`;
 
     const startTime = Date.now();
@@ -260,19 +301,40 @@ Be honest about uncertainty. Don't default to high confidence.`,
       confidenceScore: Math.round(confidence * 100) / 100,
     };
 
+    // Build tone reasoning with defaults if not provided by AI
+    const toneReasoning: ToneReasoning = result.toneReasoning || {
+      tone,
+      reasons: [
+        { factor: "sender_relationship", description: previousInteractionCount > 0 ? "Existing contact relationship" : "First-time interaction", weight: 0.4 },
+        { factor: "message_content", description: "Based on message intent and formality", weight: 0.35 },
+        { factor: "context", description: "Appropriate for the conversation topic", weight: 0.25 },
+      ],
+      previousInteractionCount,
+      confidenceInTone: result.confidenceScore,
+    };
+
     // Store draft in database
+    const draftInsert = {
+      workspace_id: workspaceId,
+      user_id: workspaceId, // Placeholder
+      message_id: messageId,
+      body: result.body,
+      tone,
+      generated_by_ai: true,
+      confidence_score: result.confidenceScore,
+      is_auto_sendable: result.isAutoSendable || false,
+      tone_reasoning: toneReasoning as any,
+      context_data: {
+        previousInteractionCount,
+        hasThreadContext: !!conversationContext,
+        senderEmail: message.sender_email,
+        senderName: message.sender_name,
+      } as any,
+    };
+
     const { data: draft, error: draftError } = await supabase
       .from("message_drafts")
-      .insert({
-        workspace_id: workspaceId,
-        user_id: workspaceId, // Placeholder
-        message_id: messageId,
-        body: result.body,
-        tone,
-        generated_by_ai: true,
-        confidence_score: result.confidenceScore,
-        is_auto_sendable: result.isAutoSendable || false,
-      })
+      .insert(draftInsert)
       .select()
       .single();
 
@@ -318,6 +380,7 @@ Be honest about uncertainty. Don't default to high confidence.`,
       body: result.body,
       confidenceScore: result.confidenceScore,
       tone,
+      toneReasoning,
     };
   } catch (error) {
     console.error("[AI Reply] Generation error:", error);

@@ -16,6 +16,7 @@ import {
 } from '@/utils/zod-schemas/aiva-schemas';
 import { isWorkspaceMember } from '../user/workspaces';
 import { syncAllWorkspaceConnections } from '@/lib/sync/orchestrator';
+import { batchSummarizeMessages } from '@/lib/ai/summarizer';
 
 // ============================================================================
 // GET MESSAGES
@@ -834,6 +835,42 @@ export const unarchiveMessageAction = authActionClient
     return {
       success: true,
       data,
+    };
+  });
+
+// ============================================================================
+// GENERATE AI SUMMARIES FOR MESSAGES
+// ============================================================================
+
+export const generateSummariesAction = authActionClient
+  .schema(
+    z.object({
+      workspaceId: getMessagesSchema.shape.workspaceId,
+      limit: z.number().int().positive().max(100).default(20),
+    })
+  )
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    const { workspaceId, limit } = parsedInput;
+
+    // Verify workspace membership
+    const isMember = await isWorkspaceMember(userId, workspaceId);
+    if (!isMember) {
+      throw new Error('You are not a member of this workspace');
+    }
+
+    const result = await batchSummarizeMessages(workspaceId, limit);
+
+    console.log('🤖 generateSummariesAction result:', {
+      workspaceId,
+      ...result,
+    });
+
+    // Revalidate inbox view to show new summaries
+    revalidatePath(`/inbox`);
+
+    return {
+      success: true,
+      ...result,
     };
   });
 

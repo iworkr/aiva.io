@@ -410,3 +410,144 @@
     animation: none;
   }
 }
+
+/* ============================================
+   AI ELEMENT STYLES
+   Soft gradients, glows, and floating effects
+   ============================================ */
+
+/* AI Glow effect */
+.ai-glow {
+  position: relative;
+}
+
+.ai-glow::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    hsl(var(--primary) / 0.3),
+    hsl(var(--accent) / 0.3),
+    hsl(var(--primary) / 0.2)
+  );
+  filter: blur(8px);
+  z-index: -1;
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+
+.ai-glow:hover::before {
+  opacity: 1;
+}
+
+/* Floating card shadow */
+.floating-shadow {
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06),
+    0 0 0 1px rgba(0, 0, 0, 0.02);
+}
+
+.dark .floating-shadow {
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.3),
+    0 2px 4px -1px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* Avatar glow on hover */
+.avatar-glow:hover {
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.2);
+}
+
+/* Chip/badge background with subtle gradient */
+.chip-gradient {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--muted)),
+    hsl(var(--muted) / 0.8)
+  );
+}
+
+/* AI element soft gradient background */
+.ai-gradient-bg {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--primary) / 0.05),
+    hsl(var(--accent) / 0.05)
+  );
+}
+
+.dark .ai-gradient-bg {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--primary) / 0.1),
+    hsl(var(--accent) / 0.1)
+  );
+}
+
+/* Typewriter cursor animation */
+@keyframes typewriter-cursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.typewriter-cursor {
+  animation: typewriter-cursor 0.7s infinite;
+}
+
+/* Confidence meter fill animation */
+@keyframes fill-bar {
+  from { width: 0; }
+  to { width: var(--fill-width); }
+}
+
+.animate-fill-bar {
+  animation: fill-bar 1.5s ease-out forwards;
+}
+
+/* Pulse with glow */
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4);
+  }
+  50% {
+    opacity: 0.8;
+    box-shadow: 0 0 0 8px hsl(var(--primary) / 0);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Staggered fade-in for lists */
+@keyframes stagger-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stagger-fade-in > * {
+  animation: stagger-fade-in 0.3s ease-out forwards;
+  opacity: 0;
+}
+
+.stagger-fade-in > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-fade-in > *:nth-child(2) { animation-delay: 50ms; }
+.stagger-fade-in > *:nth-child(3) { animation-delay: 100ms; }
+.stagger-fade-in > *:nth-child(4) { animation-delay: 150ms; }
+.stagger-fade-in > *:nth-child(5) { animation-delay: 200ms; }
+.stagger-fade-in > *:nth-child(6) { animation-delay: 250ms; }
+.stagger-fade-in > *:nth-child(7) { animation-delay: 300ms; }
+.stagger-fade-in > *:nth-child(8) { animation-delay: 350ms; }
+.stagger-fade-in > *:nth-child(9) { animation-delay: 400ms; }
+.stagger-fade-in > *:nth-child(10) { animation-delay: 450ms; }

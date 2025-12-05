@@ -37,6 +37,7 @@ interface ClassificationResult {
   sentiment: MessageSentiment;
   actionability: MessageActionability;
   summary?: string;
+  summaryShort?: string; // Short summary for inbox list (max 180 chars)
   keyPoints?: string[];
   confidenceScore: number;
 }
@@ -143,6 +144,7 @@ Respond with ONLY valid JSON:
   "sentiment": "<sentiment>",
   "actionability": "<actionability>",
   "summary": "<1-2 sentence summary>",
+  "summaryShort": "<concise 1-line summary max 180 chars for inbox list - focus on key action/info, no greetings>",
   "keyPoints": ["<key point 1>", "<key point 2>"],
   "confidenceScore": <number between 0.35 and 1.0>
 }`;
@@ -225,6 +227,13 @@ Be consistent: similar messages should get similar classifications.`,
       result.actionability,
     );
 
+    // Generate short summary if not provided by AI
+    let shortSummary = result.summaryShort;
+    if (!shortSummary && result.summary) {
+      // Truncate the regular summary to 180 chars
+      shortSummary = result.summary.substring(0, 177) + (result.summary.length > 177 ? '...' : '');
+    }
+
     // Update message with classification
     await supabase
       .from("messages")
@@ -234,6 +243,7 @@ Be consistent: similar messages should get similar classifications.`,
         sentiment: result.sentiment,
         actionability: result.actionability,
         summary: result.summary,
+        ai_summary_short: shortSummary, // Short summary for inbox list
         key_points: result.keyPoints || [],
         confidence_score: result.confidenceScore,
         updated_at: new Date().toISOString(),

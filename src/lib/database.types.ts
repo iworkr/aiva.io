@@ -130,6 +130,91 @@ export type Database = {
         }
         Relationships: []
       }
+      attachments: {
+        Row: {
+          channel_connection_id: string | null
+          content_preview: string | null
+          content_type: string | null
+          created_at: string | null
+          download_url: string | null
+          extracted_summary: string | null
+          extracted_title: string | null
+          filename: string
+          id: string
+          is_downloaded: boolean | null
+          keywords: string[] | null
+          local_path: string | null
+          message_id: string
+          mime_type: string | null
+          provider_attachment_id: string | null
+          size_bytes: number | null
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          channel_connection_id?: string | null
+          content_preview?: string | null
+          content_type?: string | null
+          created_at?: string | null
+          download_url?: string | null
+          extracted_summary?: string | null
+          extracted_title?: string | null
+          filename: string
+          id?: string
+          is_downloaded?: boolean | null
+          keywords?: string[] | null
+          local_path?: string | null
+          message_id: string
+          mime_type?: string | null
+          provider_attachment_id?: string | null
+          size_bytes?: number | null
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          channel_connection_id?: string | null
+          content_preview?: string | null
+          content_type?: string | null
+          created_at?: string | null
+          download_url?: string | null
+          extracted_summary?: string | null
+          extracted_title?: string | null
+          filename?: string
+          id?: string
+          is_downloaded?: boolean | null
+          keywords?: string[] | null
+          local_path?: string | null
+          message_id?: string
+          mime_type?: string | null
+          provider_attachment_id?: string | null
+          size_bytes?: number | null
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attachments_channel_connection_id_fkey"
+            columns: ["channel_connection_id"]
+            isOneToOne: false
+            referencedRelation: "channel_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attachments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attachments_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_customers: {
         Row: {
           billing_email: string
@@ -1571,6 +1656,7 @@ export type Database = {
           body: string
           body_html: string | null
           confidence_score: number | null
+          context_data: Json | null
           created_at: string
           edited_by_user: boolean | null
           generated_by_ai: boolean | null
@@ -1578,6 +1664,7 @@ export type Database = {
           is_auto_sendable: boolean | null
           message_id: string
           tone: string | null
+          tone_reasoning: Json | null
           updated_at: string
           user_id: string
           workspace_id: string
@@ -1588,6 +1675,7 @@ export type Database = {
           body: string
           body_html?: string | null
           confidence_score?: number | null
+          context_data?: Json | null
           created_at?: string
           edited_by_user?: boolean | null
           generated_by_ai?: boolean | null
@@ -1595,6 +1683,7 @@ export type Database = {
           is_auto_sendable?: boolean | null
           message_id: string
           tone?: string | null
+          tone_reasoning?: Json | null
           updated_at?: string
           user_id: string
           workspace_id: string
@@ -1605,6 +1694,7 @@ export type Database = {
           body?: string
           body_html?: string | null
           confidence_score?: number | null
+          context_data?: Json | null
           created_at?: string
           edited_by_user?: boolean | null
           generated_by_ai?: boolean | null
@@ -1612,6 +1702,7 @@ export type Database = {
           is_auto_sendable?: boolean | null
           message_id?: string
           tone?: string | null
+          tone_reasoning?: Json | null
           updated_at?: string
           user_id?: string
           workspace_id?: string
@@ -1645,6 +1736,7 @@ export type Database = {
           actionability:
             | Database["public"]["Enums"]["message_actionability"]
             | null
+          ai_summary_short: string | null
           attachments: Json | null
           auto_sent: boolean | null
           body: string
@@ -1680,6 +1772,7 @@ export type Database = {
           actionability?:
             | Database["public"]["Enums"]["message_actionability"]
             | null
+          ai_summary_short?: string | null
           attachments?: Json | null
           auto_sent?: boolean | null
           body: string
@@ -1715,6 +1808,7 @@ export type Database = {
           actionability?:
             | Database["public"]["Enums"]["message_actionability"]
             | null
+          ai_summary_short?: string | null
           attachments?: Json | null
           auto_sent?: boolean | null
           body?: string

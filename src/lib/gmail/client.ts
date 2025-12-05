@@ -382,3 +382,126 @@ export async function getGmailProfile(accessToken: string) {
   return await response.json();
 }
 
+// ============================================================================
+// ATTACHMENT FUNCTIONS
+// ============================================================================
+
+export interface GmailAttachment {
+  attachmentId: string;
+  messageId: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
+/**
+ * List attachments from a Gmail message
+ */
+export function getGmailMessageAttachments(gmailMessage: GmailMessage): GmailAttachment[] {
+  const attachments: GmailAttachment[] = [];
+
+  const extractAttachments = (parts: any[], messageId: string) => {
+    for (const part of parts) {
+      if (part.filename && part.body?.attachmentId) {
+        attachments.push({
+          attachmentId: part.body.attachmentId,
+          messageId,
+          filename: part.filename,
+          mimeType: part.mimeType || 'application/octet-stream',
+          size: part.body.size || 0,
+        });
+      }
+      if (part.parts) {
+        extractAttachments(part.parts, messageId);
+      }
+    }
+  };
+
+  if (gmailMessage.payload?.parts) {
+    extractAttachments(gmailMessage.payload.parts, gmailMessage.id);
+  }
+
+  return attachments;
+}
+
+/**
+ * Get attachment content from Gmail
+ */
+export async function getGmailAttachment(
+  accessToken: string,
+  messageId: string,
+  attachmentId: string
+): Promise<{ data: string; size: number }> {
+  const response = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/attachments/${attachmentId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Gmail API error: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return {
+    data: data.data, // Base64 encoded
+    size: data.size,
+  };
+}
+
+/**
+ * Get attachment as Buffer (decoded)
+ */
+export async function getGmailAttachmentBuffer(
+  accessToken: string,
+  messageId: string,
+  attachmentId: string
+): Promise<Buffer> {
+  const { data } = await getGmailAttachment(accessToken, messageId, attachmentId);
+  // Gmail uses URL-safe base64
+  const base64 = data.replace(/-/g, '+').replace(/_/g, '/');
+  return Buffer.from(base64, 'base64');
+}
+
+/**
+ * Extract text content from attachment for preview/search
+ * (Simple extraction - for production use a dedicated library)
+ */
+export function extractTextFromAttachment(
+  buffer: Buffer,
+  mimeType: string
+): string | null {
+  // Only handle text-based files
+  if (mimeType.startsWith('text/')) {
+    return buffer.toString('utf-8').substring(0, 500);
+  }
+  
+  // For other types, return null (would need dedicated parsers for PDF, docx, etc.)
+  return null;
+}
+
+/**
+ * Determine content type category from mime type
+ */
+export function getContentTypeFromMime(mimeType: string): string {
+  const mimeMap: Record<string, string> = {
+    'application/pdf': 'pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'document',
+    'application/msword': 'document',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'spreadsheet',
+    'application/vnd.ms-excel': 'spreadsheet',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'presentation',
+    'application/vnd.ms-powerpoint': 'presentation',
+    'text/plain': 'document',
+    'text/csv': 'spreadsheet',
+  };
+
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('text/')) return 'document';
+  
+  return mimeMap[mimeType] || 'other';
+}
+
