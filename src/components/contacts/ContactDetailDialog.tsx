@@ -5,8 +5,9 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import {
   Dialog,
   DialogContent,
@@ -46,6 +47,10 @@ import {
   BellOff,
   Bell,
   AlertTriangle,
+  Sparkles,
+  MessageSquare,
+  Clock,
+  ExternalLink,
 } from 'lucide-react';
 import { ChannelLogo } from './ChannelLogo';
 
@@ -69,6 +74,8 @@ import {
   deleteContactChannelAction,
   toggleContactFavoriteAction,
   toggleContactUnsubscribeAction,
+  getChannelSuggestions,
+  getContactRecentMessages,
 } from '@/data/user/contacts';
 import { cn } from '@/lib/utils';
 
@@ -95,6 +102,100 @@ export function ContactDetailDialog({
   const [newChannel, setNewChannel] = useState({ type: '', id: '', displayName: '' });
   const [showUnsubscribeConfirm, setShowUnsubscribeConfirm] = useState(false);
   const [showResubscribeConfirm, setShowResubscribeConfirm] = useState(false);
+  
+  // Channel suggestions state
+  const [channelSuggestions, setChannelSuggestions] = useState<Array<{channel_id: string; channel_display_name: string | null}>>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  
+  // Activity state
+  const [recentMessages, setRecentMessages] = useState<any[]>([]);
+  const [loadingActivity, setLoadingActivity] = useState(false);
+  const [aiDescription, setAiDescription] = useState<string | null>(null);
+  const [generatingDescription, setGeneratingDescription] = useState(false);
+
+  // Fetch channel suggestions when type changes or user types
+  useEffect(() => {
+    if (!newChannel.type || !open) return;
+    
+    const fetchSuggestions = async () => {
+      setLoadingSuggestions(true);
+      try {
+        const suggestions = await getChannelSuggestions(
+          workspaceId, 
+          userId, 
+          newChannel.type, 
+          newChannel.id || undefined
+        );
+        setChannelSuggestions(suggestions);
+      } catch (e) {
+        console.error('Failed to fetch suggestions:', e);
+      } finally {
+        setLoadingSuggestions(false);
+      }
+    };
+    
+    const timer = setTimeout(fetchSuggestions, 200); // Debounce
+    return () => clearTimeout(timer);
+  }, [newChannel.type, newChannel.id, workspaceId, userId, open]);
+
+  // Fetch recent activity when dialog opens
+  useEffect(() => {
+    if (!open || !contact?.email) return;
+    
+    const fetchActivity = async () => {
+      setLoadingActivity(true);
+      try {
+        const messages = await getContactRecentMessages(workspaceId, userId, contact.email, 5);
+        setRecentMessages(messages);
+      } catch (e) {
+        console.error('Failed to fetch activity:', e);
+      } finally {
+        setLoadingActivity(false);
+      }
+    };
+    
+    fetchActivity();
+  }, [open, contact?.email, workspaceId, userId]);
+
+  // Generate AI description based on activity
+  useEffect(() => {
+    if (!open || !contact || generatingDescription || aiDescription) return;
+    if (recentMessages.length === 0 && !contact.bio) return;
+    
+    const generateDescription = async () => {
+      setGeneratingDescription(true);
+      try {
+        // Create a brief AI description based on available data
+        const contextParts: string[] = [];
+        
+        if (contact.job_title) contextParts.push(`Works as ${contact.job_title}`);
+        if (contact.company) contextParts.push(`at ${contact.company}`);
+        if (recentMessages.length > 0) {
+          const topics = recentMessages.map(m => m.subject).filter(Boolean).slice(0, 3);
+          if (topics.length > 0) {
+            contextParts.push(`Recent topics: ${topics.join(', ')}`);
+          }
+        }
+        if (contact.interaction_count) {
+          contextParts.push(`${contact.interaction_count} interactions`);
+        }
+        
+        if (contextParts.length > 0) {
+          setAiDescription(contextParts.join('. ') + '.');
+        }
+      } finally {
+        setGeneratingDescription(false);
+      }
+    };
+    
+    generateDescription();
+  }, [open, contact, recentMessages, generatingDescription, aiDescription]);
+
+  // Reset AI description when contact changes
+  useEffect(() => {
+    setAiDescription(null);
+  }, [contact?.id]);
 
   // Toggle favorite
   const { execute: toggleFavorite } = useAction(toggleContactFavoriteAction, {
@@ -290,6 +391,28 @@ export function ContactDetailDialog({
         {/* Content Area */}
         <div className="px-6 py-5 space-y-5">
 
+          {/* AI-Generated Description */}
+          {(aiDescription || generatingDescription) && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="h-3 w-3 text-primary" />
+                <p className="text-xs font-medium text-muted-foreground">AI Summary</p>
+              </div>
+              <div className="rounded-lg bg-primary/5 border border-primary/10 p-3">
+                {generatingDescription ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Analyzing contact...
+                  </div>
+                ) : (
+                  <p className="text-sm text-foreground leading-relaxed">
+                    {aiDescription}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Bio - Full Text */}
           {contact.bio && (
             <div className="space-y-2">
@@ -372,9 +495,9 @@ export function ContactDetailDialog({
                   </Select>
                 </div>
 
-                {/* Channel ID Input - Only show after type is selected */}
+                {/* Channel ID Input with Suggestions - Only show after type is selected */}
                 {newChannel.type && (
-                  <div>
+                  <div className="relative">
                     <Label htmlFor="channelId" className="text-xs mb-1.5 block">
                       {AVAILABLE_CHANNELS.find(c => c.type === newChannel.type)?.label} ID
                     </Label>
@@ -383,13 +506,59 @@ export function ContactDetailDialog({
                       name={`channel-${newChannel.type}`}
                       placeholder={AVAILABLE_CHANNELS.find(c => c.type === newChannel.type)?.placeholder || '@username'}
                       value={newChannel.id}
-                      onChange={(e) =>
-                        setNewChannel({ ...newChannel, id: e.target.value })
-                      }
+                      onChange={(e) => {
+                        setNewChannel({ ...newChannel, id: e.target.value });
+                        setShowSuggestions(true);
+                      }}
+                      onFocus={() => setShowSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                       className="h-9 text-sm"
                       autoFocus
-                      autoComplete="on"
+                      autoComplete="off"
                     />
+                    
+                    {/* Suggestions Dropdown */}
+                    {showSuggestions && channelSuggestions.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                        <p className="px-3 py-1.5 text-[10px] text-muted-foreground uppercase tracking-wide border-b">
+                          Existing contacts
+                        </p>
+                        {channelSuggestions.map((suggestion, idx) => (
+                          <button
+                            key={`${suggestion.channel_id}-${idx}`}
+                            type="button"
+                            className="w-full px-3 py-2 text-left hover:bg-muted flex items-center gap-2 text-sm"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setNewChannel({ 
+                                ...newChannel, 
+                                id: suggestion.channel_id,
+                                displayName: suggestion.channel_display_name || ''
+                              });
+                              setShowSuggestions(false);
+                            }}
+                          >
+                            <ChannelLogo channelType={newChannel.type} size={14} />
+                            <span className="truncate">
+                              {suggestion.channel_display_name && suggestion.channel_display_name !== suggestion.channel_id ? (
+                                <>
+                                  <span className="font-medium">{suggestion.channel_display_name}</span>
+                                  <span className="text-muted-foreground ml-1.5">{suggestion.channel_id}</span>
+                                </>
+                              ) : (
+                                suggestion.channel_id
+                              )}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {loadingSuggestions && (
+                      <div className="absolute right-2 top-[34px]">
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -625,18 +794,76 @@ export function ContactDetailDialog({
             </AlertDialogContent>
           </AlertDialog>
 
-          {/* Activity Summary */}
-          {contact.interaction_count > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">Activity</p>
-              <div className="text-sm text-muted-foreground">
-                <span className="text-foreground font-medium">{contact.interaction_count}</span> interaction{contact.interaction_count !== 1 ? 's' : ''}
-                {contact.last_interaction_at && (
-                  <span> · Last {new Date(contact.last_interaction_at).toLocaleDateString()}</span>
-                )}
+          {/* Recent Activity Log */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Clock className="h-3 w-3 text-muted-foreground" />
+                <p className="text-xs font-medium text-muted-foreground">Recent Activity</p>
               </div>
+              {contact.interaction_count > 0 && (
+                <span className="text-[10px] text-muted-foreground">
+                  {contact.interaction_count} total interaction{contact.interaction_count !== 1 ? 's' : ''}
+                </span>
+              )}
             </div>
-          )}
+            
+            {loadingActivity ? (
+              <div className="flex items-center gap-2 py-4 justify-center text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading activity...
+              </div>
+            ) : recentMessages.length > 0 ? (
+              <div className="space-y-2">
+                {recentMessages.map((message: any) => (
+                  <Link
+                    key={message.id}
+                    href={`/inbox/${message.id}`}
+                    onClick={() => onOpenChange(false)}
+                    className="group flex items-start gap-3 p-2.5 rounded-lg hover:bg-muted/50 transition-colors border border-transparent hover:border-border/50"
+                  >
+                    <div className="flex-shrink-0 mt-0.5">
+                      <MessageSquare className={cn(
+                        "h-4 w-4",
+                        message.is_read ? "text-muted-foreground" : "text-primary"
+                      )} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className={cn(
+                          "text-sm truncate",
+                          !message.is_read && "font-medium"
+                        )}>
+                          {message.subject || '(No subject)'}
+                        </p>
+                        {message.priority === 'high' && (
+                          <span className="px-1.5 py-0.5 text-[10px] bg-destructive/10 text-destructive rounded">
+                            High
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">
+                        {message.snippet}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        {new Date(message.timestamp).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1" />
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground py-3 text-center">
+                No recent messages from this contact
+              </p>
+            )}
+          </div>
 
           {/* Metadata */}
           <div className="pt-3 border-t border-border/50 text-[11px] text-muted-foreground">

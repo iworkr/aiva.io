@@ -364,6 +364,70 @@ export async function getContactChannels(
 }
 
 /**
+ * Get channel suggestions for a specific channel type
+ * Returns existing channel IDs from other contacts for autocomplete
+ */
+export async function getChannelSuggestions(
+  workspaceId: string,
+  userId: string,
+  channelType: string,
+  search?: string
+) {
+  const isMember = await isWorkspaceMember(userId, workspaceId);
+  if (!isMember) return [];
+
+  const supabase = await createSupabaseUserServerActionClient();
+
+  let query = supabase
+    .from('contact_channels')
+    .select('channel_id, channel_display_name, contact_id')
+    .eq('workspace_id', workspaceId)
+    .eq('channel_type', channelType)
+    .limit(10);
+
+  if (search) {
+    query = query.or(`channel_id.ilike.%${search}%,channel_display_name.ilike.%${search}%`);
+  }
+
+  const { data, error } = await query;
+  if (error) return [];
+  
+  // Dedupe by channel_id
+  const seen = new Set<string>();
+  return (data || []).filter(item => {
+    if (seen.has(item.channel_id)) return false;
+    seen.add(item.channel_id);
+    return true;
+  });
+}
+
+/**
+ * Get recent messages for a contact (for activity log)
+ */
+export async function getContactRecentMessages(
+  workspaceId: string,
+  userId: string,
+  contactEmail: string,
+  limit: number = 5
+) {
+  const isMember = await isWorkspaceMember(userId, workspaceId);
+  if (!isMember) return [];
+
+  const supabase = await createSupabaseUserServerActionClient();
+
+  const { data, error } = await supabase
+    .from('messages')
+    .select('id, subject, snippet, timestamp, sender_email, sender_name, is_read, priority, category')
+    .eq('workspace_id', workspaceId)
+    .eq('sender_email', contactEmail)
+    .order('timestamp', { ascending: false })
+    .limit(limit);
+
+  if (error) return [];
+  return data || [];
+}
+
+/**
  * Delete a contact channel
  */
 export const deleteContactChannelAction = authActionClient
