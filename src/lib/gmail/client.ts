@@ -254,7 +254,7 @@ export function parseGmailMessage(gmailMessage: GmailMessage) {
     providerThreadId: gmailMessage.threadId,
     subject: getHeader('Subject'),
     body: body.trim(),
-    bodyHtml: undefined, // Don't store HTML - we've converted it to plain text
+    bodyHtml: bodyHtml || undefined, // Store HTML for proper email rendering
     snippet: cleanSnippet,
     senderEmail,
     senderName,

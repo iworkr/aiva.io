@@ -19,6 +19,7 @@ import {
 import { ChevronDown, ChevronUp, Sparkles, Mail, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PriorityBadge, CategoryBadge, SentimentBadge } from './ClassificationBadges';
+import { EmailHtmlRenderer } from './EmailHtmlRenderer';
 
 interface ThreadMessageProps {
   message: {
@@ -202,9 +203,9 @@ export const ThreadMessage = memo(function ThreadMessage({
       {/* Message Content */}
       <div className="px-4 pb-3 pl-[52px] overflow-hidden">
         {isCurrentMessage && hasHtmlContent ? (
-          <div 
-            className="prose prose-sm max-w-none dark:prose-invert text-foreground overflow-x-auto break-words [&_a]:text-primary [&_a]:break-all [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_table]:max-w-full [&_table]:overflow-x-auto"
-            dangerouslySetInnerHTML={{ __html: sanitizedHtmlContent }}
+          /* Use EmailHtmlRenderer for proper HTML email rendering with DOMPurify sanitization */
+          <EmailHtmlRenderer 
+            html={message.body_html || message.body || ''} 
           />
         ) : (
           <div 

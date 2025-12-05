@@ -199,12 +199,15 @@ export function parseOutlookMessage(outlookMessage: any) {
   // Create clean snippet from the converted plain text
   const cleanSnippet = plainTextBody.substring(0, 200).replace(/\s+/g, ' ').trim();
 
+  // Store original HTML body if content was HTML
+  const htmlBody = isHtmlContent ? body : undefined;
+
   return {
     providerMessageId: outlookMessage.id,
     providerThreadId: outlookMessage.conversationId,
     subject: outlookMessage.subject || '(no subject)',
     body: plainTextBody,
-    bodyHtml: undefined, // Don't store HTML - we've converted it to plain text
+    bodyHtml: htmlBody, // Store HTML for proper email rendering
     snippet: cleanSnippet,
     senderEmail: outlookMessage.from?.emailAddress?.address || '',
     senderName: outlookMessage.from?.emailAddress?.name || '',
