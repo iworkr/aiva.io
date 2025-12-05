@@ -32,6 +32,7 @@ import { InboxSkeleton } from './InboxSkeleton';
 import { MessageList } from './MessageList';
 import { SyncChannelDialog } from './SyncChannelDialog';
 import { SyncProgressDialog } from '@/components/sync/SyncProgressDialog';
+import { useSyncStatus } from '@/components/sync/SyncStatusProvider';
 
 interface InboxViewProps {
   workspaceId: string;
@@ -59,12 +60,25 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
   const [hasChannels, setHasChannels] = useState<boolean | null>(null);
   const [connectDialogOpen, setConnectDialogOpen] = useState(false);
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
-  const [syncProgressDialogOpen, setSyncProgressDialogOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  
+  // Global sync status from context
+  const { 
+    dialogOpen: syncProgressDialogOpen, 
+    setDialogOpen: setSyncProgressDialogOpen,
+    startSync: contextStartSync,
+    setWorkspaceId,
+    isSyncing: contextIsSyncing,
+  } = useSyncStatus();
   const cacheKeyRef = useRef<string>('');
   const lastFetchRef = useRef<number>(0);
   const fetchingRef = useRef<boolean>(false);
   const lastSyncTimestampRef = useRef<string>(new Date().toISOString());
+
+  // Set workspaceId in global sync context
+  useEffect(() => {
+    setWorkspaceId(workspaceId);
+  }, [workspaceId, setWorkspaceId]);
 
   // Debounce search for better performance
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
@@ -497,7 +511,7 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
     lastSyncTimestampRef.current = new Date().toISOString();
     setSyncing(true);
     setSyncDialogOpen(false);
-    setSyncProgressDialogOpen(true); // Open progress dialog
+    contextStartSync(); // Open progress dialog via global context
 
     // Note: syncWorkspaceConnectionsAction syncs all connections for the workspace
     // For channel-specific sync, we'd need a different action, but for now we sync all

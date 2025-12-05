@@ -80,42 +80,97 @@ function getPlanTier(planType: PlanType): SyncTier {
 /**
  * Get workspaces that should be synced for a given tier
  * 
- * Note: Currently treats all workspaces as 'free' tier since billing is not yet set up.
- * When billing is enabled, this will query through billing_customers to get subscription data.
+ * Queries billing_customers and billing_subscriptions to determine plan type.
+ * Falls back to 'free' tier for workspaces without active subscriptions.
  */
 async function getWorkspacesForTier(tier: SyncTier): Promise<Array<{ id: string; planType: PlanType }>> {
   const supabase = supabaseAdminClient;
 
-  // Get all workspaces
-  // Note: Billing integration not yet set up, so we just get workspaces directly
+  // Get all workspaces with their billing info
   const { data: workspaces, error: workspacesError } = await supabase
     .from('workspaces')
-    .select('id');
+    .select(`
+      id,
+      billing_customers!billing_customers_workspace_id_fkey (
+        gateway_customer_id,
+        billing_subscriptions (
+          status,
+          billing_products (
+            name,
+            active
+          )
+        )
+      )
+    `);
 
   if (workspacesError || !workspaces) {
     console.error('Failed to fetch workspaces:', workspacesError);
     return [];
   }
 
-  console.log(`📊 Found ${workspaces.length} active workspaces`);
+  console.log(`📊 Found ${workspaces.length} total workspaces`);
 
-  // For now, treat all workspaces as free tier (billing not yet configured)
-  // TODO: When billing is set up, query billing_customers -> billing_subscriptions
-  const workspacesWithPlan = workspaces.map(workspace => ({
-    id: workspace.id,
-    planType: 'free' as PlanType,
-    tier: 'free' as SyncTier,
-  }));
+  // Determine plan type for each workspace
+  const workspacesWithPlan = workspaces.map(workspace => {
+    let planType: PlanType = 'free';
+    let workspaceTier: SyncTier = 'free';
+    
+    // Check billing data
+    const billingCustomers = workspace.billing_customers as any[];
+    if (billingCustomers && billingCustomers.length > 0) {
+      for (const customer of billingCustomers) {
+        const subscriptions = customer.billing_subscriptions as any[];
+        if (subscriptions && subscriptions.length > 0) {
+          for (const sub of subscriptions) {
+            // Check for active subscription
+            if (sub.status === 'active' && sub.billing_products?.active) {
+              const productName = (sub.billing_products.name || '').toLowerCase();
+              
+              if (productName.includes('enterprise')) {
+                planType = 'enterprise';
+                workspaceTier = 'pro'; // enterprise uses pro tier sync frequency
+              } else if (productName.includes('pro') || productName.includes('professional')) {
+                planType = 'pro';
+                workspaceTier = 'pro';
+              } else if (productName.includes('basic')) {
+                planType = 'basic';
+                workspaceTier = 'basic';
+              }
+              // Break once we find an active subscription
+              break;
+            }
+          }
+        }
+      }
+    }
+    
+    return {
+      id: workspace.id,
+      planType,
+      tier: workspaceTier,
+    };
+  });
+
+  // Log plan distribution
+  const planCounts = workspacesWithPlan.reduce((acc, w) => {
+    acc[w.planType] = (acc[w.planType] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  console.log(`📊 Plan distribution:`, planCounts);
 
   // If tier is 'all', return all workspaces
   if (tier === 'all') {
     return workspacesWithPlan.map(w => ({ id: w.id, planType: w.planType }));
   }
 
-  // Filter by requested tier (currently all are 'free')
-  return workspacesWithPlan
+  // Filter by requested tier
+  const filtered = workspacesWithPlan
     .filter(w => w.tier === tier)
     .map(w => ({ id: w.id, planType: w.planType }));
+  
+  console.log(`📊 Found ${filtered.length} workspaces for tier: ${tier}`);
+  
+  return filtered;
 }
 
 /**

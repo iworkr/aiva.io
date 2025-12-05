@@ -1,6 +1,7 @@
 /**
  * SyncProgressDialog Component
  * Shows detailed sync progress with live message counts
+ * Now uses shared SyncStatusProvider context for global state
  */
 
 'use client';
@@ -23,13 +24,10 @@ import {
   Loader2 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { 
-  useSyncProgress, 
-  calculateSyncPercentage, 
-  getPhaseDescription 
-} from '@/hooks/useSyncProgress';
+import { getPhaseDescription } from '@/hooks/useSyncProgress';
 import type { SyncProgress as SyncProgressType, SyncPhase } from '@/types/sync';
 import { getIntegrationById } from '@/lib/integrations/config';
+import { useSyncStatus } from './SyncStatusProvider';
 
 interface SyncProgressDialogProps {
   isOpen: boolean;
@@ -45,22 +43,31 @@ export function SyncProgressDialog({
   onSyncComplete 
 }: SyncProgressDialogProps) {
   const [showComplete, setShowComplete] = useState(false);
+  const [localComplete, setLocalComplete] = useState(false);
   
-  const { progress, isActive, displayProgress, reset } = useSyncProgress(workspaceId, {
-    onComplete: () => {
+  // Use shared context instead of local hook
+  const { progress, isSyncing, displayProgress } = useSyncStatus();
+  
+  // Track completion
+  useEffect(() => {
+    if (progress?.phase === 'complete' && !localComplete) {
+      setLocalComplete(true);
       setShowComplete(true);
       onSyncComplete?.();
-      // Auto-close after 2 seconds on complete
+      // Auto-close dialog after 2 seconds on complete (but keep banner visible briefly)
       setTimeout(() => {
         onClose();
         setShowComplete(false);
-        reset();
       }, 2000);
-    },
-    onError: (error) => {
-      console.error('Sync error:', error);
-    },
-  });
+    }
+  }, [progress?.phase, localComplete, onSyncComplete, onClose]);
+
+  // Reset local complete state when a new sync starts
+  useEffect(() => {
+    if (progress?.phase === 'connecting' || progress?.phase === 'fetching') {
+      setLocalComplete(false);
+    }
+  }, [progress?.phase]);
 
   // Reset state when dialog closes
   useEffect(() => {
@@ -85,7 +92,7 @@ export function SyncProgressDialog({
           <DialogTitle className="flex items-center gap-2">
             <RefreshCw className={cn(
               "h-5 w-5",
-              isActive && "animate-spin"
+              isSyncing && "animate-spin"
             )} />
             {showComplete ? 'Sync Complete!' : 'Syncing Your Inbox'}
           </DialogTitle>

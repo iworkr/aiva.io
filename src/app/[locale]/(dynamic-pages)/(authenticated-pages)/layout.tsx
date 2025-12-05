@@ -1,4 +1,6 @@
 import { NotificationsDialog } from "@/components/notifications-dialog";
+import { SyncStatusProvider } from "@/components/sync/SyncStatusProvider";
+import { SyncStatusBanner } from "@/components/sync/SyncStatusBanner";
 import { CreateWorkspaceDialogProvider } from "@/contexts/CreateWorkspaceDialogContext";
 import { LoggedInUserProvider } from "@/contexts/LoggedInUserContext";
 import { NotificationsProvider } from "@/contexts/NotificationsContext";
@@ -40,9 +42,12 @@ export default async function Layout({ children, params }: AuthenticatedLayoutPr
     <CreateWorkspaceDialogProvider>
       <LoggedInUserProvider user={user}>
         <NotificationsProvider>
-          {children}
-          <NotificationsDialog />
-          <PosthogIdentify />
+          <SyncStatusProvider>
+            <SyncStatusBanner />
+            {children}
+            <NotificationsDialog />
+            <PosthogIdentify />
+          </SyncStatusProvider>
         </NotificationsProvider>
       </LoggedInUserProvider>
     </CreateWorkspaceDialogProvider>
