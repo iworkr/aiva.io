@@ -294,71 +294,69 @@ export function ContactDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto overflow-x-hidden p-0">
+      <DialogContent className="max-w-md w-full max-h-[85vh] overflow-y-auto overflow-x-hidden p-0">
         {/* Minimal Header */}
-        <div className="px-6 py-5 border-b border-border/50">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-4">
-              {/* Compact Avatar */}
-              {contact.avatar_url ? (
-                <Image
-                  src={contact.avatar_url}
-                  alt={displayName || contact.full_name}
-                  width={56}
-                  height={56}
-                  className="h-14 w-14 rounded-full object-cover flex-shrink-0"
-                  loading="lazy"
-                />
-              ) : (
-                <div
-                  className={cn(
-                    'h-14 w-14 rounded-full flex items-center justify-center text-xl font-semibold flex-shrink-0',
-                    contactColor
-                  )}
-                >
-                  {contactInitial}
-                </div>
-              )}
-
-              {/* Name and Title */}
-              <div className="min-w-0">
-                <DialogTitle className="text-lg font-semibold truncate">
-                  {displayName || contact.full_name}
-                </DialogTitle>
-                {(displayTitle || displayLocation) && (
-                  <p className="text-sm text-muted-foreground truncate">
-                    {displayTitle && displayLocation
-                      ? `${displayTitle} · ${displayLocation}`
-                      : displayTitle || displayLocation}
-                  </p>
+        <div className="px-6 pt-6 pb-4 border-b border-border/50">
+          {/* Avatar + Name Row */}
+          <div className="flex items-center gap-3 pr-8">
+            {/* Compact Avatar */}
+            {contact.avatar_url ? (
+              <Image
+                src={contact.avatar_url}
+                alt={displayName || contact.full_name}
+                width={48}
+                height={48}
+                className="h-12 w-12 rounded-full object-cover flex-shrink-0"
+                loading="lazy"
+              />
+            ) : (
+              <div
+                className={cn(
+                  'h-12 w-12 rounded-full flex items-center justify-center text-lg font-semibold flex-shrink-0',
+                  contactColor
                 )}
-              </div>
-            </div>
-
-            {/* Action Buttons - extra margin-right for dialog close button */}
-            <div className="flex items-center gap-1 flex-shrink-0 mr-8">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => toggleFavorite({ id: contact.id, workspaceId })}
-                className="h-8 w-8"
-                aria-label={contact.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
               >
-                <Star
-                  className={cn(
-                    'h-4 w-4',
-                    contact.is_favorite
-                      ? 'fill-yellow-500 text-yellow-500'
-                      : 'text-muted-foreground'
-                  )}
-                  aria-hidden="true"
-                />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={onEdit} className="h-8 gap-1.5" aria-label="Edit contact">
-                <Edit className="h-3.5 w-3.5" aria-hidden="true" />
-                Edit
-              </Button>
+                {contactInitial}
+              </div>
+            )}
+
+            {/* Name and Title */}
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <DialogTitle className="text-base font-semibold truncate pr-2">
+                {displayName || contact.full_name}
+              </DialogTitle>
+              {(displayTitle || displayLocation) && (
+                <p className="text-xs text-muted-foreground truncate">
+                  {displayTitle && displayLocation
+                    ? `${displayTitle} · ${displayLocation}`
+                    : displayTitle || displayLocation}
+                </p>
+              )}
             </div>
+          </div>
+
+          {/* Action Buttons Row - Below name, clearly separated */}
+          <div className="flex items-center gap-2 mt-3">
+            <Button
+              variant={contact.is_favorite ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => toggleFavorite({ id: contact.id, workspaceId })}
+              className="h-7 text-xs gap-1.5"
+              aria-label={contact.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
+            >
+              <Star
+                className={cn(
+                  'h-3 w-3',
+                  contact.is_favorite && 'fill-yellow-500 text-yellow-500'
+                )}
+                aria-hidden="true"
+              />
+              {contact.is_favorite ? 'Favorited' : 'Favorite'}
+            </Button>
+            <Button variant="outline" size="sm" onClick={onEdit} className="h-7 text-xs gap-1.5" aria-label="Edit contact">
+              <Edit className="h-3 w-3" aria-hidden="true" />
+              Edit
+            </Button>
           </div>
 
           {/* Channel Icons Row - Inline small */}
@@ -370,12 +368,12 @@ export function ContactDetailDialog({
                   className="opacity-60 hover:opacity-100 transition-opacity"
                   title={`${channel.channel_type}: ${channel.channel_display_name ? `${channel.channel_display_name} (${channel.channel_id})` : channel.channel_id}`}
                 >
-                  <ChannelLogo channelType={channel.channel_type} size={18} />
+                  <ChannelLogo channelType={channel.channel_type} size={16} />
                 </div>
               ))}
               {contact.contact_channels.length > 6 && (
-                <span className="text-xs text-muted-foreground">
-                  +{contact.contact_channels.length - 6} more
+                <span className="text-[10px] text-muted-foreground">
+                  +{contact.contact_channels.length - 6}
                 </span>
               )}
             </div>
