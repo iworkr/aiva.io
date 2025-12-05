@@ -74,10 +74,13 @@ export function SyncStatusProvider({ children, initialWorkspaceId = null }: Sync
   }, [workspaceId, isActive, manualSyncStarted, progress?.phase]);
 
   const startSync = useCallback(() => {
-    console.log('🚀 startSync called');
+    console.log('🚀 startSync called - resetting state first');
+    // IMPORTANT: Reset all previous sync state before starting new sync
+    resetProgress();
+    // Then start the new sync
     setManualSyncStarted(true);
     setDialogOpen(true);
-  }, []);
+  }, [resetProgress]);
 
   const reset = useCallback(() => {
     resetProgress();

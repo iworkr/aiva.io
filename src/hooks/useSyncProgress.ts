@@ -132,6 +132,13 @@ export function useSyncProgress(
       .on('broadcast', { event: 'sync.progress' }, (payload) => {
         const syncProgress = payload.payload as SyncProgress;
         
+        // IMPORTANT: When a new sync starts (connecting phase), reset displayProgress to 0
+        // This ensures the progress bar starts fresh for each new sync
+        if (syncProgress.phase === 'connecting') {
+          setDisplayProgress(0);
+          console.log('🔄 New sync detected - resetting progress to 0');
+        }
+        
         setProgress(syncProgress);
         
         // Track active state
