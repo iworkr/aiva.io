@@ -15,6 +15,118 @@ import {
 import { OpenAI } from "openai";
 import { getPriorityFromCategory } from "./priority-mapper";
 
+// Valid category enum values
+const VALID_CATEGORIES: MessageCategory[] = [
+  'customer_inquiry',
+  'customer_complaint',
+  'sales_lead',
+  'client_support',
+  'bill',
+  'invoice',
+  'payment_confirmation',
+  'authorization_code',
+  'sign_in_code',
+  'security_alert',
+  'marketing',
+  'junk_email',
+  'newsletter',
+  'internal',
+  'meeting_request',
+  'personal',
+  'social',
+  'notification',
+  'other',
+];
+
+// Map AI responses (which might use group names) to valid enum values
+const CATEGORY_MAPPING: Record<string, MessageCategory> = {
+  // Direct matches (lowercase)
+  'customer_inquiry': 'customer_inquiry',
+  'customer_complaint': 'customer_complaint',
+  'sales_lead': 'sales_lead',
+  'client_support': 'client_support',
+  'bill': 'bill',
+  'invoice': 'invoice',
+  'payment_confirmation': 'payment_confirmation',
+  'authorization_code': 'authorization_code',
+  'sign_in_code': 'sign_in_code',
+  'security_alert': 'security_alert',
+  'marketing': 'marketing',
+  'junk_email': 'junk_email',
+  'newsletter': 'newsletter',
+  'internal': 'internal',
+  'meeting_request': 'meeting_request',
+  'personal': 'personal',
+  'social': 'social',
+  'notification': 'notification',
+  'other': 'other',
+  
+  // Group names -> default category in that group
+  'business/customer': 'customer_inquiry',
+  'business': 'customer_inquiry',
+  'customer': 'customer_inquiry',
+  'financial': 'bill',
+  'finance': 'bill',
+  'security/auth': 'security_alert',
+  'security': 'security_alert',
+  'auth': 'authorization_code',
+  'promotional/updates': 'marketing',
+  'promotional': 'marketing',
+  'updates': 'notification',
+  'promo': 'marketing',
+  'communication': 'internal',
+  'comms': 'internal',
+  
+  // Common AI variations
+  'security_auth': 'security_alert',
+  'securityauth': 'security_alert',
+  'promo_updates': 'marketing',
+  'spam': 'junk_email',
+  'junk': 'junk_email',
+  'otp': 'authorization_code',
+  'code': 'authorization_code',
+  'verification': 'authorization_code',
+  'alert': 'notification',
+  'update': 'notification',
+  'receipt': 'payment_confirmation',
+  'payment': 'payment_confirmation',
+};
+
+/**
+ * Normalize AI-returned category to valid database enum value
+ */
+function normalizeCategory(aiCategory: string | undefined | null): MessageCategory {
+  if (!aiCategory) return 'other';
+  
+  // Convert to lowercase and remove extra spaces
+  const normalized = aiCategory.toLowerCase().trim().replace(/\s+/g, '_');
+  
+  // Check if it's already a valid category
+  if (VALID_CATEGORIES.includes(normalized as MessageCategory)) {
+    return normalized as MessageCategory;
+  }
+  
+  // Try the mapping
+  const mapped = CATEGORY_MAPPING[normalized];
+  if (mapped) return mapped;
+  
+  // Try without underscores
+  const withoutUnderscores = normalized.replace(/_/g, '');
+  const mappedNoUnderscore = CATEGORY_MAPPING[withoutUnderscores];
+  if (mappedNoUnderscore) return mappedNoUnderscore;
+  
+  // Try to match partial strings
+  for (const [key, value] of Object.entries(CATEGORY_MAPPING)) {
+    if (normalized.includes(key) || key.includes(normalized)) {
+      return value;
+    }
+  }
+  
+  // Default fallback
+  console.warn(`Unknown category "${aiCategory}", defaulting to "other"`);
+  return 'other';
+}
+
 // Lazy-load OpenAI client to avoid crashes on missing API key
 let openaiClient: OpenAI | null = null;
 
@@ -214,15 +326,19 @@ Be consistent: similar messages should get similar classifications.`,
       confidence = Math.min(confidence, 0.55);
     }
 
+    // Normalize category to valid enum value (AI sometimes returns group names or mixed case)
+    const normalizedCategory = normalizeCategory(rawResult.category);
+    
     const result: ClassificationResult = {
       ...rawResult,
+      category: normalizedCategory,
       confidenceScore: Math.round(confidence * 100) / 100, // Round to 2 decimals
     };
 
     // Ensure priority is correctly assigned based on category
     // Override AI priority with our priority mapping logic for consistency
     const finalPriority = getPriorityFromCategory(
-      result.category,
+      normalizedCategory,
       result.sentiment,
       result.actionability,
     );
@@ -235,11 +351,11 @@ Be consistent: similar messages should get similar classifications.`,
     }
 
     // Update message with classification
-    await supabase
+    const { error: updateError } = await supabase
       .from("messages")
       .update({
         priority: finalPriority, // Use mapped priority for consistency
-        category: result.category,
+        category: normalizedCategory, // Use normalized category
         sentiment: result.sentiment,
         actionability: result.actionability,
         summary: result.summary,
@@ -249,6 +365,11 @@ Be consistent: similar messages should get similar classifications.`,
         updated_at: new Date().toISOString(),
       })
       .eq("id", messageId);
+
+    if (updateError) {
+      console.error(`❌ Failed to update message ${messageId}:`, updateError);
+      throw new Error(`Database update failed: ${updateError.message}`);
+    }
 
     // Log AI action
     await supabase.from("ai_action_logs").insert({
