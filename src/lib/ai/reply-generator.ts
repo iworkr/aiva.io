@@ -249,7 +249,8 @@ CRITICAL: Confidence scores must be realistic and varied:
 - Use 0.50-0.69 for ambiguous situations or sensitive topics
 - Use below 0.50 when unsure about appropriate response
 
-Be honest about uncertainty. Don't default to high confidence.`,
+Be honest about uncertainty. Don't default to high confidence.
+IMPORTANT: Always return valid, complete JSON. Keep replies concise.`,
         },
         {
           role: "user",
@@ -257,13 +258,41 @@ Be honest about uncertainty. Don't default to high confidence.`,
         },
       ],
       temperature: 0.5, // Moderate creativity for replies
-      max_tokens: Math.ceil(maxLength / 2),
+      max_tokens: 1000, // Increased to ensure complete JSON response
       response_format: { type: "json_object" },
     });
 
     const processingTime = Date.now() - startTime;
 
-    const rawResult = JSON.parse(completion.choices[0].message.content || "{}");
+    // Safely parse JSON with fallback
+    let rawResult: any;
+    const responseContent = completion.choices[0].message.content || "{}";
+    
+    try {
+      rawResult = JSON.parse(responseContent);
+    } catch (parseError) {
+      console.error("[AI Reply] JSON parse error, attempting to repair:", parseError);
+      console.error("[AI Reply] Raw response:", responseContent.substring(0, 500));
+      
+      // Try to extract just the body if JSON is malformed
+      const bodyMatch = responseContent.match(/"body"\s*:\s*"([^"]*(?:\\"[^"]*)*)"/);
+      if (bodyMatch) {
+        rawResult = {
+          body: bodyMatch[1].replace(/\\"/g, '"'),
+          confidenceScore: 0.6,
+          isAutoSendable: false,
+        };
+        console.log("[AI Reply] Recovered body from malformed JSON");
+      } else {
+        // Last resort: return a generic error response
+        return {
+          body: "",
+          confidenceScore: 0,
+          tone: options.tone || "professional",
+          error: "AI response was incomplete. Please try again.",
+        };
+      }
+    }
 
     // Post-process confidence score to ensure realistic values
     let confidence = rawResult.confidenceScore;
