@@ -273,7 +273,7 @@ export function ContactDetailDialog({
                 <div
                   key={channel.id}
                   className="opacity-60 hover:opacity-100 transition-opacity"
-                  title={`${channel.channel_type}: ${channel.channel_display_name || channel.channel_id}`}
+                  title={`${channel.channel_type}: ${channel.channel_display_name ? `${channel.channel_display_name} (${channel.channel_id})` : channel.channel_id}`}
                 >
                   <ChannelLogo channelType={channel.channel_type} size={18} />
                 </div>
@@ -380,6 +380,7 @@ export function ContactDetailDialog({
                     </Label>
                     <Input
                       id="channelId"
+                      name={`channel-${newChannel.type}`}
                       placeholder={AVAILABLE_CHANNELS.find(c => c.type === newChannel.type)?.placeholder || '@username'}
                       value={newChannel.id}
                       onChange={(e) =>
@@ -387,6 +388,7 @@ export function ContactDetailDialog({
                       }
                       className="h-9 text-sm"
                       autoFocus
+                      autoComplete="on"
                     />
                   </div>
                 )}
@@ -424,34 +426,51 @@ export function ContactDetailDialog({
             {/* Channels List */}
             {contact.contact_channels && contact.contact_channels.length > 0 ? (
               <div className="space-y-1">
-                {contact.contact_channels.map((channel: any) => (
-                  <div
-                    key={channel.id}
-                    className="group flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                      <ChannelLogo channelType={channel.channel_type} size={16} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm capitalize truncate">
-                          {channel.channel_display_name || channel.channel_id}
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                      onClick={() => {
-                        if (confirm(`Remove ${channel.channel_type} channel?`)) {
-                          deleteChannel({ id: channel.id, workspaceId });
-                        }
-                      }}
-                      aria-label={`Remove ${channel.channel_type} channel`}
+                {contact.contact_channels.map((channel: any) => {
+                  // Show display name with ID, or just ID if no display name
+                  const hasDisplayName = channel.channel_display_name && 
+                    channel.channel_display_name !== channel.channel_id;
+                  
+                  return (
+                    <div
+                      key={channel.id}
+                      className="group flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors"
                     >
-                      <Trash2 className="h-3 w-3" aria-hidden="true" />
-                    </Button>
-                  </div>
-                ))}
+                      <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                        <ChannelLogo channelType={channel.channel_type} size={16} />
+                        <div className="flex-1 min-w-0">
+                          {hasDisplayName ? (
+                            <div className="flex items-baseline gap-1.5">
+                              <p className="text-sm font-medium truncate">
+                                {channel.channel_display_name}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {channel.channel_id}
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="text-sm truncate">
+                              {channel.channel_id}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                        onClick={() => {
+                          if (confirm(`Remove ${channel.channel_type} channel?`)) {
+                            deleteChannel({ id: channel.id, workspaceId });
+                          }
+                        }}
+                        aria-label={`Remove ${channel.channel_type} channel`}
+                      >
+                        <Trash2 className="h-3 w-3" aria-hidden="true" />
+                      </Button>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <p className="text-xs text-muted-foreground py-3 text-center">
