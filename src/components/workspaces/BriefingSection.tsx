@@ -318,7 +318,7 @@ export function BriefingSection({ items }: BriefingSectionProps) {
           
           {/* Arrow to full view */}
           <Link href={item.href}>
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
           </Link>
         </div>
         

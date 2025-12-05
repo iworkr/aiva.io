@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseUserServerComponentClient } from '@/supabase-clients/user/createSupabaseUserServerComponentClient';
+import { createSupabaseUserRouteHandlerClient } from '@/supabase-clients/user/createSupabaseUserRouteHandlerClient';
 import { getOAuthRedirectUri } from '@/utils/helpers';
 
 export async function GET(request: NextRequest) {
@@ -19,35 +19,81 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get authenticated user
-    const supabase = await createSupabaseUserServerComponentClient();
+    // Get authenticated user using route handler client (CRITICAL: must use route handler client for API routes)
+    const supabase = await createSupabaseUserRouteHandlerClient();
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.redirect(new URL('/login', request.url));
+      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || request.url;
+      return NextResponse.redirect(new URL('/en/login', baseUrl));
     }
 
     // Check if Microsoft OAuth credentials are configured
     const clientId = process.env.MICROSOFT_CLIENT_ID;
     const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
     
-    // Build redirect URI - ALWAYS use NEXT_PUBLIC_SITE_URL if set (for consistency)
-    // Only fall back to request origin for localhost development
+    // Build redirect URI
+    // For localhost: always use request origin (for development)
+    // For production: use NEXT_PUBLIC_SITE_URL if set (for consistency with Azure Portal)
     let redirectUri: string;
-    if (process.env.NEXT_PUBLIC_SITE_URL) {
-      // Use configured site URL (removes trailing slash, ensures HTTPS)
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL.trim().replace(/\/$/, '');
-      // Ensure HTTPS for production URLs
-      const normalizedUrl = siteUrl.startsWith('http') ? siteUrl : `https://${siteUrl}`;
-      redirectUri = `${normalizedUrl}/api/auth/outlook/callback`;
-    } else {
-      // Fallback: use request origin (for localhost development)
-      const origin = request.nextUrl.origin;
+    const origin = request.nextUrl.origin;
+    const host = request.headers.get('host') || '';
+    const forwardedHost = request.headers.get('x-forwarded-host') || '';
+    
+    // More robust localhost detection
+    const isLocalhost = 
+      origin.includes('localhost') || 
+      origin.includes('127.0.0.1') ||
+      host.includes('localhost') ||
+      host.includes('127.0.0.1') ||
+      forwardedHost.includes('localhost') ||
+      forwardedHost.includes('127.0.0.1') ||
+      request.url.includes('localhost') ||
+      request.url.includes('127.0.0.1');
+    
+    console.log('🔵 Outlook OAuth Origin Detection:', {
+      origin,
+      host,
+      forwardedHost,
+      requestUrl: request.url,
+      isLocalhost,
+      nextPublicSiteUrl: process.env.NEXT_PUBLIC_SITE_URL,
+    });
+    
+    if (isLocalhost) {
+      // Always use request origin for localhost (development)
       redirectUri = getOAuthRedirectUri(origin, '/api/auth/outlook/callback');
+      console.log('🔵 Using LOCALHOST redirect URI:', redirectUri);
+    } else if (process.env.NEXT_PUBLIC_SITE_URL) {
+      // Production: use configured site URL - normalize it EXACTLY
+      let siteUrl = process.env.NEXT_PUBLIC_SITE_URL.trim();
+      
+      // Remove all trailing slashes
+      siteUrl = siteUrl.replace(/\/+$/, '');
+      
+      // Remove protocol if present (we'll add https://)
+      siteUrl = siteUrl.replace(/^https?:\/\//, '');
+      
+      // Always use HTTPS for production
+      siteUrl = `https://${siteUrl}`;
+      
+      // Ensure no trailing slash
+      siteUrl = siteUrl.replace(/\/+$/, '');
+      
+      // Construct redirect URI - ensure exact format
+      redirectUri = `${siteUrl}/api/auth/outlook/callback`;
+      
+      console.log('🔵 Using PRODUCTION redirect URI:', redirectUri);
+    } else {
+      // Fallback: use request origin
+      redirectUri = getOAuthRedirectUri(origin, '/api/auth/outlook/callback');
+      console.log('🔵 Using FALLBACK redirect URI:', redirectUri);
     }
+    
+    console.log('🔵 Outlook OAuth Redirect URI (FINAL):', redirectUri);
 
     if (!clientId || !clientSecret) {
       return NextResponse.json(
@@ -83,7 +129,9 @@ export async function GET(request: NextRequest) {
       clientId: clientId?.substring(0, 20) + '...',
       workspaceId,
       userId: user.id,
-      origin,
+      origin: request.nextUrl.origin,
+      siteUrl: process.env.NEXT_PUBLIC_SITE_URL,
+      isProduction: !isLocalhost,
     });
 
     const authUrl = new URL('https://login.microsoftonline.com/common/oauth2/v2.0/authorize');

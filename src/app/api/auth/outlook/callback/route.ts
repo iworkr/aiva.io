@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseUserServerComponentClient } from '@/supabase-clients/user/createSupabaseUserServerComponentClient';
+import { createSupabaseUserRouteHandlerClient } from '@/supabase-clients/user/createSupabaseUserRouteHandlerClient';
 import { createChannelConnectionAction } from '@/data/user/channels';
 import { toSiteURL, getOAuthRedirectUri } from '@/utils/helpers';
 
@@ -44,8 +44,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get authenticated user
-    const supabase = await createSupabaseUserServerComponentClient();
+    // Get authenticated user using route handler client (CRITICAL: must use route handler client for API routes)
+    const supabase = await createSupabaseUserRouteHandlerClient();
     const {
       data: { user },
       error: authError,

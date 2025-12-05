@@ -315,14 +315,14 @@ Be honest about uncertainty. Don't default to high confidence.`,
 
     // Store draft in database
     const draftInsert = {
-      workspace_id: workspaceId,
-      user_id: workspaceId, // Placeholder
-      message_id: messageId,
-      body: result.body,
-      tone,
-      generated_by_ai: true,
-      confidence_score: result.confidenceScore,
-      is_auto_sendable: result.isAutoSendable || false,
+        workspace_id: workspaceId,
+        user_id: workspaceId, // Placeholder
+        message_id: messageId,
+        body: result.body,
+        tone,
+        generated_by_ai: true,
+        confidence_score: result.confidenceScore,
+        is_auto_sendable: result.isAutoSendable || false,
       tone_reasoning: toneReasoning as any,
       context_data: {
         previousInteractionCount,

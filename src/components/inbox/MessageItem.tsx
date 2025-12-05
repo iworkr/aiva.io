@@ -416,10 +416,10 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
               </div>
             </div>
           ) : (
-            <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">
+          <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">
               {hasAISummary && <Sparkles className="inline h-3 w-3 mr-1 text-primary/60" aria-hidden="true" />}
-              {parseMarkdown(displaySnippet)}
-            </p>
+            {parseMarkdown(displaySnippet)}
+          </p>
           )}
 
           {/* AI Classifications & Quick Actions Row */}

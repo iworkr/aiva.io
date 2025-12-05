@@ -44,9 +44,31 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Use current origin for callback (localhost vs production)
+    // Build redirect URI
+    // For localhost: always use request origin (for development)
+    // For production: use NEXT_PUBLIC_SITE_URL if set (for consistency with Slack App Console)
+    let redirectUri: string;
     const origin = request.nextUrl.origin;
-    const redirectUri = `${origin}/api/auth/slack/callback`;
+    const host = request.headers.get('host') || '';
+    const forwardedHost = request.headers.get('x-forwarded-host') || '';
+    
+    const isLocalhost = 
+      origin.includes('localhost') || 
+      origin.includes('127.0.0.1') ||
+      host.includes('localhost') ||
+      forwardedHost.includes('localhost');
+    
+    if (isLocalhost) {
+      redirectUri = `${origin}/api/auth/slack/callback`;
+    } else if (process.env.NEXT_PUBLIC_SITE_URL) {
+      let siteUrl = process.env.NEXT_PUBLIC_SITE_URL.trim().replace(/\/+$/, '').replace(/^https?:\/\//, '');
+      siteUrl = `https://${siteUrl}`;
+      redirectUri = `${siteUrl}/api/auth/slack/callback`;
+    } else {
+      redirectUri = `${origin}/api/auth/slack/callback`;
+    }
+    
+    console.log('🔵 Slack OAuth Redirect URI:', redirectUri);
 
     const state = Buffer.from(
       JSON.stringify({
