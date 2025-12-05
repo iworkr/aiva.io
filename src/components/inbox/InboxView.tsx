@@ -31,6 +31,7 @@ import { InboxHeaderFilters, type SortOption, type StatusFilter } from './InboxH
 import { InboxSkeleton } from './InboxSkeleton';
 import { MessageList } from './MessageList';
 import { SyncChannelDialog } from './SyncChannelDialog';
+import { SyncProgressDialog } from '@/components/sync/SyncProgressDialog';
 
 interface InboxViewProps {
   workspaceId: string;
@@ -58,6 +59,7 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
   const [hasChannels, setHasChannels] = useState<boolean | null>(null);
   const [connectDialogOpen, setConnectDialogOpen] = useState(false);
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
+  const [syncProgressDialogOpen, setSyncProgressDialogOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const cacheKeyRef = useRef<string>('');
   const lastFetchRef = useRef<number>(0);
@@ -462,6 +464,7 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
     lastSyncTimestampRef.current = new Date().toISOString();
     setSyncing(true);
     setSyncDialogOpen(false);
+    setSyncProgressDialogOpen(true); // Open progress dialog
 
     // Note: syncWorkspaceConnectionsAction syncs all connections for the workspace
     // For channel-specific sync, we'd need a different action, but for now we sync all
@@ -691,6 +694,37 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
         userId={userId}
         onSync={performSync}
         syncing={syncing}
+      />
+
+      {/* Sync Progress Dialog - shows detailed progress with live counts */}
+      <SyncProgressDialog
+        isOpen={syncProgressDialogOpen}
+        onClose={() => setSyncProgressDialogOpen(false)}
+        workspaceId={workspaceId}
+        onSyncComplete={() => {
+          // Refresh messages after sync completes
+          try {
+            localStorage.removeItem(cacheKey);
+          } catch (error) {
+            console.error('Failed to clear cache:', error);
+          }
+          fetchingRef.current = false;
+          lastFetchRef.current = 0;
+          setCurrentOffset(0);
+          const { orderBy, orderDirection } = getSortParams(sortBy);
+          fetchMessages({
+            workspaceId,
+            channelConnectionId: selectedChannel || undefined,
+            priority: priorityFilter as MessagePriority | undefined,
+            category: categoryFilter as MessageCategory | undefined,
+            isRead: statusFilter === 'unread' ? false : undefined,
+            isStarred: statusFilter === 'starred' ? true : undefined,
+            limit: MESSAGES_PER_PAGE,
+            offset: 0,
+            orderBy,
+            orderDirection,
+          });
+        }}
       />
     </div>
   );

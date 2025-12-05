@@ -6,12 +6,40 @@
 'use server';
 
 import { createSupabaseUserServerActionClient } from '@/supabase-clients/user/createSupabaseUserServerActionClient';
+import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
 import { syncGmailMessages } from '@/lib/gmail/sync';
 import { syncOutlookMessages } from '@/lib/outlook/sync';
 import { syncTwitterMessages } from '@/lib/twitter/sync';
 import { syncTelegramMessages } from '@/lib/telegram/sync';
 import { syncLinkedInMessages } from '@/lib/linkedin/sync';
 import { classifyMessage } from '@/lib/ai/classifier';
+import type { SyncProgress, SyncPhase } from '@/types/sync';
+
+/**
+ * Broadcast sync progress to Realtime channel
+ */
+async function broadcastProgress(
+  workspaceId: string,
+  progress: Partial<SyncProgress> & { phase: SyncPhase }
+) {
+  try {
+    const channel = supabaseAdminClient.channel(`sync-progress:${workspaceId}`);
+    
+    await channel.send({
+      type: 'broadcast',
+      event: 'sync.progress',
+      payload: {
+        ...progress,
+        timestamp: Date.now(),
+      },
+    });
+    
+    // Unsubscribe after sending (we're just broadcasting, not listening)
+    supabaseAdminClient.removeChannel(channel);
+  } catch (error) {
+    console.error('Failed to broadcast sync progress:', error);
+  }
+}
 
 export type ChannelProvider =
   | 'gmail'
@@ -32,6 +60,7 @@ export interface SyncResult {
   success: boolean;
   syncedCount?: number;
   newCount?: number;
+  classifiedCount?: number;
   errorCount?: number;
   error?: string;
 }
@@ -57,6 +86,17 @@ export async function syncChannelConnection(
     .single();
 
   if (error || !connection) {
+    // Broadcast error
+    await broadcastProgress(workspaceId, {
+      phase: 'error',
+      connectionName: '',
+      provider: 'unknown',
+      totalMessages: 0,
+      syncedMessages: 0,
+      classifiedMessages: 0,
+      error: 'Connection not found',
+    });
+    
     return {
       provider: 'gmail',
       connectionId,
@@ -66,8 +106,28 @@ export async function syncChannelConnection(
     };
   }
 
+  // Broadcast connecting phase
+  await broadcastProgress(workspaceId, {
+    phase: 'connecting',
+    connectionName: connection.provider_account_name || '',
+    provider: connection.provider,
+    totalMessages: 0,
+    syncedMessages: 0,
+    classifiedMessages: 0,
+  });
+
   try {
     let syncResult: any;
+
+    // Broadcast fetching phase
+    await broadcastProgress(workspaceId, {
+      phase: 'fetching',
+      connectionName: connection.provider_account_name || '',
+      provider: connection.provider,
+      totalMessages: 0,
+      syncedMessages: 0,
+      classifiedMessages: 0,
+    });
 
     // Route to appropriate sync function
     // Note: cast to any so newly added providers (twitter, telegram) are accepted
@@ -126,37 +186,103 @@ export async function syncChannelConnection(
         };
     }
 
+    // Broadcast syncing complete phase
+    await broadcastProgress(workspaceId, {
+      phase: 'syncing',
+      connectionName: connection.provider_account_name || '',
+      provider: connection.provider,
+      totalMessages: syncResult.syncedCount || 0,
+      syncedMessages: syncResult.newCount || 0,
+      classifiedMessages: 0,
+    });
+
     // Auto-classify new messages if enabled
+    let classifiedCount = 0;
     if (options.autoClassify && syncResult.newCount && syncResult.newCount > 0) {
       try {
-        // Get newly synced messages
+        // Get newly synced messages that haven't been classified yet
         const { data: newMessages } = await supabase
           .from('messages')
-          .select('id')
+          .select('id, subject')
           .eq('channel_connection_id', connectionId)
           .is('priority', null)
           .order('created_at', { ascending: false })
           .limit(syncResult.newCount);
 
         if (newMessages && newMessages.length > 0) {
-          // Classify in background (don't wait)
-          Promise.all(
-            newMessages.map((msg) => classifyMessage(msg.id, workspaceId))
-          ).catch((err) => console.error('Auto-classification error:', err));
+          console.log(`🤖 Classifying ${newMessages.length} new messages...`);
+          
+          // Broadcast classifying phase
+          await broadcastProgress(workspaceId, {
+            phase: 'classifying',
+            connectionName: connection.provider_account_name || '',
+            provider: connection.provider,
+            totalMessages: syncResult.syncedCount || 0,
+            syncedMessages: syncResult.newCount || 0,
+            classifiedMessages: 0,
+          });
+          
+          // Classify messages one by one with progress updates
+          for (let i = 0; i < newMessages.length; i++) {
+            const msg = newMessages[i];
+            try {
+              await classifyMessage(msg.id, workspaceId);
+              classifiedCount++;
+              
+              // Broadcast progress every message (or every 3 for performance)
+              if (i % 3 === 0 || i === newMessages.length - 1) {
+                await broadcastProgress(workspaceId, {
+                  phase: 'classifying',
+                  connectionName: connection.provider_account_name || '',
+                  provider: connection.provider,
+                  totalMessages: syncResult.syncedCount || 0,
+                  syncedMessages: syncResult.newCount || 0,
+                  classifiedMessages: classifiedCount,
+                  currentMessage: msg.subject || 'Processing...',
+                });
+              }
+            } catch (classifyError) {
+              console.error(`Classification failed for message ${msg.id}:`, classifyError);
+            }
+          }
+          
+          console.log(`✅ Classification complete: ${classifiedCount}/${newMessages.length} successful`);
         }
       } catch (error) {
         console.error('Auto-classify error:', error);
       }
     }
 
+    // Broadcast complete phase
+    await broadcastProgress(workspaceId, {
+      phase: 'complete',
+      connectionName: connection.provider_account_name || '',
+      provider: connection.provider,
+      totalMessages: syncResult.syncedCount || 0,
+      syncedMessages: syncResult.newCount || 0,
+      classifiedMessages: classifiedCount,
+    });
+
     return {
       provider: connection.provider,
       connectionId,
       accountName: connection.provider_account_name,
       ...syncResult,
+      classifiedCount,
       success: true,
     };
   } catch (error) {
+    // Broadcast error phase
+    await broadcastProgress(workspaceId, {
+      phase: 'error',
+      connectionName: connection.provider_account_name || '',
+      provider: connection.provider,
+      totalMessages: 0,
+      syncedMessages: 0,
+      classifiedMessages: 0,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+
     return {
       provider: connection.provider,
       connectionId,

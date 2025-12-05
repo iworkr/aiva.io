@@ -540,14 +540,16 @@ export async function findOrCreateContactFromMessage(
     return { contactId, isNew: false };
   }
 
-  // Step 3: No existing contact found - create new one
+  // Step 3: No existing contact found - create new one (or find existing by name)
   const displayName = senderName || normalizedEmail || normalizedChannelId;
   const firstName = senderName?.split(' ')[0] || null;
   const lastName = senderName?.split(' ').slice(1).join(' ') || null;
 
-  const { data: newContact, error: contactError } = await supabase
+  // Use upsert to handle the unique constraint on workspace_id + full_name
+  // This prevents duplicate key errors when the same sender name exists
+  const { data: upsertedContact, error: contactError } = await supabase
     .from('contacts')
-    .insert({
+    .upsert({
       workspace_id: workspaceId,
       full_name: displayName,
       first_name: firstName,
@@ -556,17 +558,50 @@ export async function findOrCreateContactFromMessage(
       created_by: userId,
       last_interaction_at: new Date().toISOString(),
       interaction_count: 1,
+    }, {
+      onConflict: 'workspace_id,full_name',
+      ignoreDuplicates: false, // Update if exists
     })
     .select('id')
     .single();
 
-  if (contactError) throw new Error(contactError.message);
+  // If upsert failed (e.g., different constraint), try to find existing contact by name
+  let contactId: string;
+  let isNew = true;
 
-  // Link the channel to the new contact
+  if (contactError) {
+    // Fallback: try to find existing contact by name
+    const { data: existingByName } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .eq('full_name', displayName)
+      .single();
+
+    if (existingByName) {
+      contactId = existingByName.id;
+      isNew = false;
+      // Update interaction time
+      await supabase
+        .from('contacts')
+        .update({
+          last_interaction_at: new Date().toISOString(),
+          ...(normalizedEmail && { email: normalizedEmail }),
+        })
+        .eq('id', contactId);
+    } else {
+      // Still can't find - throw the original error
+      throw new Error(contactError.message);
+    }
+  } else {
+    contactId = upsertedContact.id;
+  }
+
+  // Link the channel to the contact (use upsert to avoid duplicates)
   const { error: channelError } = await supabase
     .from('contact_channels')
-    .insert({
-      contact_id: newContact.id,
+    .upsert({
+      contact_id: contactId,
       workspace_id: workspaceId,
       channel_type: channelType,
       channel_id: normalizedChannelId,
@@ -574,13 +609,16 @@ export async function findOrCreateContactFromMessage(
       is_primary: true,
       last_message_at: new Date().toISOString(),
       message_count: 1,
+    }, {
+      onConflict: 'contact_id,workspace_id,channel_type,channel_id',
+      ignoreDuplicates: true, // Don't update if channel already exists
     });
 
   if (channelError) {
-    console.error('Failed to link channel to contact:', channelError);
-    // Don't throw - contact was created successfully
+    // Log but don't throw - contact was created/found successfully
+    console.warn('Channel link warning (may already exist):', channelError.message);
   }
 
-  return { contactId: newContact.id, isNew: true };
+  return { contactId, isNew };
 }
 
