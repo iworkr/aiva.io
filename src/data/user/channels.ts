@@ -7,6 +7,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createSupabaseUserServerActionClient } from '@/supabase-clients/user/createSupabaseUserServerActionClient';
+import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
 import { authActionClient } from '@/lib/safe-action';
 import {
   createChannelConnectionSchema,
@@ -43,7 +44,7 @@ export const createChannelConnectionAction = authActionClient
 
     const supabase = await createSupabaseUserServerActionClient();
 
-    // Check if connection already exists
+    // Check if connection already exists in THIS workspace
     const { data: existing } = await supabase
       .from('channel_connections')
       .select('id, status')
@@ -83,6 +84,37 @@ export const createChannelConnectionAction = authActionClient
         data,
         message: `${provider} reconnected successfully`,
       };
+    }
+
+    // SAFEGUARD: Check if this account is already connected to a DIFFERENT workspace
+    // Use admin client to check across all workspaces (user client is limited by RLS)
+    const { data: existingInOtherWorkspace } = await supabaseAdminClient
+      .from('channel_connections')
+      .select('id, workspace_id, status')
+      .eq('provider' as any, provider as any)
+      .eq('provider_account_id', providerAccountId)
+      .eq('status', 'active')
+      .neq('workspace_id', workspaceId)
+      .single();
+
+    if (existingInOtherWorkspace) {
+      console.log(`⚠️ Account ${providerAccountId} already connected to workspace ${existingInOtherWorkspace.workspace_id}, unlinking...`);
+      
+      // Automatically unlink from the other workspace
+      const { error: unlinkError } = await supabaseAdminClient
+        .from('channel_connections')
+        .update({
+          status: 'revoked',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingInOtherWorkspace.id);
+
+      if (unlinkError) {
+        console.error('Failed to unlink from other workspace:', unlinkError);
+        // Continue anyway - we'll create the new connection
+      } else {
+        console.log(`✅ Successfully unlinked ${providerAccountId} from workspace ${existingInOtherWorkspace.workspace_id}`);
+      }
     }
 
     // Create new connection
