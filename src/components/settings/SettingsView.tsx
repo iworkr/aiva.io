@@ -33,7 +33,13 @@ import {
   Loader2,
   Save,
   CheckCircle,
+  Zap,
+  Clock,
+  AlertTriangle,
+  Play,
+  Pause,
 } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
 import { useAction } from 'next-safe-action/hooks';
 import {
@@ -41,8 +47,12 @@ import {
   updateNotificationSettingsAction,
   updateAccountSettingsAction,
   updateSyncSettingsAction,
+  updateAutoSendSettingsAction,
+  pauseAutoSendAction,
+  resumeAutoSendAction,
   getWorkspaceSettings,
   getUserProfile,
+  getAutoSendSettings,
 } from '@/data/user/settings';
 import { useRouter } from '@/i18n/routing';
 import { ReactNode } from 'react';
@@ -124,6 +134,16 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   const [syncFrequency, setSyncFrequency] = useState('15');
   const [settingsInitialized, setSettingsInitialized] = useState(false);
   const [detectedTimezone] = useState(() => detectUserTimezone()); // Store detected timezone
+
+  // Auto-send settings state
+  const [autoSendEnabled, setAutoSendEnabled] = useState(false);
+  const [autoSendDelayType, setAutoSendDelayType] = useState<'exact' | 'random'>('random');
+  const [autoSendDelayMin, setAutoSendDelayMin] = useState(10);
+  const [autoSendDelayMax, setAutoSendDelayMax] = useState(30);
+  const [autoSendConfidenceThreshold, setAutoSendConfidenceThreshold] = useState(0.85);
+  const [autoSendTimeStart, setAutoSendTimeStart] = useState('09:00');
+  const [autoSendTimeEnd, setAutoSendTimeEnd] = useState('21:00');
+  const [autoSendPaused, setAutoSendPaused] = useState(false);
   
   // Check Pro subscription status
   const { hasPro, loading: loadingPro } = useProSubscription(workspaceId);
@@ -133,11 +153,12 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
 
   // Fetch function for settings
   const fetchSettingsData = useCallback(async () => {
-    const [rawSettings, profile] = await Promise.all([
+    const [rawSettings, profile, autoSend] = await Promise.all([
       getWorkspaceSettings(workspaceId, userId),
       getUserProfile(userId),
+      getAutoSendSettings(workspaceId, userId),
     ]);
-    return { settings: rawSettings, profile };
+    return { settings: rawSettings, profile, autoSend };
   }, [workspaceId, userId]);
 
   // Use cached data for instant load
@@ -193,6 +214,28 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
         if (settings?.syncFrequency) {
           setSyncFrequency(String(settings.syncFrequency));
         }
+
+        // Set auto-send settings
+        const autoSend = data.autoSend as {
+          autoSendEnabled?: boolean;
+          autoSendDelayType?: 'exact' | 'random';
+          autoSendDelayMin?: number;
+          autoSendDelayMax?: number;
+          autoSendConfidenceThreshold?: number;
+          autoSendTimeStart?: string;
+          autoSendTimeEnd?: string;
+          autoSendPaused?: boolean;
+        };
+        if (autoSend) {
+          setAutoSendEnabled(autoSend.autoSendEnabled ?? false);
+          setAutoSendDelayType(autoSend.autoSendDelayType ?? 'random');
+          setAutoSendDelayMin(autoSend.autoSendDelayMin ?? 10);
+          setAutoSendDelayMax(autoSend.autoSendDelayMax ?? 30);
+          setAutoSendConfidenceThreshold(autoSend.autoSendConfidenceThreshold ?? 0.85);
+          setAutoSendTimeStart(autoSend.autoSendTimeStart ?? '09:00');
+          setAutoSendTimeEnd(autoSend.autoSendTimeEnd ?? '21:00');
+          setAutoSendPaused(autoSend.autoSendPaused ?? false);
+        }
         
         setSettingsInitialized(true);
       },
@@ -239,6 +282,28 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
       }
       if (settings?.syncFrequency) {
         setSyncFrequency(String(settings.syncFrequency));
+      }
+
+      // Initialize auto-send settings from cache
+      const autoSend = cachedSettings.autoSend as {
+        autoSendEnabled?: boolean;
+        autoSendDelayType?: 'exact' | 'random';
+        autoSendDelayMin?: number;
+        autoSendDelayMax?: number;
+        autoSendConfidenceThreshold?: number;
+        autoSendTimeStart?: string;
+        autoSendTimeEnd?: string;
+        autoSendPaused?: boolean;
+      };
+      if (autoSend) {
+        setAutoSendEnabled(autoSend.autoSendEnabled ?? false);
+        setAutoSendDelayType(autoSend.autoSendDelayType ?? 'random');
+        setAutoSendDelayMin(autoSend.autoSendDelayMin ?? 10);
+        setAutoSendDelayMax(autoSend.autoSendDelayMax ?? 30);
+        setAutoSendConfidenceThreshold(autoSend.autoSendConfidenceThreshold ?? 0.85);
+        setAutoSendTimeStart(autoSend.autoSendTimeStart ?? '09:00');
+        setAutoSendTimeEnd(autoSend.autoSendTimeEnd ?? '21:00');
+        setAutoSendPaused(autoSend.autoSendPaused ?? false);
       }
       
       setSettingsInitialized(true);
@@ -295,6 +360,39 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
       toast.error(error.serverError || 'Failed to save setting');
     },
   });
+
+  // Auto-send Settings
+  const { execute: saveAutoSendSettings, status: autoSendStatus } = useAction(updateAutoSendSettingsAction, {
+    onSuccess: () => {
+      toast.success('Auto-reply setting updated', { duration: 2000 });
+    },
+    onError: ({ error }) => {
+      toast.error(error.serverError || 'Failed to save auto-reply setting');
+    },
+  });
+
+  const { execute: pauseAutoSend, status: pauseStatus } = useAction(pauseAutoSendAction, {
+    onSuccess: () => {
+      setAutoSendPaused(true);
+      toast.success('Auto-reply paused', { duration: 3000 });
+    },
+    onError: ({ error }) => {
+      toast.error(error.serverError || 'Failed to pause auto-reply');
+    },
+  });
+
+  const { execute: resumeAutoSend, status: resumeStatus } = useAction(resumeAutoSendAction, {
+    onSuccess: () => {
+      setAutoSendPaused(false);
+      toast.success('Auto-reply resumed', { duration: 3000 });
+    },
+    onError: ({ error }) => {
+      toast.error(error.serverError || 'Failed to resume auto-reply');
+    },
+  });
+
+  // Auto-send timer ref for debounced saves
+  const autoSendSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Auto-save AI settings when switches/selects change
   const triggerAIAutoSave = useCallback((updates: { 
@@ -408,6 +506,74 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
     saveAccountSettings({
       displayName,
     });
+  };
+
+  // Auto-send settings handlers with debounced save
+  const triggerAutoSendSave = useCallback((updates: Partial<{
+    autoSendEnabled: boolean;
+    autoSendDelayType: 'exact' | 'random';
+    autoSendDelayMin: number;
+    autoSendDelayMax: number;
+    autoSendConfidenceThreshold: number;
+    autoSendTimeStart: string;
+    autoSendTimeEnd: string;
+  }>) => {
+    if (!hasInitializedRef.current) return;
+    
+    if (autoSendSaveTimerRef.current) {
+      clearTimeout(autoSendSaveTimerRef.current);
+    }
+    
+    autoSendSaveTimerRef.current = setTimeout(() => {
+      saveAutoSendSettings({
+        workspaceId,
+        ...updates,
+      });
+    }, 800);
+  }, [workspaceId, saveAutoSendSettings]);
+
+  const handleAutoSendToggle = (enabled: boolean) => {
+    setAutoSendEnabled(enabled);
+    triggerAutoSendSave({ autoSendEnabled: enabled });
+  };
+
+  const handleAutoSendDelayTypeChange = (type: 'exact' | 'random') => {
+    setAutoSendDelayType(type);
+    triggerAutoSendSave({ autoSendDelayType: type });
+  };
+
+  const handleAutoSendDelayMinChange = (value: number) => {
+    setAutoSendDelayMin(value);
+    triggerAutoSendSave({ autoSendDelayMin: value });
+  };
+
+  const handleAutoSendDelayMaxChange = (value: number) => {
+    setAutoSendDelayMax(value);
+    triggerAutoSendSave({ autoSendDelayMax: value });
+  };
+
+  const handleAutoSendConfidenceChange = (value: number[]) => {
+    const confidence = value[0] / 100;
+    setAutoSendConfidenceThreshold(confidence);
+    triggerAutoSendSave({ autoSendConfidenceThreshold: confidence });
+  };
+
+  const handleAutoSendTimeStartChange = (value: string) => {
+    setAutoSendTimeStart(value);
+    triggerAutoSendSave({ autoSendTimeStart: value });
+  };
+
+  const handleAutoSendTimeEndChange = (value: string) => {
+    setAutoSendTimeEnd(value);
+    triggerAutoSendSave({ autoSendTimeEnd: value });
+  };
+
+  const handlePauseAutoSend = () => {
+    pauseAutoSend({ workspaceId });
+  };
+
+  const handleResumeAutoSend = () => {
+    resumeAutoSend({ workspaceId });
   };
 
   // Mark as initialized after first data load
@@ -618,6 +784,278 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                       <li>• Custom AI prompts</li>
                     </ul>
                   </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Auto-Reply Settings Card */}
+            <Card className="border-primary/20">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-bold flex items-center gap-2">
+                      <Zap className="h-5 w-5 text-primary" />
+                      Auto-Reply
+                    </CardTitle>
+                    <CardDescription className="text-base">
+                      Configure automatic reply sending for routine messages
+                    </CardDescription>
+                  </div>
+                  {hasPro && (
+                    <Badge variant={autoSendPaused ? 'destructive' : autoSendEnabled ? 'default' : 'secondary'}>
+                      {autoSendPaused ? 'Paused' : autoSendEnabled ? 'Active' : 'Disabled'}
+                    </Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {!hasPro ? (
+                  <div className="flex items-center gap-4 p-4 rounded-lg border border-dashed border-primary/30 bg-primary/5">
+                    <Lock className="h-8 w-8 text-primary/50" />
+                    <div>
+                      <p className="font-medium">Upgrade to Pro for Auto-Reply</p>
+                      <p className="text-sm text-muted-foreground">
+                        Automatically send AI-drafted replies for routine, low-risk messages
+                      </p>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2"
+                        onClick={() => router.push('/settings/billing')}
+                      >
+                        View Plans
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Master Toggle */}
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="auto-send-enabled">Enable Auto-Reply</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Automatically send AI-drafted replies when confidence is high
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {autoSendStatus === 'executing' && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                        <span className="text-sm text-muted-foreground">{autoSendEnabled ? 'On' : 'Off'}</span>
+                        <Switch
+                          id="auto-send-enabled"
+                          checked={autoSendEnabled}
+                          onCheckedChange={handleAutoSendToggle}
+                          disabled={autoSendPaused}
+                        />
+                      </div>
+                    </div>
+
+                    {autoSendEnabled && (
+                      <>
+                        <Separator />
+
+                        {/* Kill Switch */}
+                        {autoSendPaused ? (
+                          <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <AlertTriangle className="h-5 w-5 text-destructive" />
+                                <div>
+                                  <p className="font-medium text-destructive">Auto-Reply Paused</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    All pending auto-sends have been cancelled
+                                  </p>
+                                </div>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleResumeAutoSend}
+                                disabled={resumeStatus === 'executing'}
+                              >
+                                {resumeStatus === 'executing' ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <Play className="h-4 w-4 mr-1" />
+                                    Resume
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                            <div className="flex items-center gap-3">
+                              <Pause className="h-4 w-4 text-muted-foreground" />
+                              <p className="text-sm text-muted-foreground">
+                                Emergency stop: Pause all auto-replies instantly
+                              </p>
+                            </div>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={handlePauseAutoSend}
+                              disabled={pauseStatus === 'executing'}
+                            >
+                              {pauseStatus === 'executing' ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                'Pause All'
+                              )}
+                            </Button>
+                          </div>
+                        )}
+
+                        <Separator />
+
+                        {/* Confidence Threshold */}
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <Label>Confidence Threshold</Label>
+                              <p className="text-sm text-muted-foreground">
+                                Only auto-send when AI confidence is above this level
+                              </p>
+                            </div>
+                            <span className="text-lg font-bold text-primary">
+                              {Math.round(autoSendConfidenceThreshold * 100)}%
+                            </span>
+                          </div>
+                          <Slider
+                            value={[autoSendConfidenceThreshold * 100]}
+                            onValueChange={handleAutoSendConfidenceChange}
+                            min={70}
+                            max={95}
+                            step={5}
+                            className="w-full"
+                          />
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>70% (more auto-sends)</span>
+                            <span>95% (only very confident)</span>
+                          </div>
+                        </div>
+
+                        <Separator />
+
+                        {/* Delay Settings */}
+                        <div className="space-y-4">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-muted-foreground" />
+                              <Label>Sending Delay</Label>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              Wait before sending to allow review time
+                            </p>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="delay-type" className="text-sm">Delay Mode</Label>
+                              <Select value={autoSendDelayType} onValueChange={(v) => handleAutoSendDelayTypeChange(v as 'exact' | 'random')}>
+                                <SelectTrigger id="delay-type">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="exact">Fixed delay</SelectItem>
+                                  <SelectItem value="random">Random range</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {autoSendDelayType === 'exact' ? (
+                              <div className="space-y-2">
+                                <Label htmlFor="delay-min" className="text-sm">Delay (minutes)</Label>
+                                <Select value={String(autoSendDelayMin)} onValueChange={(v) => handleAutoSendDelayMinChange(Number(v))}>
+                                  <SelectTrigger id="delay-min">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {[5, 10, 15, 20, 30, 45, 60].map((min) => (
+                                      <SelectItem key={min} value={String(min)}>
+                                        {min} minutes
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="space-y-2">
+                                  <Label htmlFor="delay-min" className="text-sm">Min delay</Label>
+                                  <Select value={String(autoSendDelayMin)} onValueChange={(v) => handleAutoSendDelayMinChange(Number(v))}>
+                                    <SelectTrigger id="delay-min">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {[5, 10, 15, 20, 30].map((min) => (
+                                        <SelectItem key={min} value={String(min)}>
+                                          {min} min
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </>
+                            )}
+                          </div>
+
+                          {autoSendDelayType === 'random' && (
+                            <div className="grid grid-cols-2 gap-4">
+                              <div /> {/* Spacer */}
+                              <div className="space-y-2">
+                                <Label htmlFor="delay-max" className="text-sm">Max delay</Label>
+                                <Select value={String(autoSendDelayMax)} onValueChange={(v) => handleAutoSendDelayMaxChange(Number(v))}>
+                                  <SelectTrigger id="delay-max">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {[15, 20, 30, 45, 60, 90, 120].filter(max => max > autoSendDelayMin).map((max) => (
+                                      <SelectItem key={max} value={String(max)}>
+                                        {max} min
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <Separator />
+
+                        {/* Time Window */}
+                        <div className="space-y-4">
+                          <div className="space-y-0.5">
+                            <Label>Sending Hours</Label>
+                            <p className="text-sm text-muted-foreground">
+                              Only auto-send during these hours (your timezone)
+                            </p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="time-start" className="text-sm">Start time</Label>
+                              <Input
+                                id="time-start"
+                                type="time"
+                                value={autoSendTimeStart}
+                                onChange={(e) => handleAutoSendTimeStartChange(e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="time-end" className="text-sm">End time</Label>
+                              <Input
+                                id="time-end"
+                                type="time"
+                                value={autoSendTimeEnd}
+                                onChange={(e) => handleAutoSendTimeEndChange(e.target.value)}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>

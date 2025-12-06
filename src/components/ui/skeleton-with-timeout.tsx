@@ -51,10 +51,10 @@ export function SkeletonWithTimeout({
 
       {/* Spinner overlay (visible while loading, before timeout) */}
       {showSpinner && !timedOut && (
-        <div className="absolute top-4 right-4 z-10">
-          <div className="flex items-center gap-2 bg-background/95 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm border border-border/50">
-            <Loader2 className="h-4 w-4 animate-spin text-primary" />
-            <span className="text-xs text-muted-foreground">Loading...</span>
+        <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+          <div className="flex items-center gap-2 bg-background/95 backdrop-blur-sm rounded-full px-4 py-2 shadow-md border border-border/50">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <span className="text-sm text-muted-foreground">Loading...</span>
           </div>
         </div>
       )}

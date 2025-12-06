@@ -380,6 +380,29 @@ IMPORTANT: Always return valid, complete JSON. Keep replies concise.`,
       })
       .eq("id", messageId);
 
+    // Check if draft is auto-sendable and queue for auto-send
+    if (draft && result.isAutoSendable && result.confidenceScore >= 0.85) {
+      try {
+        const { queueAutoSend } = await import('@/lib/workers/auto-send-worker');
+        const queueResult = await queueAutoSend(
+          workspaceId,
+          messageId,
+          draft.id,
+          message.connection_id,
+          result.confidenceScore
+        );
+        
+        if (queueResult.queued) {
+          console.log('[AI Reply] Draft queued for auto-send at:', queueResult.scheduledAt);
+        } else {
+          console.log('[AI Reply] Auto-send not queued:', queueResult.reason);
+        }
+      } catch (autoSendError) {
+        // Don't fail the whole operation if auto-send queueing fails
+        console.error('[AI Reply] Failed to queue auto-send:', autoSendError);
+      }
+    }
+
     // Log AI action
     await supabase.from("ai_action_logs").insert({
       workspace_id: workspaceId,

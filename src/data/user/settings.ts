@@ -48,6 +48,27 @@ const updateSyncSettingsSchema = z.object({
   syncFrequency: z.number().optional(),
 });
 
+// Auto-Send Settings Schemas
+const updateAutoSendSettingsSchema = z.object({
+  workspaceId: z.string().uuid(),
+  autoSendEnabled: z.boolean().optional(),
+  autoSendDelayType: z.enum(['exact', 'random']).optional(),
+  autoSendDelayMin: z.number().min(1).max(120).optional(),
+  autoSendDelayMax: z.number().min(1).max(120).optional(),
+  autoSendConfidenceThreshold: z.number().min(0.70).max(0.95).optional(),
+  autoSendTimeStart: z.string().optional(), // "HH:MM" format
+  autoSendTimeEnd: z.string().optional(),   // "HH:MM" format
+});
+
+const pauseAutoSendSchema = z.object({
+  workspaceId: z.string().uuid(),
+});
+
+const cancelScheduledSendSchema = z.object({
+  workspaceId: z.string().uuid(),
+  queueId: z.string().uuid(),
+});
+
 // ============================================================================
 // AI SETTINGS
 // ============================================================================
@@ -294,6 +315,255 @@ export const updateSyncSettingsAction = authActionClient
     revalidatePath(`/settings`);
     return { success: true };
   });
+
+// ============================================================================
+// AUTO-SEND SETTINGS
+// ============================================================================
+
+export const updateAutoSendSettingsAction = authActionClient
+  .schema(updateAutoSendSettingsSchema)
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    const { workspaceId, ...settings } = parsedInput;
+
+    const isMember = await isWorkspaceMember(userId, workspaceId);
+    if (!isMember) throw new Error('Not a workspace member');
+
+    const supabase = await createSupabaseUserServerActionClient();
+
+    // Build update object with only provided fields
+    const updateData: Record<string, any> = {};
+    
+    if (settings.autoSendEnabled !== undefined) {
+      updateData.auto_send_enabled = settings.autoSendEnabled;
+    }
+    if (settings.autoSendDelayType !== undefined) {
+      updateData.auto_send_delay_type = settings.autoSendDelayType;
+    }
+    if (settings.autoSendDelayMin !== undefined) {
+      updateData.auto_send_delay_min = settings.autoSendDelayMin;
+    }
+    if (settings.autoSendDelayMax !== undefined) {
+      updateData.auto_send_delay_max = settings.autoSendDelayMax;
+    }
+    if (settings.autoSendConfidenceThreshold !== undefined) {
+      updateData.auto_send_confidence_threshold = settings.autoSendConfidenceThreshold;
+    }
+    if (settings.autoSendTimeStart !== undefined) {
+      updateData.auto_send_time_start = settings.autoSendTimeStart;
+    }
+    if (settings.autoSendTimeEnd !== undefined) {
+      updateData.auto_send_time_end = settings.autoSendTimeEnd;
+    }
+
+    // If enabling, ensure paused is false
+    if (settings.autoSendEnabled === true) {
+      updateData.auto_send_paused = false;
+      updateData.auto_send_paused_at = null;
+    }
+
+    const { error } = await supabase
+      .from('workspace_settings')
+      .update(updateData)
+      .eq('workspace_id', workspaceId);
+
+    if (error) throw new Error(error.message);
+
+    revalidatePath(`/settings`);
+    return { success: true };
+  });
+
+export const pauseAutoSendAction = authActionClient
+  .schema(pauseAutoSendSchema)
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    const { workspaceId } = parsedInput;
+
+    const isMember = await isWorkspaceMember(userId, workspaceId);
+    if (!isMember) throw new Error('Not a workspace member');
+
+    const supabase = await createSupabaseUserServerActionClient();
+
+    // Set paused flag
+    const { error: settingsError } = await supabase
+      .from('workspace_settings')
+      .update({
+        auto_send_paused: true,
+        auto_send_paused_at: new Date().toISOString(),
+      })
+      .eq('workspace_id', workspaceId);
+
+    if (settingsError) throw new Error(settingsError.message);
+
+    // Cancel all pending items in queue
+    const { error: queueError } = await supabase
+      .from('auto_send_queue')
+      .update({ status: 'cancelled' })
+      .eq('workspace_id', workspaceId)
+      .eq('status', 'pending');
+
+    if (queueError) {
+      console.error('Failed to cancel queued items:', queueError);
+    }
+
+    // Log the pause action
+    await supabase.from('auto_send_log').insert({
+      workspace_id: workspaceId,
+      action: 'paused',
+      details: { reason: 'manual_kill_switch' },
+    });
+
+    revalidatePath(`/settings`);
+    return { success: true, paused: true };
+  });
+
+export const resumeAutoSendAction = authActionClient
+  .schema(pauseAutoSendSchema)
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    const { workspaceId } = parsedInput;
+
+    const isMember = await isWorkspaceMember(userId, workspaceId);
+    if (!isMember) throw new Error('Not a workspace member');
+
+    const supabase = await createSupabaseUserServerActionClient();
+
+    const { error } = await supabase
+      .from('workspace_settings')
+      .update({
+        auto_send_paused: false,
+        auto_send_paused_at: null,
+      })
+      .eq('workspace_id', workspaceId);
+
+    if (error) throw new Error(error.message);
+
+    revalidatePath(`/settings`);
+    return { success: true, paused: false };
+  });
+
+export const cancelScheduledSendAction = authActionClient
+  .schema(cancelScheduledSendSchema)
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    const { workspaceId, queueId } = parsedInput;
+
+    const isMember = await isWorkspaceMember(userId, workspaceId);
+    if (!isMember) throw new Error('Not a workspace member');
+
+    const supabase = await createSupabaseUserServerActionClient();
+
+    // Get the queue item to log details
+    const { data: queueItem } = await supabase
+      .from('auto_send_queue')
+      .select('message_id, draft_id, confidence_score')
+      .eq('id', queueId)
+      .eq('workspace_id', workspaceId)
+      .single();
+
+    // Update status to cancelled
+    const { error } = await supabase
+      .from('auto_send_queue')
+      .update({ status: 'cancelled' })
+      .eq('id', queueId)
+      .eq('workspace_id', workspaceId)
+      .eq('status', 'pending'); // Only cancel if still pending
+
+    if (error) throw new Error(error.message);
+
+    // Log the cancellation
+    if (queueItem) {
+      await supabase.from('auto_send_log').insert({
+        workspace_id: workspaceId,
+        queue_id: queueId,
+        message_id: queueItem.message_id,
+        draft_id: queueItem.draft_id,
+        action: 'cancelled',
+        confidence_score: queueItem.confidence_score,
+        details: { reason: 'user_cancelled' },
+      });
+    }
+
+    revalidatePath(`/settings`);
+    return { success: true };
+  });
+
+// Get auto-send queue for a workspace
+export async function getAutoSendQueue(workspaceId: string, userId: string) {
+  const isMember = await isWorkspaceMember(userId, workspaceId);
+  if (!isMember) throw new Error('Not a workspace member');
+
+  const supabase = await createSupabaseUserServerActionClient();
+
+  const { data, error } = await supabase
+    .from('auto_send_queue')
+    .select(`
+      *,
+      message:messages(subject, sender_email, sender_name),
+      draft:message_drafts(body)
+    `)
+    .eq('workspace_id', workspaceId)
+    .order('scheduled_send_at', { ascending: true })
+    .limit(50);
+
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+// Get auto-send settings for a workspace
+export async function getAutoSendSettings(workspaceId: string, userId: string) {
+  const isMember = await isWorkspaceMember(userId, workspaceId);
+  if (!isMember) throw new Error('Not a workspace member');
+
+  const supabase = await createSupabaseUserServerActionClient();
+
+  const { data, error } = await supabase
+    .from('workspace_settings')
+    .select(`
+      auto_send_enabled,
+      auto_send_delay_type,
+      auto_send_delay_min,
+      auto_send_delay_max,
+      auto_send_confidence_threshold,
+      auto_send_time_start,
+      auto_send_time_end,
+      auto_send_paused,
+      auto_send_paused_at
+    `)
+    .eq('workspace_id', workspaceId)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    throw new Error(error.message);
+  }
+
+  // Return defaults if no settings found
+  return {
+    autoSendEnabled: data?.auto_send_enabled ?? false,
+    autoSendDelayType: data?.auto_send_delay_type ?? 'random',
+    autoSendDelayMin: data?.auto_send_delay_min ?? 10,
+    autoSendDelayMax: data?.auto_send_delay_max ?? 30,
+    autoSendConfidenceThreshold: data?.auto_send_confidence_threshold ?? 0.85,
+    autoSendTimeStart: data?.auto_send_time_start ?? '09:00',
+    autoSendTimeEnd: data?.auto_send_time_end ?? '21:00',
+    autoSendPaused: data?.auto_send_paused ?? false,
+    autoSendPausedAt: data?.auto_send_paused_at,
+  };
+}
+
+// Get recent auto-send log entries
+export async function getAutoSendLog(workspaceId: string, userId: string, limit = 20) {
+  const isMember = await isWorkspaceMember(userId, workspaceId);
+  if (!isMember) throw new Error('Not a workspace member');
+
+  const supabase = await createSupabaseUserServerActionClient();
+
+  const { data, error } = await supabase
+    .from('auto_send_log')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw new Error(error.message);
+  return data || [];
+}
 
 // ============================================================================
 // GET SETTINGS
