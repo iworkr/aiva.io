@@ -388,7 +388,7 @@ IMPORTANT: Always return valid, complete JSON. Keep replies concise.`,
           workspaceId,
           messageId,
           draft.id,
-          message.connection_id,
+          message.channel_connection_id,
           result.confidenceScore
         );
         

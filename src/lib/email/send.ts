@@ -3,8 +3,8 @@
  * Used for auto-send replies and manual send functionality
  */
 
-import { createSupabaseServerAdminClient } from '@/supabase-clients/admin/createSupabaseServerAdminClient';
-import { refreshGoogleToken } from '@/lib/gmail/gmail-auth';
+import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
+import { refreshGmailToken } from '@/lib/gmail/client';
 
 interface SendEmailResult {
   success: boolean;
@@ -34,11 +34,11 @@ async function getConnectionCredentials(connectionId: string): Promise<{
   accessToken: string;
   email: string;
 } | null> {
-  const supabase = await createSupabaseServerAdminClient();
+  const supabase = supabaseAdminClient;
 
   const { data: connection, error } = await supabase
     .from('channel_connections')
-    .select('provider, credentials, email_address')
+    .select('provider, access_token, refresh_token, token_expires_at, provider_account_name, metadata')
     .eq('id', connectionId)
     .single();
 
@@ -47,29 +47,16 @@ async function getConnectionCredentials(connectionId: string): Promise<{
     return null;
   }
 
-  const credentials = connection.credentials as any;
-  let accessToken = credentials.access_token;
+  let accessToken = connection.access_token;
 
   // Check if token needs refresh (Gmail)
-  if (connection.provider === 'gmail' && credentials.refresh_token) {
-    const expiresAt = credentials.expires_at;
-    if (expiresAt && Date.now() >= (expiresAt - 60000)) {
+  if (connection.provider === 'gmail' && connection.refresh_token) {
+    const expiresAt = connection.token_expires_at;
+    if (expiresAt && Date.now() >= (new Date(expiresAt).getTime() - 60000)) {
       // Token expired or expires in less than 1 minute, refresh it
       try {
-        const refreshed = await refreshGoogleToken(credentials.refresh_token);
-        accessToken = refreshed.access_token;
-
-        // Update stored credentials
-        await supabase
-          .from('channel_connections')
-          .update({
-            credentials: {
-              ...credentials,
-              access_token: refreshed.access_token,
-              expires_at: refreshed.expires_at,
-            },
-          })
-          .eq('id', connectionId);
+        // refreshGmailToken updates the database directly and returns the new access token
+        accessToken = await refreshGmailToken(connectionId, connection.refresh_token);
       } catch (refreshError) {
         console.error('Failed to refresh token:', refreshError);
         return null;
@@ -77,10 +64,14 @@ async function getConnectionCredentials(connectionId: string): Promise<{
     }
   }
 
+  // Get email from provider_account_name or metadata
+  const metadata = connection.metadata as Record<string, any> | null;
+  const email = connection.provider_account_name || metadata?.email || '';
+
   return {
     provider: connection.provider,
     accessToken,
-    email: connection.email_address || '',
+    email,
   };
 }
 

@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseServerAdminClient } from '@/supabase-clients/admin/createSupabaseServerAdminClient';
+import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
 import { sendReply } from '@/lib/email/send';
 import { getWorkspaceAutoSendSettings, updateQueueItemStatus } from '@/lib/workers/auto-send-worker';
 
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = await createSupabaseServerAdminClient();
+  const supabase = supabaseAdminClient;
   const startTime = Date.now();
   const results = {
     processed: 0,
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
         // Get the draft content
         const { data: draft, error: draftError } = await supabase
           .from('message_drafts')
-          .select('body, subject')
+          .select('body')
           .eq('id', item.draft_id)
           .single();
 
@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
         // Get the original message for threading info
         const { data: message, error: messageError } = await supabase
           .from('messages')
-          .select('external_id, thread_id, sender_email, subject, metadata')
+          .select('provider_message_id, provider_thread_id, sender_email, subject, raw_data')
           .eq('id', item.message_id)
           .single();
 
@@ -165,20 +165,21 @@ export async function GET(request: NextRequest) {
           continue;
         }
 
-        // Prepare reply subject
-        const replySubject = draft.subject || 
-          (message.subject?.startsWith('Re:') ? message.subject : `Re: ${message.subject || 'No Subject'}`);
+        // Prepare reply subject - always based on original message
+        const replySubject = message.subject?.startsWith('Re:') 
+          ? message.subject 
+          : `Re: ${message.subject || 'No Subject'}`;
 
         // Get message headers for threading
-        const metadata = message.metadata as any;
-        const messageIdHeader = metadata?.messageId || metadata?.internetMessageId;
-        const references = metadata?.references;
+        const rawData = message.raw_data as any;
+        const messageIdHeader = rawData?.messageId || rawData?.internetMessageId;
+        const references = rawData?.references;
 
         // Send the reply
         const sendResult = await sendReply({
           connectionId: item.connection_id,
-          originalMessageId: message.external_id,
-          threadId: message.thread_id,
+          originalMessageId: message.provider_message_id,
+          threadId: message.provider_thread_id || '',
           to: [message.sender_email],
           subject: replySubject,
           body: draft.body,
@@ -208,7 +209,7 @@ export async function GET(request: NextRequest) {
           // Update draft status
           await supabase
             .from('message_drafts')
-            .update({ status: 'sent', sent_at: new Date().toISOString() })
+            .update({ auto_sent: true, auto_sent_at: new Date().toISOString() })
             .eq('id', item.draft_id);
 
           results.sent++;
@@ -226,7 +227,7 @@ export async function GET(request: NextRequest) {
             confidence_score: item.confidence_score,
             details: {
               error: sendResult.error,
-              attempt: item.attempts + 1,
+              attempt: (item.attempts ?? 0) + 1,
             },
           });
 

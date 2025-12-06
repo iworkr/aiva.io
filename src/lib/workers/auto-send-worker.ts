@@ -3,8 +3,7 @@
  * Manages queueing and scheduling of auto-send messages
  */
 
-import { createSupabaseUserServerActionClient } from '@/supabase-clients/user/createSupabaseUserServerActionClient';
-import { createSupabaseServerAdminClient } from '@/supabase-clients/admin/createSupabaseServerAdminClient';
+import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
 
 export interface AutoSendSettings {
   autoSendEnabled: boolean;
@@ -110,7 +109,7 @@ function adjustToSendingWindow(
  * Get workspace auto-send settings
  */
 export async function getWorkspaceAutoSendSettings(workspaceId: string): Promise<AutoSendSettings | null> {
-  const supabase = await createSupabaseServerAdminClient();
+  const supabase = supabaseAdminClient;
 
   const { data, error } = await supabase
     .from('workspace_settings')
@@ -133,7 +132,7 @@ export async function getWorkspaceAutoSendSettings(workspaceId: string): Promise
 
   return {
     autoSendEnabled: data.auto_send_enabled ?? false,
-    autoSendDelayType: data.auto_send_delay_type ?? 'random',
+    autoSendDelayType: (data.auto_send_delay_type ?? 'random') as 'exact' | 'random',
     autoSendDelayMin: data.auto_send_delay_min ?? 10,
     autoSendDelayMax: data.auto_send_delay_max ?? 30,
     autoSendConfidenceThreshold: data.auto_send_confidence_threshold ?? 0.85,
@@ -153,7 +152,7 @@ export async function queueAutoSend(
   connectionId: string,
   confidenceScore: number
 ): Promise<QueueAutoSendResult> {
-  const supabase = await createSupabaseServerAdminClient();
+  const supabase = supabaseAdminClient;
 
   // Get workspace settings
   const settings = await getWorkspaceAutoSendSettings(workspaceId);
@@ -281,7 +280,7 @@ export function isMessageAutoSendable(message: {
  * Get pending items in the auto-send queue that are ready to be sent
  */
 export async function getPendingAutoSends(limit = 50): Promise<any[]> {
-  const supabase = await createSupabaseServerAdminClient();
+  const supabase = supabaseAdminClient;
 
   const { data, error } = await supabase
     .from('auto_send_queue')
@@ -316,7 +315,7 @@ export async function updateQueueItemStatus(
     sentMessageId?: string;
   }
 ): Promise<void> {
-  const supabase = await createSupabaseServerAdminClient();
+  const supabase = supabaseAdminClient;
 
   const update: Record<string, any> = {
     status,
