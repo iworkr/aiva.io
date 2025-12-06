@@ -90,30 +90,37 @@ export async function syncGmailMessages(
     let syncedCount = 0;
     let newCount = 0;
     let errorCount = 0;
+    let skippedCount = 0;
 
-    // Fetch and store each message
+    // First, check which messages already exist in our database to avoid unnecessary API calls
+    const messageIds = messagesList.messages.map((m: any) => m.id);
+    const { data: existingMessages } = await supabase
+      .from("messages")
+      .select("provider_message_id")
+      .eq("channel_connection_id", connectionId)
+      .in("provider_message_id", messageIds);
+    
+    const existingIds = new Set((existingMessages || []).map(m => m.provider_message_id));
+    
+    console.log(`📥 Checking ${messageIds.length} messages, ${existingIds.size} already synced`);
+
+    // Fetch and store only NEW messages (not already in database)
     for (const messageRef of messagesList.messages) {
+      // Skip if message already exists - BEFORE making API call
+      if (existingIds.has(messageRef.id)) {
+        skippedCount++;
+        syncedCount++;
+        continue;
+      }
+
       try {
-        // Get full message details
+        // Get full message details - only for NEW messages
         const gmailMessage = await getGmailMessage(accessToken, messageRef.id);
 
         // Parse to normalized format
         const parsed = parseGmailMessage(gmailMessage);
 
-        // Check if message already exists
-        const { data: existing } = await supabase
-          .from("messages")
-          .select("id")
-          .eq("channel_connection_id", connectionId)
-          .eq("provider_message_id", parsed.providerMessageId)
-          .single();
-
-        if (existing) {
-          syncedCount++;
-          continue; // Skip if already exists
-        }
-
-        // Store message in database directly (system sync, not user-initiated action)
+        // Store message in database directly (no need to check exists - we already did above)
         const { data: inserted, error: insertError } = await supabase
           .from("messages")
           .insert({
@@ -181,14 +188,17 @@ export async function syncGmailMessages(
       })
       .eq("id", connectionId);
 
+    console.log(`📥 Gmail sync complete: ${newCount} new, ${skippedCount} skipped (already synced), ${errorCount} errors`);
+    
     return {
       success: true,
       syncedCount,
       newCount,
+      skippedCount,
       errorCount,
       hasMore: !!messagesList.nextPageToken,
       nextPageToken: messagesList.nextPageToken,
-      message: `Synced ${syncedCount} messages (${newCount} new, ${errorCount} errors)`,
+      message: `Synced ${syncedCount} messages (${newCount} new, ${skippedCount} skipped, ${errorCount} errors)`,
     };
   } catch (error) {
     console.error("Gmail sync error:", error);
