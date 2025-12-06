@@ -107,9 +107,11 @@ export async function syncWorkspaceInBackground(
   options: BackgroundSyncOptions = {}
 ): Promise<BackgroundSyncResult> {
   try {
+    // Use admin client since this is called from background jobs without user context
     const result = await syncAllWorkspaceConnections(workspaceId, {
       maxMessagesPerConnection: options.maxMessages || 50,
       autoClassify: options.autoClassify ?? true,
+      useAdminClient: true, // Critical: use admin client for background sync
     });
 
     return {

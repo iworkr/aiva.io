@@ -323,6 +323,7 @@ export async function syncAllWorkspaceConnections(
   options: {
     maxMessagesPerConnection?: number;
     autoClassify?: boolean;
+    useAdminClient?: boolean; // Use admin client for background/cron jobs
   } = {}
 ): Promise<{
   success: boolean;
@@ -330,7 +331,11 @@ export async function syncAllWorkspaceConnections(
   totalNewMessages: number;
   results: SyncResult[];
 }> {
-  const supabase = await createSupabaseUserServerActionClient();
+  // Use admin client for background jobs (cron, webhooks) that don't have user context
+  // Use user client for user-initiated syncs (manual sync button)
+  const supabase = options.useAdminClient 
+    ? supabaseAdminClient 
+    : await createSupabaseUserServerActionClient();
 
   // Get all active connections for workspace
   const { data: connections, error } = await supabase
@@ -338,6 +343,12 @@ export async function syncAllWorkspaceConnections(
     .select('id, provider, provider_account_name')
     .eq('workspace_id', workspaceId)
     .eq('status', 'active');
+  
+  console.log(`📡 syncAllWorkspaceConnections for workspace ${workspaceId}:`, {
+    connectionsFound: connections?.length || 0,
+    error: error?.message,
+    useAdminClient: options.useAdminClient,
+  });
 
   if (error || !connections || connections.length === 0) {
     return {
@@ -368,6 +379,7 @@ export async function syncAllWorkspaceConnections(
       {
         maxMessages: options.maxMessagesPerConnection || 50,
         autoClassify: options.autoClassify,
+        useAdminClient: options.useAdminClient, // Pass through for background jobs
       },
       {
         baseProgress,
@@ -417,6 +429,7 @@ async function syncChannelConnectionWithProgress(
   options: {
     maxMessages?: number;
     autoClassify?: boolean;
+    useAdminClient?: boolean;
   },
   progressContext: {
     baseProgress: number;
@@ -427,7 +440,10 @@ async function syncChannelConnectionWithProgress(
     cumulativeClassified: number;
   }
 ): Promise<SyncResult> {
-  const supabase = await createSupabaseUserServerActionClient();
+  // Use admin client for background jobs without user context
+  const supabase = options.useAdminClient 
+    ? supabaseAdminClient 
+    : await createSupabaseUserServerActionClient();
   const { baseProgress, connectionWeight, connectionIndex, totalConnections, cumulativeSynced, cumulativeClassified } = progressContext;
 
   // Helper to calculate and broadcast progress within this connection's weight
