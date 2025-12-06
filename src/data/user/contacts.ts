@@ -7,6 +7,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createSupabaseUserServerActionClient } from '@/supabase-clients/user/createSupabaseUserServerActionClient';
+import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
 import { authActionClient } from '@/lib/safe-action';
 import {
   createContactSchema,
@@ -612,6 +613,8 @@ export async function findOrCreateContactFromChannel(
  * This ensures that:
  * - Same person across channels (Gmail, Instagram, etc.) is linked to one contact
  * - All communication history is unified under one contact
+ * 
+ * @param options.useAdminClient - Use admin client for background jobs (cron, webhooks)
  */
 export async function findOrCreateContactFromMessage(
   workspaceId: string,
@@ -619,12 +622,19 @@ export async function findOrCreateContactFromMessage(
   channelType: string,
   senderEmail: string | null,
   senderName: string | null,
-  channelId?: string // For non-email channels (Instagram username, phone number, etc.)
+  channelId?: string, // For non-email channels (Instagram username, phone number, etc.)
+  options: { useAdminClient?: boolean } = {}
 ): Promise<{ contactId: string; isNew: boolean }> {
-  const isMember = await isWorkspaceMember(userId, workspaceId);
-  if (!isMember) throw new Error('Not a workspace member');
+  // Skip member check for background jobs that use admin client
+  if (!options.useAdminClient) {
+    const isMember = await isWorkspaceMember(userId, workspaceId);
+    if (!isMember) throw new Error('Not a workspace member');
+  }
 
-  const supabase = await createSupabaseUserServerActionClient();
+  // Use admin client for background jobs that don't have user context
+  const supabase = options.useAdminClient 
+    ? supabaseAdminClient 
+    : await createSupabaseUserServerActionClient();
 
   // Normalize email for matching (lowercase, trim)
   const normalizedEmail = senderEmail?.toLowerCase().trim() || null;

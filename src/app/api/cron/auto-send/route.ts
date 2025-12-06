@@ -16,12 +16,16 @@ export const runtime = 'nodejs';
 export const maxDuration = 60; // 60 second timeout
 
 export async function GET(request: NextRequest) {
+  console.log('📤 Auto-send cron job started');
+  
   // Verify cron authorization
   const authHeader = request.headers.get('authorization');
   if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
-    console.log('Unauthorized auto-send cron attempt');
+    console.log('❌ Unauthorized auto-send cron attempt');
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  
+  console.log('✅ Auto-send cron authorized');
 
   const supabase = supabaseAdminClient;
   const startTime = Date.now();
@@ -34,7 +38,26 @@ export async function GET(request: NextRequest) {
   };
 
   try {
-    // Get pending items that are ready to send
+    // Step 1: Check workspace settings first
+    console.log('📊 Checking workspace auto-send settings...');
+    const { data: allSettings, error: settingsError } = await supabase
+      .from('workspace_settings')
+      .select('workspace_id, auto_send_enabled, auto_send_paused, auto_send_confidence_threshold, auto_send_time_start, auto_send_time_end');
+    
+    if (settingsError) {
+      console.error('❌ Failed to fetch workspace settings:', settingsError);
+    } else {
+      console.log('📋 Workspace auto-send settings:');
+      allSettings?.forEach((s, i) => {
+        console.log(`   ${i + 1}. Workspace ${s.workspace_id?.substring(0, 8)}... - Enabled: ${s.auto_send_enabled}, Paused: ${s.auto_send_paused}, Threshold: ${s.auto_send_confidence_threshold}`);
+      });
+      
+      const enabledCount = allSettings?.filter(s => s.auto_send_enabled && !s.auto_send_paused).length || 0;
+      console.log(`📊 ${enabledCount}/${allSettings?.length || 0} workspaces have auto-send enabled and not paused`);
+    }
+
+    // Step 2: Get pending items that are ready to send
+    console.log('📥 Fetching pending auto-send queue items...');
     const { data: pendingItems, error: fetchError } = await supabase
       .from('auto_send_queue')
       .select(`
@@ -45,47 +68,80 @@ export async function GET(request: NextRequest) {
         connection_id,
         scheduled_send_at,
         attempts,
-        confidence_score
+        confidence_score,
+        status,
+        created_at
       `)
       .eq('status', 'pending')
       .lte('scheduled_send_at', new Date().toISOString())
       .lt('attempts', 3)
       .order('scheduled_send_at', { ascending: true })
-      .limit(20); // Process up to 20 items per run
+      .limit(20);
 
     if (fetchError) {
-      console.error('Failed to fetch pending auto-sends:', fetchError);
+      console.error('❌ Failed to fetch pending auto-sends:', fetchError);
       return NextResponse.json({ 
         error: 'Failed to fetch pending items',
         details: fetchError.message 
       }, { status: 500 });
     }
 
+    // Also check total queue status
+    const { data: allQueueItems } = await supabase
+      .from('auto_send_queue')
+      .select('status, confidence_score, scheduled_send_at')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    
+    if (allQueueItems && allQueueItems.length > 0) {
+      const statusCounts = allQueueItems.reduce((acc, item) => {
+        const status = item.status || 'unknown';
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      console.log('📊 Queue status breakdown:', statusCounts);
+    } else {
+      console.log('📊 Auto-send queue is empty');
+    }
+
     if (!pendingItems || pendingItems.length === 0) {
+      console.log('ℹ️ No pending auto-sends ready to process');
+      console.log(`   (Queue checked at: ${new Date().toISOString()})`);
       return NextResponse.json({ 
         message: 'No pending auto-sends',
+        queueStatus: allQueueItems?.length ? 'items exist but not ready' : 'empty',
         ...results,
         duration: Date.now() - startTime 
       });
     }
 
-    console.log(`Processing ${pendingItems.length} auto-send items`);
+    console.log(`📋 Found ${pendingItems.length} pending auto-send items ready to process:`);
+    pendingItems.forEach((item, i) => {
+      console.log(`   ${i + 1}. Queue ID: ${item.id?.substring(0, 8)}...`);
+      console.log(`      Message: ${item.message_id?.substring(0, 8)}..., Draft: ${item.draft_id?.substring(0, 8)}...`);
+      console.log(`      Confidence: ${((item.confidence_score ?? 0) * 100).toFixed(1)}%, Attempts: ${item.attempts ?? 0}`);
+      console.log(`      Scheduled: ${item.scheduled_send_at}, Created: ${item.created_at}`);
+    });
 
     // Process each item
     for (const item of pendingItems) {
       results.processed++;
+      console.log(`\n🔄 Processing queue item ${results.processed}/${pendingItems.length}: ${item.id?.substring(0, 8)}...`);
 
       try {
         // Get workspace settings to check if auto-send is still enabled/not paused
+        console.log(`   📊 Checking workspace ${item.workspace_id?.substring(0, 8)}... settings...`);
         const settings = await getWorkspaceAutoSendSettings(item.workspace_id);
         
+        console.log(`   📋 Settings: enabled=${settings?.autoSendEnabled}, paused=${settings?.autoSendPaused}, threshold=${settings?.autoSendConfidenceThreshold}`);
+        
         if (!settings || !settings.autoSendEnabled || settings.autoSendPaused) {
-          // Auto-send disabled or paused, skip this item
+          console.log(`   ⏭️ Skipping: Auto-send ${!settings ? 'not configured' : settings.autoSendPaused ? 'paused' : 'disabled'}`);
+          
           await updateQueueItemStatus(item.id, 'cancelled', {
             errorMessage: 'Auto-send disabled or paused',
           });
           
-          // Log the skip
           await supabase.from('auto_send_log').insert({
             workspace_id: item.workspace_id,
             message_id: item.message_id,
@@ -101,9 +157,12 @@ export async function GET(request: NextRequest) {
 
         // Check time window
         const now = new Date();
-        if (!isWithinTimeWindow(now, settings.autoSendTimeStart, settings.autoSendTimeEnd)) {
-          // Outside time window, reschedule for next window
+        const withinWindow = isWithinTimeWindow(now, settings.autoSendTimeStart, settings.autoSendTimeEnd);
+        console.log(`   🕐 Time window check: ${settings.autoSendTimeStart}-${settings.autoSendTimeEnd}, Current: ${now.toTimeString().substring(0, 5)}, Within: ${withinWindow}`);
+        
+        if (!withinWindow) {
           const nextWindow = getNextWindowStart(settings.autoSendTimeStart);
+          console.log(`   ⏭️ Outside time window, rescheduling to: ${nextWindow.toISOString()}`);
           
           await supabase
             .from('auto_send_queue')
@@ -115,9 +174,11 @@ export async function GET(request: NextRequest) {
         }
 
         // Mark as processing
+        console.log(`   ⚙️ Marking as processing...`);
         await updateQueueItemStatus(item.id, 'processing');
 
         // Get the draft content
+        console.log(`   📝 Fetching draft ${item.draft_id?.substring(0, 8)}...`);
         const { data: draft, error: draftError } = await supabase
           .from('message_drafts')
           .select('body')
@@ -125,6 +186,7 @@ export async function GET(request: NextRequest) {
           .single();
 
         if (draftError || !draft) {
+          console.log(`   ❌ Draft not found: ${draftError?.message}`);
           await updateQueueItemStatus(item.id, 'failed', {
             errorMessage: 'Draft not found',
           });
@@ -132,8 +194,10 @@ export async function GET(request: NextRequest) {
           results.errors.push(`Draft not found for queue item ${item.id}`);
           continue;
         }
+        console.log(`   ✅ Draft found, body length: ${draft.body?.length || 0} chars`);
 
         // Get the original message for threading info
+        console.log(`   📧 Fetching original message ${item.message_id?.substring(0, 8)}...`);
         const { data: message, error: messageError } = await supabase
           .from('messages')
           .select('provider_message_id, provider_thread_id, sender_email, subject, raw_data')
@@ -141,6 +205,7 @@ export async function GET(request: NextRequest) {
           .single();
 
         if (messageError || !message) {
+          console.log(`   ❌ Message not found: ${messageError?.message}`);
           await updateQueueItemStatus(item.id, 'failed', {
             errorMessage: 'Original message not found',
           });
@@ -148,15 +213,18 @@ export async function GET(request: NextRequest) {
           results.errors.push(`Message not found for queue item ${item.id}`);
           continue;
         }
+        console.log(`   ✅ Message found: "${message.subject?.substring(0, 40)}..." from ${message.sender_email}`);
 
         // Get connection for provider info
+        console.log(`   🔗 Fetching connection ${item.connection_id?.substring(0, 8)}...`);
         const { data: connection, error: connError } = await supabase
           .from('channel_connections')
-          .select('provider')
+          .select('provider, provider_account_name')
           .eq('id', item.connection_id)
           .single();
 
         if (connError || !connection) {
+          console.log(`   ❌ Connection not found: ${connError?.message}`);
           await updateQueueItemStatus(item.id, 'failed', {
             errorMessage: 'Connection not found',
           });
@@ -164,8 +232,9 @@ export async function GET(request: NextRequest) {
           results.errors.push(`Connection not found for queue item ${item.id}`);
           continue;
         }
+        console.log(`   ✅ Connection: ${connection.provider} (${connection.provider_account_name})`);
 
-        // Prepare reply subject - always based on original message
+        // Prepare reply subject
         const replySubject = message.subject?.startsWith('Re:') 
           ? message.subject 
           : `Re: ${message.subject || 'No Subject'}`;
@@ -174,6 +243,10 @@ export async function GET(request: NextRequest) {
         const rawData = message.raw_data as any;
         const messageIdHeader = rawData?.messageId || rawData?.internetMessageId;
         const references = rawData?.references;
+
+        console.log(`   📤 Sending reply to: ${message.sender_email}`);
+        console.log(`      Subject: ${replySubject}`);
+        console.log(`      Via: ${connection.provider}`);
 
         // Send the reply
         const sendResult = await sendReply({
@@ -188,11 +261,12 @@ export async function GET(request: NextRequest) {
         });
 
         if (sendResult.success) {
+          console.log(`   ✅ Reply sent successfully! Message ID: ${sendResult.messageId}`);
+          
           await updateQueueItemStatus(item.id, 'sent', {
             sentMessageId: sendResult.messageId,
           });
 
-          // Log success
           await supabase.from('auto_send_log').insert({
             workspace_id: item.workspace_id,
             message_id: item.message_id,
@@ -206,7 +280,6 @@ export async function GET(request: NextRequest) {
             },
           });
 
-          // Update draft status
           await supabase
             .from('message_drafts')
             .update({ auto_sent: true, auto_sent_at: new Date().toISOString() })
@@ -214,11 +287,12 @@ export async function GET(request: NextRequest) {
 
           results.sent++;
         } else {
+          console.log(`   ❌ Send failed: ${sendResult.error}`);
+          
           await updateQueueItemStatus(item.id, 'failed', {
             errorMessage: sendResult.error || 'Unknown send error',
           });
 
-          // Log failure
           await supabase.from('auto_send_log').insert({
             workspace_id: item.workspace_id,
             message_id: item.message_id,
@@ -235,7 +309,7 @@ export async function GET(request: NextRequest) {
           results.errors.push(`Send failed for ${item.id}: ${sendResult.error}`);
         }
       } catch (itemError) {
-        console.error(`Error processing auto-send item ${item.id}:`, itemError);
+        console.error(`   ❌ Exception processing item:`, itemError);
         
         await updateQueueItemStatus(item.id, 'failed', {
           errorMessage: itemError instanceof Error ? itemError.message : 'Unknown error',
@@ -247,7 +321,11 @@ export async function GET(request: NextRequest) {
     }
 
     const duration = Date.now() - startTime;
-    console.log(`Auto-send cron completed in ${duration}ms:`, results);
+    console.log(`\n🏁 Auto-send cron completed in ${duration}ms`);
+    console.log(`   Processed: ${results.processed}`);
+    console.log(`   Sent: ${results.sent}`);
+    console.log(`   Failed: ${results.failed}`);
+    console.log(`   Skipped: ${results.skipped}`);
 
     return NextResponse.json({
       message: 'Auto-send processing complete',
@@ -255,7 +333,7 @@ export async function GET(request: NextRequest) {
       duration,
     });
   } catch (error) {
-    console.error('Auto-send cron error:', error);
+    console.error('❌ Auto-send cron error:', error);
     return NextResponse.json({ 
       error: 'Auto-send cron failed',
       details: error instanceof Error ? error.message : 'Unknown error',
@@ -301,4 +379,3 @@ function getNextWindowStart(startTime: string): Date {
   
   return next;
 }
-

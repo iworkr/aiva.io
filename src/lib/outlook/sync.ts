@@ -139,7 +139,8 @@ export async function syncOutlookMessages(
               'outlook', // channel type
               parsed.senderEmail, // email
               parsed.senderName, // name
-              parsed.senderEmail // channel ID (email for Outlook)
+              parsed.senderEmail, // channel ID (email for Outlook)
+              { useAdminClient: options.useAdminClient } // Pass through for background jobs
             );
             console.log('✅ Contact created/linked for Outlook message', {
               senderEmail: parsed.senderEmail,

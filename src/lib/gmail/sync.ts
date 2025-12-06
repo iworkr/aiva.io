@@ -156,7 +156,8 @@ export async function syncGmailMessages(
               'gmail', // channel type
               parsed.senderEmail, // email
               parsed.senderName, // name
-              parsed.senderEmail // channel ID (email for Gmail)
+              parsed.senderEmail, // channel ID (email for Gmail)
+              { useAdminClient: options.useAdminClient } // Pass through for background jobs
             );
           } catch (contactError) {
             // Log but don't fail the sync if contact creation fails
