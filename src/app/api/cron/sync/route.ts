@@ -198,14 +198,14 @@ export async function GET(request: NextRequest) {
           
           try {
             // Get messages that need drafts:
-            // - Actionable (question or request)
+            // - Any actionability type that might need a response (excluding 'none')
             // - No existing draft
             // - Recent (last 24 hours)
             const { data: actionableMessages } = await supabase
               .from('messages')
               .select('id, subject, actionability, has_draft_reply')
               .eq('workspace_id', connection.workspace_id)
-              .in('actionability', ['question', 'request'])
+              .in('actionability', ['question', 'request', 'fyi', 'scheduling_intent', 'task']) // All types except 'none'
               .eq('has_draft_reply', false)
               .gte('timestamp', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
               .order('timestamp', { ascending: false })
