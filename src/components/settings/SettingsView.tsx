@@ -924,13 +924,13 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                           <Slider
                             value={[autoSendConfidenceThreshold * 100]}
                             onValueChange={handleAutoSendConfidenceChange}
-                            min={70}
+                            min={50}
                             max={95}
                             step={5}
                             className="w-full"
                           />
                           <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>70% (more auto-sends)</span>
+                            <span>50% (more auto-sends)</span>
                             <span>95% (only very confident)</span>
                           </div>
                         </div>
