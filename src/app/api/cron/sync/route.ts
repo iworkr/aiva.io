@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
       if (connection.last_sync_at) {
         const lastSyncTime = new Date(connection.last_sync_at).getTime();
         const timeSinceLastSync = Date.now() - lastSyncTime;
-        const minSyncInterval = 2 * 60 * 1000; // 2 minutes minimum between syncs
+        const minSyncInterval = 5 * 60 * 1000; // 5 minutes minimum between syncs (Gmail quota protection)
         
         if (timeSinceLastSync < minSyncInterval) {
           const waitTime = Math.ceil((minSyncInterval - timeSinceLastSync) / 1000);

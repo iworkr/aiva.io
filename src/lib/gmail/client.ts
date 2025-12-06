@@ -143,6 +143,77 @@ export async function listGmailMessages(
 }
 
 /**
+ * Get Gmail history (for incremental sync)
+ * This is much more efficient than listing all messages
+ */
+export async function getGmailHistory(
+  accessToken: string,
+  startHistoryId: string,
+  options: {
+    maxResults?: number;
+    labelId?: string;
+  } = {}
+): Promise<{
+  history?: Array<{
+    id: string;
+    messagesAdded?: Array<{ message: { id: string; threadId: string } }>;
+  }>;
+  historyId: string;
+  nextPageToken?: string;
+}> {
+  const params = new URLSearchParams({
+    startHistoryId,
+    maxResults: String(options.maxResults || 100),
+  });
+
+  if (options.labelId) params.append('labelId', options.labelId);
+
+  const response = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/history?${params}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    // 404 means historyId is too old, need full sync
+    if (response.status === 404) {
+      return { historyId: startHistoryId };
+    }
+    throw new Error(`Gmail API error: ${response.statusText}`);
+  }
+
+  return await response.json();
+}
+
+/**
+ * Get current Gmail profile with historyId
+ */
+export async function getGmailProfileWithHistory(accessToken: string): Promise<{
+  emailAddress: string;
+  historyId: string;
+  messagesTotal: number;
+  threadsTotal: number;
+}> {
+  const response = await fetch(
+    'https://gmail.googleapis.com/gmail/v1/users/me/profile',
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Gmail API error: ${response.statusText}`);
+  }
+
+  return await response.json();
+}
+
+/**
  * Get single Gmail message
  */
 export async function getGmailMessage(

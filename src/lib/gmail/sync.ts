@@ -12,6 +12,8 @@ import {
   getGmailAccessToken,
   getGmailMessage,
   listGmailMessages,
+  getGmailHistory,
+  getGmailProfileWithHistory,
   parseGmailMessage,
 } from "./client";
 import { findOrCreateContactFromMessage } from "@/data/user/contacts";
@@ -58,33 +60,110 @@ export async function syncGmailMessages(
       workspaceId,
       maxMessages: options.maxMessages,
       query: options.query,
+      hasHistoryId: !!connection.sync_cursor,
     });
 
     // Get access token (will refresh if needed)
     const accessToken = await getGmailAccessToken(connectionId);
 
-    // List messages
-    const messagesList = await listGmailMessages(accessToken, {
-      maxResults: options.maxMessages || 50,
-      // If a specific query is provided, use it; otherwise fetch recent messages
-      // Leaving q empty lets Gmail return recent mail instead of only unread
-      q: options.query ?? "",
-    });
+    let messageIds: string[] = [];
+    let newHistoryId: string | null = null;
 
-    console.log("📥 Gmail messages listed", {
-      connectionId,
-      workspaceId,
-      totalRefs: messagesList.messages?.length ?? 0,
-      nextPageToken: messagesList.nextPageToken,
-    });
+    // Try to use History API for incremental sync (much more efficient)
+    if (connection.sync_cursor && !options.query) {
+      console.log("📥 Using Gmail History API for incremental sync...");
+      try {
+        const history = await getGmailHistory(accessToken, connection.sync_cursor, {
+          maxResults: options.maxMessages || 10,
+          labelId: 'INBOX',
+        });
+        
+        newHistoryId = history.historyId;
+        
+        // Extract message IDs from history
+        if (history.history) {
+          for (const h of history.history) {
+            if (h.messagesAdded) {
+              for (const added of h.messagesAdded) {
+                if (!messageIds.includes(added.message.id)) {
+                  messageIds.push(added.message.id);
+                }
+              }
+            }
+          }
+        }
+        
+        console.log(`📥 History API: ${messageIds.length} new messages since last sync`);
+        
+        if (messageIds.length === 0) {
+          // Update historyId even if no new messages
+          await supabase
+            .from("channel_connections")
+            .update({
+              sync_cursor: newHistoryId,
+              last_sync_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", connectionId);
+            
+          return {
+            success: true,
+            syncedCount: 0,
+            newCount: 0,
+            skippedCount: 0,
+            message: "No new messages since last sync (via History API)",
+          };
+        }
+      } catch (historyError) {
+        console.log("📥 History API failed, falling back to list:", historyError);
+        // Fall back to list API
+      }
+    }
 
-    if (!messagesList.messages || messagesList.messages.length === 0) {
-      return {
-        success: true,
-        syncedCount: 0,
-        newCount: 0,
-        message: "No new messages to sync",
-      };
+    // Fall back to List API if History API didn't work or no sync_cursor
+    if (messageIds.length === 0) {
+      // Get current historyId for future incremental syncs
+      try {
+        const profile = await getGmailProfileWithHistory(accessToken);
+        newHistoryId = profile.historyId;
+      } catch (e) {
+        console.log("📥 Could not get historyId:", e);
+      }
+
+      const messagesList = await listGmailMessages(accessToken, {
+        maxResults: options.maxMessages || 10,
+        q: options.query ?? "",
+      });
+
+      console.log("📥 Gmail messages listed", {
+        connectionId,
+        workspaceId,
+        totalRefs: messagesList.messages?.length ?? 0,
+        nextPageToken: messagesList.nextPageToken,
+      });
+
+      if (!messagesList.messages || messagesList.messages.length === 0) {
+        // Update historyId for next sync
+        if (newHistoryId) {
+          await supabase
+            .from("channel_connections")
+            .update({
+              sync_cursor: newHistoryId,
+              last_sync_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", connectionId);
+        }
+        
+        return {
+          success: true,
+          syncedCount: 0,
+          newCount: 0,
+          message: "No new messages to sync",
+        };
+      }
+      
+      messageIds = messagesList.messages.map((m: any) => m.id);
     }
 
     let syncedCount = 0;
@@ -93,7 +172,6 @@ export async function syncGmailMessages(
     let skippedCount = 0;
 
     // First, check which messages already exist in our database to avoid unnecessary API calls
-    const messageIds = messagesList.messages.map((m: any) => m.id);
     const { data: existingMessages } = await supabase
       .from("messages")
       .select("provider_message_id")
@@ -105,9 +183,9 @@ export async function syncGmailMessages(
     console.log(`📥 Checking ${messageIds.length} messages, ${existingIds.size} already synced`);
 
     // Fetch and store only NEW messages (not already in database)
-    for (const messageRef of messagesList.messages) {
+    for (const messageId of messageIds) {
       // Skip if message already exists - BEFORE making API call
-      if (existingIds.has(messageRef.id)) {
+      if (existingIds.has(messageId)) {
         skippedCount++;
         syncedCount++;
         continue;
@@ -115,7 +193,7 @@ export async function syncGmailMessages(
 
       try {
         // Get full message details - only for NEW messages
-        const gmailMessage = await getGmailMessage(accessToken, messageRef.id);
+        const gmailMessage = await getGmailMessage(accessToken, messageId);
 
         // Parse to normalized format
         const parsed = parseGmailMessage(gmailMessage);
@@ -145,7 +223,7 @@ export async function syncGmailMessages(
 
         if (insertError) {
           console.error(
-            `Failed to insert Gmail message ${messageRef.id} into messages:`,
+            `Failed to insert Gmail message ${messageId} into messages:`,
             insertError,
           );
           errorCount++;
@@ -173,17 +251,17 @@ export async function syncGmailMessages(
         }
         syncedCount++;
       } catch (error) {
-        console.error(`Failed to sync message ${messageRef.id}:`, error);
+        console.error(`Failed to sync message ${messageId}:`, error);
         errorCount++;
       }
     }
 
-    // Update last sync time and cursor
+    // Update last sync time and historyId (for incremental sync)
     await supabase
       .from("channel_connections")
       .update({
         last_sync_at: new Date().toISOString(),
-        sync_cursor: messagesList.nextPageToken || null,
+        sync_cursor: newHistoryId || connection.sync_cursor,
         updated_at: new Date().toISOString(),
       })
       .eq("id", connectionId);
@@ -196,8 +274,6 @@ export async function syncGmailMessages(
       newCount,
       skippedCount,
       errorCount,
-      hasMore: !!messagesList.nextPageToken,
-      nextPageToken: messagesList.nextPageToken,
       message: `Synced ${syncedCount} messages (${newCount} new, ${skippedCount} skipped, ${errorCount} errors)`,
     };
   } catch (error) {
