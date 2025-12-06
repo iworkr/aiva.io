@@ -192,61 +192,58 @@ export async function GET(request: NextRequest) {
           console.error(`   ❌ Classification error:`, classifyError);
         }
 
-        // Auto-generate drafts for actionable messages if auto-send is enabled
-        if (autoSendEnabled) {
-          console.log(`   ✍️ Auto-send enabled (threshold: ${confidenceThreshold}), generating drafts...`);
-          
-          try {
-            // Get messages that need drafts:
-            // - Any actionability type that might need a response (excluding 'none')
-            // - No existing draft
-            // - Recent (last 24 hours)
-            const { data: actionableMessages } = await supabase
-              .from('messages')
-              .select('id, subject, actionability, has_draft_reply')
-              .eq('workspace_id', connection.workspace_id)
-              .in('actionability', ['question', 'request', 'fyi', 'scheduling_intent', 'task']) // All types except 'none'
-              .eq('has_draft_reply', false)
-              .gte('timestamp', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-              .order('timestamp', { ascending: false })
-              .limit(10); // Limit to avoid timeouts
+        // ALWAYS generate drafts for actionable messages (drafts are useful regardless of auto-send)
+        // Auto-send setting only controls whether drafts get QUEUED for automatic sending
+        console.log(`   ✍️ Generating drafts for actionable messages (auto-send: ${autoSendEnabled ? 'enabled' : 'disabled'}, threshold: ${confidenceThreshold})...`);
+        
+        try {
+          // Get messages that need drafts:
+          // - Any actionability type that might need a response (excluding 'none')
+          // - No existing draft
+          // - Recent (last 24 hours)
+          const { data: actionableMessages } = await supabase
+            .from('messages')
+            .select('id, subject, actionability, has_draft_reply')
+            .eq('workspace_id', connection.workspace_id)
+            .in('actionability', ['question', 'request', 'fyi', 'scheduling_intent', 'task']) // All types except 'none'
+            .eq('has_draft_reply', false)
+            .gte('timestamp', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+            .order('timestamp', { ascending: false })
+            .limit(10); // Limit to avoid timeouts
 
-            if (actionableMessages && actionableMessages.length > 0) {
-              console.log(`      📝 Found ${actionableMessages.length} actionable messages without drafts`);
-              
-              for (const msg of actionableMessages) {
-                try {
-                  console.log(`      ✍️ Generating draft for: ${msg.subject?.substring(0, 40) || 'No subject'}...`);
-                  
-                  const draftResult = await generateReplyDraft(
-                    msg.id,
-                    connection.workspace_id,
-                    {
-                      useAdminClient: true,
-                      skipFeatureCheck: true,
-                    }
-                  );
-                  
-                  if (draftResult.body && !draftResult.error) {
-                    draftsGenerated++;
-                    console.log(`         ✅ Draft generated (confidence: ${draftResult.confidenceScore})`);
-                  } else if (draftResult.error) {
-                    console.log(`         ⚠️ Draft error: ${draftResult.error}`);
+          if (actionableMessages && actionableMessages.length > 0) {
+            console.log(`      📝 Found ${actionableMessages.length} actionable messages without drafts`);
+            
+            for (const msg of actionableMessages) {
+              try {
+                console.log(`      ✍️ Generating draft for: ${msg.subject?.substring(0, 40) || 'No subject'}...`);
+                
+                const draftResult = await generateReplyDraft(
+                  msg.id,
+                  connection.workspace_id,
+                  {
+                    useAdminClient: true,
+                    skipFeatureCheck: true,
                   }
-                } catch (draftErr) {
-                  console.error(`         ❌ Failed to generate draft:`, draftErr instanceof Error ? draftErr.message : draftErr);
+                );
+                
+                if (draftResult.body && !draftResult.error) {
+                  draftsGenerated++;
+                  console.log(`         ✅ Draft generated (confidence: ${draftResult.confidenceScore})`);
+                } else if (draftResult.error) {
+                  console.log(`         ⚠️ Draft error: ${draftResult.error}`);
                 }
+              } catch (draftErr) {
+                console.error(`         ❌ Failed to generate draft:`, draftErr instanceof Error ? draftErr.message : draftErr);
               }
-              
-              console.log(`   📊 Generated ${draftsGenerated}/${actionableMessages.length} drafts`);
-            } else {
-              console.log(`      ℹ️ No actionable messages without drafts found`);
             }
-          } catch (draftError) {
-            console.error(`   ❌ Draft generation error:`, draftError);
+            
+            console.log(`   📊 Generated ${draftsGenerated}/${actionableMessages.length} drafts`);
+          } else {
+            console.log(`      ℹ️ No actionable messages without drafts found`);
           }
-        } else {
-          console.log(`   ℹ️ Auto-send disabled for workspace, skipping draft generation`);
+        } catch (draftError) {
+          console.error(`   ❌ Draft generation error:`, draftError);
         }
         
         results.push({
