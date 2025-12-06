@@ -121,6 +121,19 @@ export async function GET(request: NextRequest) {
     for (const connection of connections) {
       console.log(`\n🔄 Syncing ${connection.provider}: ${connection.provider_account_name}...`);
       
+      // Rate limit protection: Skip if last sync was less than 2 minutes ago
+      if (connection.last_sync_at) {
+        const lastSyncTime = new Date(connection.last_sync_at).getTime();
+        const timeSinceLastSync = Date.now() - lastSyncTime;
+        const minSyncInterval = 2 * 60 * 1000; // 2 minutes minimum between syncs
+        
+        if (timeSinceLastSync < minSyncInterval) {
+          const waitTime = Math.ceil((minSyncInterval - timeSinceLastSync) / 1000);
+          console.log(`   ⏳ Skipping - last sync was ${Math.round(timeSinceLastSync / 1000)}s ago, need ${waitTime}s more cooldown`);
+          continue;
+        }
+      }
+      
       try {
         let syncResult: any;
 
@@ -128,7 +141,7 @@ export async function GET(request: NextRequest) {
           case 'gmail':
             console.log('   📧 Starting Gmail sync...');
             syncResult = await syncGmailMessages(connection.id, connection.workspace_id, {
-              maxMessages: 20, // Reduced from 50 to avoid rate limiting
+              maxMessages: 10, // Reduced to 10 to avoid rate limiting
               useAdminClient: true, // Critical: use admin client for cron jobs
             });
             break;
@@ -136,7 +149,7 @@ export async function GET(request: NextRequest) {
           case 'outlook':
             console.log('   📧 Starting Outlook sync...');
             syncResult = await syncOutlookMessages(connection.id, connection.workspace_id, {
-              maxMessages: 20, // Reduced from 50 to avoid rate limiting
+              maxMessages: 20,
               useAdminClient: true, // Critical: use admin client for cron jobs
             });
             break;
