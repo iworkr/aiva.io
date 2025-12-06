@@ -7,6 +7,7 @@
 
 import { createMessageAction } from "@/data/user/messages";
 import { createSupabaseUserServerActionClient } from "@/supabase-clients/user/createSupabaseUserServerActionClient";
+import { supabaseAdminClient } from "@/supabase-clients/admin/supabaseAdminClient";
 import {
   getGmailAccessToken,
   getGmailMessage,
@@ -17,6 +18,7 @@ import { findOrCreateContactFromMessage } from "@/data/user/contacts";
 
 /**
  * Sync Gmail messages for a channel connection
+ * @param useAdminClient - Use admin client for background jobs (cron, webhooks)
  */
 export async function syncGmailMessages(
   connectionId: string,
@@ -24,10 +26,14 @@ export async function syncGmailMessages(
   options: {
     maxMessages?: number;
     query?: string;
+    useAdminClient?: boolean;
   } = {},
 ) {
   try {
-    const supabase = await createSupabaseUserServerActionClient();
+    // Use admin client for background jobs that don't have user context
+    const supabase = options.useAdminClient 
+      ? supabaseAdminClient 
+      : await createSupabaseUserServerActionClient();
 
     // Get connection details (including user_id for contact creation)
     const { data: connection, error: connectionError } = await supabase

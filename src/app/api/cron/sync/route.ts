@@ -127,6 +127,7 @@ export async function GET(request: NextRequest) {
             console.log('   📧 Starting Gmail sync...');
             syncResult = await syncGmailMessages(connection.id, connection.workspace_id, {
               maxMessages: 50,
+              useAdminClient: true, // Critical: use admin client for cron jobs
             });
             break;
 
@@ -134,6 +135,7 @@ export async function GET(request: NextRequest) {
             console.log('   📧 Starting Outlook sync...');
             syncResult = await syncOutlookMessages(connection.id, connection.workspace_id, {
               maxMessages: 50,
+              useAdminClient: true, // Critical: use admin client for cron jobs
             });
             break;
 

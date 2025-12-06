@@ -3,7 +3,7 @@
  * Utilities for interacting with Gmail API
  */
 
-import { createSupabaseUserServerActionClient } from '@/supabase-clients/user/createSupabaseUserServerActionClient';
+import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
 import { htmlToPlainText, decodeHtmlEntities } from '@/utils/html-to-text';
 
 interface GmailMessage {
@@ -61,9 +61,8 @@ export async function refreshGmailToken(
   const expiresIn = data.expires_in;
   const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
-  // Update token in database
-  const supabase = await createSupabaseUserServerActionClient();
-  await supabase
+  // Update token in database (use admin client for background operations)
+  await supabaseAdminClient
     .from('channel_connections')
     .update({
       access_token: newAccessToken,
@@ -78,11 +77,10 @@ export async function refreshGmailToken(
 
 /**
  * Get Gmail access token (refresh if needed)
+ * Uses admin client to work in both user and background contexts
  */
 export async function getGmailAccessToken(connectionId: string): Promise<string> {
-  const supabase = await createSupabaseUserServerActionClient();
-
-  const { data: connection, error } = await supabase
+  const { data: connection, error } = await supabaseAdminClient
     .from('channel_connections')
     .select('access_token, refresh_token, token_expires_at')
     .eq('id', connectionId)
