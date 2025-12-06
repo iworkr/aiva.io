@@ -11,6 +11,7 @@ import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClien
 import { syncGmailMessages } from '@/lib/gmail/sync';
 import { syncOutlookMessages } from '@/lib/outlook/sync';
 import { classifyMessage } from '@/lib/ai/classifier';
+import { generateReplyDraft } from '@/lib/ai/reply-generator';
 
 /**
  * Verify the request is from Vercel Cron or an authorized source
@@ -152,6 +153,18 @@ export async function GET(request: NextRequest) {
 
         // Auto-classify unclassified messages in this workspace
         let classifiedCount = 0;
+        let draftsGenerated = 0;
+        
+        // Check if workspace has auto-send enabled
+        const { data: wsSettings } = await supabase
+          .from('workspace_settings')
+          .select('auto_send_enabled, auto_send_confidence_threshold')
+          .eq('workspace_id', connection.workspace_id)
+          .single();
+
+        const autoSendEnabled = wsSettings?.auto_send_enabled ?? false;
+        const confidenceThreshold = wsSettings?.auto_send_confidence_threshold ?? 0.70;
+
         try {
           const { data: unclassifiedMessages } = await supabase
             .from('messages')
@@ -168,7 +181,7 @@ export async function GET(request: NextRequest) {
               try {
                 const result = await classifyMessage(msg.id, connection.workspace_id, { useAdminClient: true });
                 classifiedCount++;
-                console.log(`      ✅ ${msg.subject?.substring(0, 30) || 'No subject'} → ${result.priority}/${result.category}`);
+                console.log(`      ✅ ${msg.subject?.substring(0, 30) || 'No subject'} → ${result.priority}/${result.category} (${result.actionability})`);
               } catch (classifyErr) {
                 console.error(`      ❌ Failed to classify ${msg.id}:`, classifyErr instanceof Error ? classifyErr.message : classifyErr);
               }
@@ -177,6 +190,63 @@ export async function GET(request: NextRequest) {
           }
         } catch (classifyError) {
           console.error(`   ❌ Classification error:`, classifyError);
+        }
+
+        // Auto-generate drafts for actionable messages if auto-send is enabled
+        if (autoSendEnabled) {
+          console.log(`   ✍️ Auto-send enabled (threshold: ${confidenceThreshold}), generating drafts...`);
+          
+          try {
+            // Get messages that need drafts:
+            // - Actionable (question or request)
+            // - No existing draft
+            // - Recent (last 24 hours)
+            const { data: actionableMessages } = await supabase
+              .from('messages')
+              .select('id, subject, actionability, has_draft_reply')
+              .eq('workspace_id', connection.workspace_id)
+              .in('actionability', ['question', 'request'])
+              .eq('has_draft_reply', false)
+              .gte('timestamp', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+              .order('timestamp', { ascending: false })
+              .limit(10); // Limit to avoid timeouts
+
+            if (actionableMessages && actionableMessages.length > 0) {
+              console.log(`      📝 Found ${actionableMessages.length} actionable messages without drafts`);
+              
+              for (const msg of actionableMessages) {
+                try {
+                  console.log(`      ✍️ Generating draft for: ${msg.subject?.substring(0, 40) || 'No subject'}...`);
+                  
+                  const draftResult = await generateReplyDraft(
+                    msg.id,
+                    connection.workspace_id,
+                    {
+                      useAdminClient: true,
+                      skipFeatureCheck: true,
+                    }
+                  );
+                  
+                  if (draftResult.body && !draftResult.error) {
+                    draftsGenerated++;
+                    console.log(`         ✅ Draft generated (confidence: ${draftResult.confidenceScore})`);
+                  } else if (draftResult.error) {
+                    console.log(`         ⚠️ Draft error: ${draftResult.error}`);
+                  }
+                } catch (draftErr) {
+                  console.error(`         ❌ Failed to generate draft:`, draftErr instanceof Error ? draftErr.message : draftErr);
+                }
+              }
+              
+              console.log(`   📊 Generated ${draftsGenerated}/${actionableMessages.length} drafts`);
+            } else {
+              console.log(`      ℹ️ No actionable messages without drafts found`);
+            }
+          } catch (draftError) {
+            console.error(`   ❌ Draft generation error:`, draftError);
+          }
+        } else {
+          console.log(`   ℹ️ Auto-send disabled for workspace, skipping draft generation`);
         }
         
         results.push({
@@ -187,6 +257,7 @@ export async function GET(request: NextRequest) {
           syncedCount: syncResult?.syncedCount || 0,
           newCount: syncResult?.newCount || 0,
           classifiedCount,
+          draftsGenerated,
         });
 
         // Update last sync time
@@ -215,11 +286,13 @@ export async function GET(request: NextRequest) {
 
     const duration = Date.now() - startTime;
     const totalClassified = results.reduce((sum, r) => sum + (r.classifiedCount || 0), 0);
+    const totalDraftsGenerated = results.reduce((sum, r) => sum + (r.draftsGenerated || 0), 0);
     
     console.log(`\n🏁 Sync cron completed in ${duration}ms`);
     console.log(`   Connections synced: ${totalSynced}/${connections.length}`);
     console.log(`   New messages: ${totalNewMessages}`);
     console.log(`   Messages classified: ${totalClassified}`);
+    console.log(`   Drafts generated: ${totalDraftsGenerated}`);
     console.log(`   Errors: ${totalErrors}`);
 
     return NextResponse.json({
@@ -231,6 +304,7 @@ export async function GET(request: NextRequest) {
       connectionsSynced: totalSynced,
       totalNewMessages,
       totalClassified,
+      totalDraftsGenerated,
       totalErrors,
       results,
     });

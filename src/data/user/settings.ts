@@ -55,7 +55,7 @@ const updateAutoSendSettingsSchema = z.object({
   autoSendDelayType: z.enum(['exact', 'random']).optional(),
   autoSendDelayMin: z.number().min(1).max(120).optional(),
   autoSendDelayMax: z.number().min(1).max(120).optional(),
-  autoSendConfidenceThreshold: z.number().min(0.70).max(0.95).optional(),
+  autoSendConfidenceThreshold: z.number().min(0.50).max(0.95).optional(), // Lowered to 50%
   autoSendTimeStart: z.string().optional(), // "HH:MM" format
   autoSendTimeEnd: z.string().optional(),   // "HH:MM" format
 });

@@ -6,6 +6,7 @@
 "use server";
 
 import { createSupabaseUserServerActionClient } from "@/supabase-clients/user/createSupabaseUserServerActionClient";
+import { supabaseAdminClient } from "@/supabase-clients/admin/supabaseAdminClient";
 import { OpenAI } from "openai";
 
 // Lazy-load OpenAI client to avoid crashes on missing API key
@@ -30,6 +31,8 @@ interface ReplyOptions {
   includeQuote?: boolean;
   maxLength?: number;
   context?: string;
+  useAdminClient?: boolean; // Use admin client for background jobs
+  skipFeatureCheck?: boolean; // Skip feature check for cron jobs
 }
 
 interface ToneReason {
@@ -56,6 +59,8 @@ interface ReplyDraftResult {
 
 /**
  * Generate reply draft for a message
+ * @param options.useAdminClient - Use admin client for background jobs (cron, webhooks)
+ * @param options.skipFeatureCheck - Skip feature check for cron jobs
  */
 export async function generateReplyDraft(
   messageId: string,
@@ -63,34 +68,38 @@ export async function generateReplyDraft(
   options: ReplyOptions = {},
 ): Promise<ReplyDraftResult> {
   try {
-    // Check feature access - AI drafts require Pro plan
-    // In development mode (no Stripe), this should return true
-    const { getHasFeature } = await import("@/rsc-data/user/subscriptions");
+    // Skip feature check for cron jobs
+    if (!options.skipFeatureCheck) {
+      // Check feature access - AI drafts require Pro plan
+      const { getHasFeature } = await import("@/rsc-data/user/subscriptions");
 
-    let hasAIDrafts = true;
-    try {
-      hasAIDrafts = await getHasFeature(workspaceId, "aiDrafts");
-      console.log("[AI Reply] Feature check result:", {
-        workspaceId,
-        hasAIDrafts,
-      });
-    } catch (featureError) {
-      // If feature check fails, allow access in development
-      console.warn(
-        "[AI Reply] Feature check failed, defaulting to allowed:",
-        featureError,
-      );
-      hasAIDrafts = true;
-    }
+      let hasAIDrafts = true;
+      try {
+        hasAIDrafts = await getHasFeature(workspaceId, "aiDrafts");
+        console.log("[AI Reply] Feature check result:", {
+          workspaceId,
+          hasAIDrafts,
+        });
+      } catch (featureError) {
+        // If feature check fails, allow access in development
+        console.warn(
+          "[AI Reply] Feature check failed, defaulting to allowed:",
+          featureError,
+        );
+        hasAIDrafts = true;
+      }
 
-    if (!hasAIDrafts) {
-      throw new Error(
-        "AI reply drafts are a Pro feature. Upgrade your plan to access AI-powered reply generation.",
-      );
+      if (!hasAIDrafts) {
+        throw new Error(
+          "AI reply drafts are a Pro feature. Upgrade your plan to access AI-powered reply generation.",
+        );
+      }
     }
 
     console.log("[AI Reply] Creating Supabase client...");
-    const supabase = await createSupabaseUserServerActionClient();
+    const supabase = options.useAdminClient 
+      ? supabaseAdminClient 
+      : await createSupabaseUserServerActionClient();
 
     // Get the message
     console.log("[AI Reply] Fetching message:", { messageId, workspaceId });
@@ -381,21 +390,44 @@ IMPORTANT: Always return valid, complete JSON. Keep replies concise.`,
       .eq("id", messageId);
 
     // Check if draft is auto-sendable and queue for auto-send
-    if (draft && result.isAutoSendable && result.confidenceScore >= 0.85) {
+    if (draft && result.isAutoSendable) {
       try {
-        const { queueAutoSend } = await import('@/lib/workers/auto-send-worker');
-        const queueResult = await queueAutoSend(
-          workspaceId,
-          messageId,
-          draft.id,
-          message.channel_connection_id,
-          result.confidenceScore
-        );
+        // Get workspace auto-send threshold (default 0.70 if not set)
+        const { data: wsSettings } = await supabase
+          .from('workspace_settings')
+          .select('auto_send_enabled, auto_send_confidence_threshold')
+          .eq('workspace_id', workspaceId)
+          .single();
+
+        const autoSendEnabled = wsSettings?.auto_send_enabled ?? false;
+        const threshold = wsSettings?.auto_send_confidence_threshold ?? 0.70;
         
-        if (queueResult.queued) {
-          console.log('[AI Reply] Draft queued for auto-send at:', queueResult.scheduledAt);
+        console.log('[AI Reply] Auto-send check:', {
+          enabled: autoSendEnabled,
+          threshold,
+          confidenceScore: result.confidenceScore,
+          meetsThreshold: result.confidenceScore >= threshold,
+        });
+
+        if (autoSendEnabled && result.confidenceScore >= threshold) {
+          const { queueAutoSend } = await import('@/lib/workers/auto-send-worker');
+          const queueResult = await queueAutoSend(
+            workspaceId,
+            messageId,
+            draft.id,
+            message.channel_connection_id,
+            result.confidenceScore
+          );
+          
+          if (queueResult.queued) {
+            console.log('[AI Reply] Draft queued for auto-send at:', queueResult.scheduledAt);
+          } else {
+            console.log('[AI Reply] Auto-send not queued:', queueResult.reason);
+          }
+        } else if (!autoSendEnabled) {
+          console.log('[AI Reply] Auto-send disabled for workspace');
         } else {
-          console.log('[AI Reply] Auto-send not queued:', queueResult.reason);
+          console.log('[AI Reply] Confidence score below threshold:', result.confidenceScore, '<', threshold);
         }
       } catch (autoSendError) {
         // Don't fail the whole operation if auto-send queueing fails
