@@ -101,14 +101,14 @@ export async function generateReplyDraft(
       ? supabaseAdminClient 
       : await createSupabaseUserServerActionClient();
 
-    // Get the message
+    // Get the message with channel connection user_id
     console.log("[AI Reply] Fetching message:", { messageId, workspaceId });
     const { data: message, error } = await supabase
       .from("messages")
       .select(
         `
         *,
-        channel_connection:channel_connections(provider, provider_account_name)
+        channel_connection:channel_connections(provider, provider_account_name, user_id)
       `,
       )
       .eq("id", messageId)
@@ -351,10 +351,13 @@ IMPORTANT: Always return valid, complete JSON. Keep replies concise.`,
       confidenceInTone: result.confidenceScore,
     };
 
+    // Get the user_id from the channel connection (the user who connected this channel)
+    const connectionUserId = (message.channel_connection as any)?.user_id;
+    
     // Store draft in database
     const draftInsert = {
         workspace_id: workspaceId,
-        user_id: workspaceId, // Placeholder
+        user_id: connectionUserId || workspaceId, // Use connection owner's user_id, fallback to workspace (may fail)
         message_id: messageId,
         body: result.body,
         tone,
@@ -438,7 +441,7 @@ IMPORTANT: Always return valid, complete JSON. Keep replies concise.`,
     // Log AI action
     await supabase.from("ai_action_logs").insert({
       workspace_id: workspaceId,
-      user_id: workspaceId, // Placeholder
+      user_id: connectionUserId || workspaceId, // Use connection owner's user_id
       action_type: "reply_draft",
       input_ref: messageId,
       output_ref: draft?.id,

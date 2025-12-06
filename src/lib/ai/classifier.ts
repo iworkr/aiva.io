@@ -169,10 +169,10 @@ export async function classifyMessage(
       ? supabaseAdminClient 
       : await createSupabaseUserServerActionClient();
 
-    // Get the message
+    // Get the message with channel connection user_id
     const { data: message, error } = await supabase
       .from("messages")
-      .select("*")
+      .select("*, channel_connection:channel_connections(user_id)")
       .eq("id", messageId)
       .eq("workspace_id", workspaceId)
       .single();
@@ -180,6 +180,9 @@ export async function classifyMessage(
     if (error || !message) {
       throw new Error("Message not found");
     }
+    
+    // Get the user_id from the channel connection
+    const connectionUserId = (message.channel_connection as any)?.user_id;
 
     // Prepare prompt for OpenAI
     const prompt = `Analyze this email message and classify it:
@@ -379,7 +382,7 @@ Be consistent: similar messages should get similar classifications.`,
     // Log AI action
     await supabase.from("ai_action_logs").insert({
       workspace_id: workspaceId,
-      user_id: message.workspace_id, // Placeholder - should be actual user
+      user_id: connectionUserId || workspaceId, // Use connection owner's user_id
       action_type: "classification",
       input_ref: messageId,
       model_used: completion.model,
