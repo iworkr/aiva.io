@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
 import { syncGmailMessages } from '@/lib/gmail/sync';
 import { syncOutlookMessages } from '@/lib/outlook/sync';
+import { classifyMessage } from '@/lib/ai/classifier';
 
 /**
  * Verify the request is from Vercel Cron or an authorized source
@@ -148,6 +149,35 @@ export async function GET(request: NextRequest) {
         
         totalSynced++;
         totalNewMessages += syncResult?.newCount || 0;
+
+        // Auto-classify unclassified messages in this workspace
+        let classifiedCount = 0;
+        try {
+          const { data: unclassifiedMessages } = await supabase
+            .from('messages')
+            .select('id, subject')
+            .eq('workspace_id', connection.workspace_id)
+            .or('priority.is.null,category.is.null')
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+          if (unclassifiedMessages && unclassifiedMessages.length > 0) {
+            console.log(`   🤖 Classifying ${unclassifiedMessages.length} messages...`);
+            
+            for (const msg of unclassifiedMessages) {
+              try {
+                const result = await classifyMessage(msg.id, connection.workspace_id, { useAdminClient: true });
+                classifiedCount++;
+                console.log(`      ✅ ${msg.subject?.substring(0, 30) || 'No subject'} → ${result.priority}/${result.category}`);
+              } catch (classifyErr) {
+                console.error(`      ❌ Failed to classify ${msg.id}:`, classifyErr instanceof Error ? classifyErr.message : classifyErr);
+              }
+            }
+            console.log(`   📊 Classified ${classifiedCount}/${unclassifiedMessages.length} messages`);
+          }
+        } catch (classifyError) {
+          console.error(`   ❌ Classification error:`, classifyError);
+        }
         
         results.push({
           connectionId: connection.id,
@@ -156,6 +186,7 @@ export async function GET(request: NextRequest) {
           success: true,
           syncedCount: syncResult?.syncedCount || 0,
           newCount: syncResult?.newCount || 0,
+          classifiedCount,
         });
 
         // Update last sync time
@@ -183,10 +214,12 @@ export async function GET(request: NextRequest) {
     }
 
     const duration = Date.now() - startTime;
+    const totalClassified = results.reduce((sum, r) => sum + (r.classifiedCount || 0), 0);
     
     console.log(`\n🏁 Sync cron completed in ${duration}ms`);
     console.log(`   Connections synced: ${totalSynced}/${connections.length}`);
     console.log(`   New messages: ${totalNewMessages}`);
+    console.log(`   Messages classified: ${totalClassified}`);
     console.log(`   Errors: ${totalErrors}`);
 
     return NextResponse.json({
@@ -197,6 +230,7 @@ export async function GET(request: NextRequest) {
       totalConnections: connections.length,
       connectionsSynced: totalSynced,
       totalNewMessages,
+      totalClassified,
       totalErrors,
       results,
     });

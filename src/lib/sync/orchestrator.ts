@@ -74,9 +74,12 @@ export async function syncChannelConnection(
   options: {
     maxMessages?: number;
     autoClassify?: boolean;
+    useAdminClient?: boolean;
   } = {}
 ): Promise<SyncResult> {
-  const supabase = await createSupabaseUserServerActionClient();
+  const supabase = options.useAdminClient 
+    ? supabaseAdminClient 
+    : await createSupabaseUserServerActionClient();
 
   // Get connection details
   const { data: connection, error } = await supabase
@@ -245,7 +248,7 @@ export async function syncChannelConnection(
             
             try {
               console.log(`   🏷️ Classifying message ${i + 1}/${totalToClassify}: ${msg.subject?.substring(0, 40) || 'No subject'}...`);
-              const result = await classifyMessage(msg.id, workspaceId);
+              const result = await classifyMessage(msg.id, workspaceId, { useAdminClient: options.useAdminClient });
               console.log(`   ✅ Classified as: priority=${result.priority}, category=${result.category}`);
               classifiedCount++;
               
@@ -574,7 +577,7 @@ async function syncChannelConnectionWithProgress(
             const msg = unclassifiedMessages[i];
             
             try {
-              await classifyMessage(msg.id, workspaceId);
+              await classifyMessage(msg.id, workspaceId, { useAdminClient: options.useAdminClient });
               classifiedCount++;
               
               // Calculate progress within classifying phase (50-100% of connection)

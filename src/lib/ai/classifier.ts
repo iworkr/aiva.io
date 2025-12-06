@@ -6,6 +6,7 @@
 "use server";
 
 import { createSupabaseUserServerActionClient } from "@/supabase-clients/user/createSupabaseUserServerActionClient";
+import { supabaseAdminClient } from "@/supabase-clients/admin/supabaseAdminClient";
 import {
   MessageActionability,
   MessageCategory,
@@ -156,13 +157,17 @@ interface ClassificationResult {
 
 /**
  * Classify a message using AI
+ * @param useAdminClient - Use admin client for background jobs (cron, webhooks)
  */
 export async function classifyMessage(
   messageId: string,
   workspaceId: string,
+  options: { useAdminClient?: boolean } = {},
 ): Promise<ClassificationResult> {
   try {
-    const supabase = await createSupabaseUserServerActionClient();
+    const supabase = options.useAdminClient 
+      ? supabaseAdminClient 
+      : await createSupabaseUserServerActionClient();
 
     // Get the message
     const { data: message, error } = await supabase
@@ -405,6 +410,7 @@ Be consistent: similar messages should get similar classifications.`,
 export async function batchClassifyMessages(
   messageIds: string[],
   workspaceId: string,
+  options: { useAdminClient?: boolean } = {},
 ): Promise<{ successful: number; failed: number; results: any[] }> {
   const results = [];
   let successful = 0;
@@ -412,7 +418,7 @@ export async function batchClassifyMessages(
 
   for (const messageId of messageIds) {
     try {
-      const result = await classifyMessage(messageId, workspaceId);
+      const result = await classifyMessage(messageId, workspaceId, options);
       results.push({ messageId, success: true, result });
       successful++;
     } catch (error) {
@@ -434,8 +440,11 @@ export async function batchClassifyMessages(
 export async function autoClassifyNewMessages(
   workspaceId: string,
   limit: number = 10,
+  options: { useAdminClient?: boolean } = {},
 ) {
-  const supabase = await createSupabaseUserServerActionClient();
+  const supabase = options.useAdminClient 
+    ? supabaseAdminClient 
+    : await createSupabaseUserServerActionClient();
 
   // Get unclassified messages
   const { data: messages, error } = await supabase
@@ -455,7 +464,7 @@ export async function autoClassifyNewMessages(
   }
 
   const messageIds = messages.map((m) => m.id);
-  const result = await batchClassifyMessages(messageIds, workspaceId);
+  const result = await batchClassifyMessages(messageIds, workspaceId, options);
 
   return {
     success: true,
