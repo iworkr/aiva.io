@@ -392,8 +392,17 @@ IMPORTANT: Always return valid, complete JSON. Keep replies concise.`,
       })
       .eq("id", messageId);
 
+    // Log draft result for debugging
+    console.log('[AI Reply] Draft result:', {
+      draftSaved: !!draft,
+      draftId: draft?.id,
+      isAutoSendable: result.isAutoSendable,
+      confidenceScore: result.confidenceScore,
+    });
+
     // Check if draft is auto-sendable and queue for auto-send
-    if (draft && result.isAutoSendable) {
+    // We now check auto-send even if isAutoSendable is false, using confidence threshold as the main gate
+    if (draft) {
       try {
         // Get workspace auto-send threshold (default 0.70 if not set)
         const { data: wsSettings } = await supabase
@@ -409,10 +418,19 @@ IMPORTANT: Always return valid, complete JSON. Keep replies concise.`,
           enabled: autoSendEnabled,
           threshold,
           confidenceScore: result.confidenceScore,
+          isAutoSendable: result.isAutoSendable,
           meetsThreshold: result.confidenceScore >= threshold,
         });
 
-        if (autoSendEnabled && result.confidenceScore >= threshold) {
+        // Queue for auto-send if:
+        // 1. Auto-send is enabled for workspace
+        // 2. Confidence meets threshold (primary gate)
+        // 3. AI marked it as auto-sendable OR confidence is very high (>= 0.80)
+        const shouldQueue = autoSendEnabled && 
+          result.confidenceScore >= threshold && 
+          (result.isAutoSendable || result.confidenceScore >= 0.80);
+
+        if (shouldQueue) {
           const { queueAutoSend } = await import('@/lib/workers/auto-send-worker');
           const queueResult = await queueAutoSend(
             workspaceId,
@@ -429,13 +447,17 @@ IMPORTANT: Always return valid, complete JSON. Keep replies concise.`,
           }
         } else if (!autoSendEnabled) {
           console.log('[AI Reply] Auto-send disabled for workspace');
+        } else if (result.confidenceScore < threshold) {
+          console.log('[AI Reply] Confidence below threshold:', result.confidenceScore, '<', threshold);
         } else {
-          console.log('[AI Reply] Confidence score below threshold:', result.confidenceScore, '<', threshold);
+          console.log('[AI Reply] AI marked as not auto-sendable and confidence < 0.80');
         }
       } catch (autoSendError) {
         // Don't fail the whole operation if auto-send queueing fails
         console.error('[AI Reply] Failed to queue auto-send:', autoSendError);
       }
+    } else {
+      console.log('[AI Reply] Draft not saved, skipping auto-send queue');
     }
 
     // Log AI action
