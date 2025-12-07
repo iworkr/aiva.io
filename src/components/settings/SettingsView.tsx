@@ -13,7 +13,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
@@ -38,6 +41,14 @@ import {
   AlertTriangle,
   Play,
   Pause,
+  Filter,
+  Mail,
+  Ban,
+  ChevronDown,
+  ChevronUp,
+  Briefcase,
+  Home,
+  Shuffle,
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
@@ -48,11 +59,13 @@ import {
   updateAccountSettingsAction,
   updateSyncSettingsAction,
   updateAutoSendSettingsAction,
+  updateAutoSendFiltersAction,
   pauseAutoSendAction,
   resumeAutoSendAction,
   getWorkspaceSettings,
   getUserProfile,
   getAutoSendSettings,
+  getAutoSendFilters,
 } from '@/data/user/settings';
 import { useRouter } from '@/i18n/routing';
 import { ReactNode } from 'react';
@@ -144,6 +157,16 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   const [autoSendTimeStart, setAutoSendTimeStart] = useState('09:00');
   const [autoSendTimeEnd, setAutoSendTimeEnd] = useState('21:00');
   const [autoSendPaused, setAutoSendPaused] = useState(false);
+
+  // Auto-send filter settings state
+  const [inboxType, setInboxType] = useState<'work' | 'personal' | 'mixed'>('work');
+  const [excludedCategories, setExcludedCategories] = useState<string[]>(['marketing', 'newsletter', 'junk_email', 'social', 'notification']);
+  const [excludedSendersText, setExcludedSendersText] = useState('');
+  const [domainWhitelistText, setDomainWhitelistText] = useState('');
+  const [domainBlacklistText, setDomainBlacklistText] = useState('');
+  const [maxRepliesPerThread, setMaxRepliesPerThread] = useState(1);
+  const [senderCooldownMinutes, setSenderCooldownMinutes] = useState(60);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   
   // Check Pro subscription status
   const { hasPro, loading: loadingPro } = useProSubscription(workspaceId);
@@ -153,12 +176,13 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
 
   // Fetch function for settings
   const fetchSettingsData = useCallback(async () => {
-    const [rawSettings, profile, autoSend] = await Promise.all([
+    const [rawSettings, profile, autoSend, autoSendFilters] = await Promise.all([
       getWorkspaceSettings(workspaceId, userId),
       getUserProfile(userId),
       getAutoSendSettings(workspaceId, userId),
+      getAutoSendFilters(workspaceId, userId),
     ]);
-    return { settings: rawSettings, profile, autoSend };
+    return { settings: rawSettings, profile, autoSend, autoSendFilters };
   }, [workspaceId, userId]);
 
   // Use cached data for instant load
@@ -236,6 +260,26 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
           setAutoSendTimeEnd(autoSend.autoSendTimeEnd ?? '21:00');
           setAutoSendPaused(autoSend.autoSendPaused ?? false);
         }
+
+        // Set auto-send filter settings
+        const filters = data.autoSendFilters as {
+          inboxType?: 'work' | 'personal' | 'mixed';
+          excludedCategories?: string[];
+          excludedSenders?: string[];
+          domainWhitelist?: string[];
+          domainBlacklist?: string[];
+          maxRepliesPerThread?: number;
+          senderCooldownMinutes?: number;
+        };
+        if (filters) {
+          setInboxType(filters.inboxType ?? 'work');
+          setExcludedCategories(filters.excludedCategories ?? ['marketing', 'newsletter', 'junk_email', 'social', 'notification']);
+          setExcludedSendersText((filters.excludedSenders ?? []).join('\n'));
+          setDomainWhitelistText((filters.domainWhitelist ?? []).join('\n'));
+          setDomainBlacklistText((filters.domainBlacklist ?? []).join('\n'));
+          setMaxRepliesPerThread(filters.maxRepliesPerThread ?? 1);
+          setSenderCooldownMinutes(filters.senderCooldownMinutes ?? 60);
+        }
         
         setSettingsInitialized(true);
       },
@@ -304,6 +348,26 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
         setAutoSendTimeStart(autoSend.autoSendTimeStart ?? '09:00');
         setAutoSendTimeEnd(autoSend.autoSendTimeEnd ?? '21:00');
         setAutoSendPaused(autoSend.autoSendPaused ?? false);
+      }
+
+      // Initialize filter settings from cache
+      const filters = cachedSettings.autoSendFilters as {
+        inboxType?: 'work' | 'personal' | 'mixed';
+        excludedCategories?: string[];
+        excludedSenders?: string[];
+        domainWhitelist?: string[];
+        domainBlacklist?: string[];
+        maxRepliesPerThread?: number;
+        senderCooldownMinutes?: number;
+      };
+      if (filters) {
+        setInboxType(filters.inboxType ?? 'work');
+        setExcludedCategories(filters.excludedCategories ?? ['marketing', 'newsletter', 'junk_email', 'social', 'notification']);
+        setExcludedSendersText((filters.excludedSenders ?? []).join('\n'));
+        setDomainWhitelistText((filters.domainWhitelist ?? []).join('\n'));
+        setDomainBlacklistText((filters.domainBlacklist ?? []).join('\n'));
+        setMaxRepliesPerThread(filters.maxRepliesPerThread ?? 1);
+        setSenderCooldownMinutes(filters.senderCooldownMinutes ?? 60);
       }
       
       setSettingsInitialized(true);
@@ -391,8 +455,19 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
     },
   });
 
+  // Filter Settings
+  const { execute: saveFilterSettings, status: filterStatus } = useAction(updateAutoSendFiltersAction, {
+    onSuccess: () => {
+      toast.success('Filter settings updated', { duration: 2000 });
+    },
+    onError: ({ error }) => {
+      toast.error(error.serverError || 'Failed to save filter settings');
+    },
+  });
+
   // Auto-send timer ref for debounced saves
   const autoSendSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const filterSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Auto-save AI settings when switches/selects change
   const triggerAIAutoSave = useCallback((updates: { 
@@ -576,6 +651,71 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
     resumeAutoSend({ workspaceId });
   };
 
+  // Filter settings handlers
+  const triggerFilterSave = useCallback((updates: {
+    inboxType?: 'work' | 'personal' | 'mixed';
+    excludedCategories?: string[];
+    excludedSenders?: string[];
+    domainWhitelist?: string[];
+    domainBlacklist?: string[];
+    maxRepliesPerThread?: number;
+    senderCooldownMinutes?: number;
+  }) => {
+    if (!hasInitializedRef.current) return;
+    
+    if (filterSaveTimerRef.current) {
+      clearTimeout(filterSaveTimerRef.current);
+    }
+    
+    filterSaveTimerRef.current = setTimeout(() => {
+      saveFilterSettings({
+        workspaceId,
+        ...updates,
+      });
+    }, 500);
+  }, [workspaceId, saveFilterSettings]);
+
+  const handleInboxTypeChange = (value: 'work' | 'personal' | 'mixed') => {
+    setInboxType(value);
+    triggerFilterSave({ inboxType: value });
+  };
+
+  const handleExcludedCategoryToggle = (category: string, enabled: boolean) => {
+    const newCategories = enabled 
+      ? [...excludedCategories, category]
+      : excludedCategories.filter(c => c !== category);
+    setExcludedCategories(newCategories);
+    triggerFilterSave({ excludedCategories: newCategories });
+  };
+
+  const handleExcludedSendersChange = (text: string) => {
+    setExcludedSendersText(text);
+    const senders = text.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+    triggerFilterSave({ excludedSenders: senders });
+  };
+
+  const handleDomainWhitelistChange = (text: string) => {
+    setDomainWhitelistText(text);
+    const domains = text.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+    triggerFilterSave({ domainWhitelist: domains });
+  };
+
+  const handleDomainBlacklistChange = (text: string) => {
+    setDomainBlacklistText(text);
+    const domains = text.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+    triggerFilterSave({ domainBlacklist: domains });
+  };
+
+  const handleMaxRepliesChange = (value: number) => {
+    setMaxRepliesPerThread(value);
+    triggerFilterSave({ maxRepliesPerThread: value });
+  };
+
+  const handleSenderCooldownChange = (value: number) => {
+    setSenderCooldownMinutes(value);
+    triggerFilterSave({ senderCooldownMinutes: value });
+  };
+
   // Mark as initialized after first data load
   useEffect(() => {
     if (settingsInitialized && !hasInitializedRef.current) {
@@ -592,6 +732,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
       if (aiSaveTimerRef.current) clearTimeout(aiSaveTimerRef.current);
       if (notifSaveTimerRef.current) clearTimeout(notifSaveTimerRef.current);
       if (syncSaveTimerRef.current) clearTimeout(syncSaveTimerRef.current);
+      if (filterSaveTimerRef.current) clearTimeout(filterSaveTimerRef.current);
     };
   }, []);
 
@@ -1059,6 +1200,215 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                 )}
               </CardContent>
             </Card>
+
+            {/* Smart Filters Card - Only show when auto-reply is enabled */}
+            {hasPro && autoSendEnabled && (
+              <Card className="border-primary/20">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-xl font-bold flex items-center gap-2">
+                    <Filter className="h-5 w-5 text-primary" />
+                    Smart Filters
+                  </CardTitle>
+                  <CardDescription className="text-base">
+                    Control which messages receive auto-replies to prevent unwanted responses
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Inbox Type */}
+                  <div className="space-y-3">
+                    <div className="space-y-0.5">
+                      <Label>Inbox Type</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Determines default reply tone and filtering behavior
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <Button
+                        variant={inboxType === 'work' ? 'default' : 'outline'}
+                        className="flex flex-col items-center gap-1 h-auto py-3"
+                        onClick={() => handleInboxTypeChange('work')}
+                      >
+                        <Briefcase className="h-5 w-5" />
+                        <span className="text-sm">Work</span>
+                        <span className="text-xs text-muted-foreground">Formal, professional</span>
+                      </Button>
+                      <Button
+                        variant={inboxType === 'personal' ? 'default' : 'outline'}
+                        className="flex flex-col items-center gap-1 h-auto py-3"
+                        onClick={() => handleInboxTypeChange('personal')}
+                      >
+                        <Home className="h-5 w-5" />
+                        <span className="text-sm">Personal</span>
+                        <span className="text-xs text-muted-foreground">Casual, friendly</span>
+                      </Button>
+                      <Button
+                        variant={inboxType === 'mixed' ? 'default' : 'outline'}
+                        className="flex flex-col items-center gap-1 h-auto py-3"
+                        onClick={() => handleInboxTypeChange('mixed')}
+                      >
+                        <Shuffle className="h-5 w-5" />
+                        <span className="text-sm">Mixed</span>
+                        <span className="text-xs text-muted-foreground">Context-aware</span>
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Excluded Categories */}
+                  <div className="space-y-3">
+                    <div className="space-y-0.5">
+                      <Label className="flex items-center gap-2">
+                        <Ban className="h-4 w-4 text-destructive" />
+                        Excluded Categories
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Never auto-reply to these types of messages
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { id: 'marketing', label: 'Marketing & Promotions' },
+                        { id: 'newsletter', label: 'Newsletters' },
+                        { id: 'junk_email', label: 'Spam / Junk' },
+                        { id: 'social', label: 'Social Notifications' },
+                        { id: 'notification', label: 'System Notifications' },
+                        { id: 'bill', label: 'Bills & Invoices' },
+                      ].map(({ id, label }) => (
+                        <div key={id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`exclude-${id}`}
+                            checked={excludedCategories.includes(id)}
+                            onCheckedChange={(checked) => handleExcludedCategoryToggle(id, !!checked)}
+                          />
+                          <Label htmlFor={`exclude-${id}`} className="text-sm font-normal cursor-pointer">
+                            {label}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Reply Limits */}
+                  <div className="space-y-4">
+                    <div className="space-y-0.5">
+                      <Label>Reply Limits</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Prevent excessive auto-replies to the same conversation or person
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="max-replies" className="text-sm">Max replies per thread</Label>
+                        <Select value={String(maxRepliesPerThread)} onValueChange={(v) => handleMaxRepliesChange(Number(v))}>
+                          <SelectTrigger id="max-replies">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[1, 2, 3, 5].map((n) => (
+                              <SelectItem key={n} value={String(n)}>
+                                {n} {n === 1 ? 'reply' : 'replies'}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="sender-cooldown" className="text-sm">Cooldown per sender</Label>
+                        <Select value={String(senderCooldownMinutes)} onValueChange={(v) => handleSenderCooldownChange(Number(v))}>
+                          <SelectTrigger id="sender-cooldown">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[0, 15, 30, 60, 120, 240].map((mins) => (
+                              <SelectItem key={mins} value={String(mins)}>
+                                {mins === 0 ? 'No cooldown' : mins < 60 ? `${mins} minutes` : `${mins / 60} hour${mins > 60 ? 's' : ''}`}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Advanced Filters - Collapsible */}
+                  <Collapsible open={showAdvancedFilters} onOpenChange={setShowAdvancedFilters}>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" className="w-full justify-between">
+                        <span className="flex items-center gap-2">
+                          <Mail className="h-4 w-4" />
+                          Advanced Sender Filters
+                        </span>
+                        {showAdvancedFilters ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-4 pt-4">
+                      {/* Excluded Sender Patterns */}
+                      <div className="space-y-2">
+                        <Label htmlFor="excluded-senders" className="text-sm">
+                          Blocked Sender Patterns
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          One pattern per line. Examples: noreply@, @marketing.com, support@
+                        </p>
+                        <Textarea
+                          id="excluded-senders"
+                          placeholder="noreply@&#10;no-reply@&#10;mailer-daemon@&#10;notifications@"
+                          value={excludedSendersText}
+                          onChange={(e) => handleExcludedSendersChange(e.target.value)}
+                          rows={4}
+                        />
+                      </div>
+
+                      {/* Domain Blacklist */}
+                      <div className="space-y-2">
+                        <Label htmlFor="domain-blacklist" className="text-sm">
+                          Blocked Domains
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Never auto-reply to these domains. One per line.
+                        </p>
+                        <Textarea
+                          id="domain-blacklist"
+                          placeholder="spammer.com&#10;marketing-emails.net"
+                          value={domainBlacklistText}
+                          onChange={(e) => handleDomainBlacklistChange(e.target.value)}
+                          rows={3}
+                        />
+                      </div>
+
+                      {/* Domain Whitelist */}
+                      <div className="space-y-2">
+                        <Label htmlFor="domain-whitelist" className="text-sm">
+                          Allowed Domains (Optional)
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          If set, only auto-reply to these domains. Leave empty to allow all.
+                        </p>
+                        <Textarea
+                          id="domain-whitelist"
+                          placeholder="mycompany.com&#10;partner-company.com"
+                          value={domainWhitelistText}
+                          onChange={(e) => handleDomainWhitelistChange(e.target.value)}
+                          rows={3}
+                        />
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+
+                  {filterStatus === 'executing' && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Saving filters...
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Auto-save notice */}
             <p className="text-xs text-muted-foreground text-right">

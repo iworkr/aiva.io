@@ -12,6 +12,11 @@ import { syncGmailMessages } from '@/lib/gmail/sync';
 import { syncOutlookMessages } from '@/lib/outlook/sync';
 import { classifyMessage } from '@/lib/ai/classifier';
 import { generateReplyDraft } from '@/lib/ai/reply-generator';
+import {
+  checkAutoReplyEligibility,
+  DEFAULT_EXCLUDED_SENDER_PATTERNS,
+  DEFAULT_EXCLUDED_CATEGORIES,
+} from '@/lib/workers/auto-send-worker';
 
 /**
  * Verify the request is from Vercel Cron or an authorized source
@@ -78,6 +83,7 @@ export async function GET(request: NextRequest) {
         id,
         workspace_id,
         provider,
+        provider_account_id,
         provider_account_name,
         status,
         access_token,
@@ -168,15 +174,35 @@ export async function GET(request: NextRequest) {
         let classifiedCount = 0;
         let draftsGenerated = 0;
         
-        // Check if workspace has auto-send enabled
+        // Check if workspace has auto-send enabled and get filter settings
         const { data: wsSettings } = await supabase
           .from('workspace_settings')
-          .select('auto_send_enabled, auto_send_confidence_threshold')
+          .select(`
+            auto_send_enabled, 
+            auto_send_confidence_threshold,
+            auto_send_excluded_categories,
+            auto_send_excluded_senders,
+            auto_send_domain_whitelist,
+            auto_send_domain_blacklist,
+            auto_send_max_replies_per_thread,
+            auto_send_sender_cooldown_minutes
+          `)
           .eq('workspace_id', connection.workspace_id)
           .single();
 
         const autoSendEnabled = wsSettings?.auto_send_enabled ?? false;
         const confidenceThreshold = wsSettings?.auto_send_confidence_threshold ?? 0.70;
+        
+        // Filter settings for smart auto-reply
+        const filterSettings = {
+          connectionEmail: connection.provider_account_id || '',
+          excludedSenderPatterns: (wsSettings?.auto_send_excluded_senders as string[]) || DEFAULT_EXCLUDED_SENDER_PATTERNS,
+          excludedCategories: (wsSettings?.auto_send_excluded_categories as string[]) || DEFAULT_EXCLUDED_CATEGORIES,
+          domainWhitelist: (wsSettings?.auto_send_domain_whitelist as string[]) || [],
+          domainBlacklist: (wsSettings?.auto_send_domain_blacklist as string[]) || [],
+          maxRepliesPerThread: wsSettings?.auto_send_max_replies_per_thread ?? 1,
+          senderCooldownMinutes: wsSettings?.auto_send_sender_cooldown_minutes ?? 60,
+        };
 
         try {
           const { data: unclassifiedMessages } = await supabase
@@ -207,28 +233,63 @@ export async function GET(request: NextRequest) {
 
         // ALWAYS generate drafts for actionable messages (drafts are useful regardless of auto-send)
         // Auto-send setting only controls whether drafts get QUEUED for automatic sending
+        // But we now filter OUT inappropriate messages (self-replies, system emails, etc.)
         console.log(`   ✍️ Generating drafts for actionable messages (auto-send: ${autoSendEnabled ? 'enabled' : 'disabled'}, threshold: ${confidenceThreshold})...`);
+        console.log(`      🔍 Filter: connection email=${filterSettings.connectionEmail}, excluded categories=${filterSettings.excludedCategories.length}, excluded senders=${filterSettings.excludedSenderPatterns.length}`);
         
         try {
           // Get messages that need drafts:
           // - Any actionability type that might need a response (excluding 'none')
           // - No existing draft
           // - Recent (last 24 hours)
+          // - Include sender_email, category, provider_thread_id for filtering
           const { data: actionableMessages } = await supabase
             .from('messages')
-            .select('id, subject, actionability, has_draft_reply')
+            .select('id, subject, actionability, has_draft_reply, sender_email, category, provider_thread_id')
             .eq('workspace_id', connection.workspace_id)
             .in('actionability', ['question', 'request', 'fyi', 'scheduling_intent', 'task']) // All types except 'none'
             .eq('has_draft_reply', false)
             .gte('timestamp', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
             .order('timestamp', { ascending: false })
-            .limit(10); // Limit to avoid timeouts
+            .limit(15); // Limit to avoid timeouts, increased slightly to account for filtering
 
           if (actionableMessages && actionableMessages.length > 0) {
             console.log(`      📝 Found ${actionableMessages.length} actionable messages without drafts`);
             
+            let skippedByFilter = 0;
+            
             for (const msg of actionableMessages) {
               try {
+                // *** SMART FILTER CHECK ***
+                // Check if this message should receive an auto-reply
+                const filterResult = await checkAutoReplyEligibility(
+                  {
+                    id: msg.id,
+                    sender_email: msg.sender_email || '',
+                    category: msg.category,
+                    provider_thread_id: msg.provider_thread_id,
+                  },
+                  connection.workspace_id,
+                  filterSettings
+                );
+
+                if (!filterResult.eligible) {
+                  skippedByFilter++;
+                  console.log(`      ⏭️ SKIPPED: ${msg.subject?.substring(0, 30) || 'No subject'}`);
+                  console.log(`         Reason: ${filterResult.reason}`);
+                  
+                  // Log to auto_send_log for transparency
+                  await supabase.from('auto_send_log').insert({
+                    workspace_id: connection.workspace_id,
+                    message_id: msg.id,
+                    action: 'skipped',
+                    skip_reason: filterResult.reason,
+                    details: filterResult.details as any,
+                  });
+                  
+                  continue;
+                }
+
                 console.log(`      ✍️ Generating draft for: ${msg.subject?.substring(0, 40) || 'No subject'}...`);
                 
                 const draftResult = await generateReplyDraft(
@@ -251,7 +312,7 @@ export async function GET(request: NextRequest) {
               }
             }
             
-            console.log(`   📊 Generated ${draftsGenerated}/${actionableMessages.length} drafts`);
+            console.log(`   📊 Generated ${draftsGenerated}/${actionableMessages.length} drafts (${skippedByFilter} skipped by filters)`);
           } else {
             console.log(`      ℹ️ No actionable messages without drafts found`);
           }

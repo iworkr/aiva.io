@@ -69,6 +69,18 @@ const cancelScheduledSendSchema = z.object({
   queueId: z.string().uuid(),
 });
 
+// Auto-Send Filter Settings Schema
+const updateAutoSendFiltersSchema = z.object({
+  workspaceId: z.string().uuid(),
+  inboxType: z.enum(['work', 'personal', 'mixed']).optional(),
+  excludedCategories: z.array(z.string()).optional(),
+  excludedSenders: z.array(z.string()).optional(),
+  domainWhitelist: z.array(z.string()).optional(),
+  domainBlacklist: z.array(z.string()).optional(),
+  maxRepliesPerThread: z.number().min(1).max(10).optional(),
+  senderCooldownMinutes: z.number().min(0).max(1440).optional(), // 0-24 hours
+});
+
 // ============================================================================
 // AI SETTINGS
 // ============================================================================
@@ -483,6 +495,93 @@ export const cancelScheduledSendAction = authActionClient
     revalidatePath(`/settings`);
     return { success: true };
   });
+
+// ============================================================================
+// AUTO-SEND FILTER SETTINGS
+// ============================================================================
+
+export const updateAutoSendFiltersAction = authActionClient
+  .schema(updateAutoSendFiltersSchema)
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    const { workspaceId, ...settings } = parsedInput;
+
+    const isMember = await isWorkspaceMember(userId, workspaceId);
+    if (!isMember) throw new Error('Not a workspace member');
+
+    const supabase = await createSupabaseUserServerActionClient();
+
+    // Build update object with only provided fields
+    const updateData: Record<string, any> = {};
+    
+    if (settings.inboxType !== undefined) {
+      updateData.inbox_type = settings.inboxType;
+    }
+    if (settings.excludedCategories !== undefined) {
+      updateData.auto_send_excluded_categories = settings.excludedCategories;
+    }
+    if (settings.excludedSenders !== undefined) {
+      updateData.auto_send_excluded_senders = settings.excludedSenders;
+    }
+    if (settings.domainWhitelist !== undefined) {
+      updateData.auto_send_domain_whitelist = settings.domainWhitelist;
+    }
+    if (settings.domainBlacklist !== undefined) {
+      updateData.auto_send_domain_blacklist = settings.domainBlacklist;
+    }
+    if (settings.maxRepliesPerThread !== undefined) {
+      updateData.auto_send_max_replies_per_thread = settings.maxRepliesPerThread;
+    }
+    if (settings.senderCooldownMinutes !== undefined) {
+      updateData.auto_send_sender_cooldown_minutes = settings.senderCooldownMinutes;
+    }
+
+    const { error } = await supabase
+      .from('workspace_settings')
+      .update(updateData)
+      .eq('workspace_id', workspaceId);
+
+    if (error) throw new Error(error.message);
+
+    revalidatePath(`/settings`);
+    return { success: true };
+  });
+
+// Get auto-send filter settings for a workspace
+export async function getAutoSendFilters(workspaceId: string, userId: string) {
+  const isMember = await isWorkspaceMember(userId, workspaceId);
+  if (!isMember) throw new Error('Not a workspace member');
+
+  const supabase = await createSupabaseUserServerActionClient();
+
+  const { data, error } = await supabase
+    .from('workspace_settings')
+    .select(`
+      inbox_type,
+      auto_send_excluded_categories,
+      auto_send_excluded_senders,
+      auto_send_domain_whitelist,
+      auto_send_domain_blacklist,
+      auto_send_max_replies_per_thread,
+      auto_send_sender_cooldown_minutes
+    `)
+    .eq('workspace_id', workspaceId)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    throw new Error(error.message);
+  }
+
+  // Return defaults if no settings found
+  return {
+    inboxType: data?.inbox_type ?? 'work',
+    excludedCategories: data?.auto_send_excluded_categories ?? ['marketing', 'newsletter', 'junk_email', 'social', 'notification'],
+    excludedSenders: data?.auto_send_excluded_senders ?? ['noreply@', 'no-reply@', 'donotreply@', 'mailer-daemon@', 'postmaster@', 'notifications@', 'alert@', 'system@', 'automated@', 'bounce@', 'newsletter@', 'marketing@'],
+    domainWhitelist: data?.auto_send_domain_whitelist ?? [],
+    domainBlacklist: data?.auto_send_domain_blacklist ?? [],
+    maxRepliesPerThread: data?.auto_send_max_replies_per_thread ?? 1,
+    senderCooldownMinutes: data?.auto_send_sender_cooldown_minutes ?? 60,
+  };
+}
 
 // Get auto-send queue for a workspace
 export async function getAutoSendQueue(workspaceId: string, userId: string) {

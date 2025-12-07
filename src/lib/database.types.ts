@@ -2665,11 +2665,18 @@ export type Database = {
           auto_send_delay_max: number | null
           auto_send_delay_min: number | null
           auto_send_delay_type: string | null
+          auto_send_domain_blacklist: string[] | null
+          auto_send_domain_whitelist: string[] | null
           auto_send_enabled: boolean | null
+          auto_send_excluded_categories: string[] | null
+          auto_send_excluded_senders: string[] | null
+          auto_send_max_replies_per_thread: number | null
           auto_send_paused: boolean | null
           auto_send_paused_at: string | null
+          auto_send_sender_cooldown_minutes: number | null
           auto_send_time_end: string | null
           auto_send_time_start: string | null
+          inbox_type: string | null
           sync_frequency_minutes: number | null
           workspace_id: string
           workspace_settings: Json
@@ -2679,11 +2686,18 @@ export type Database = {
           auto_send_delay_max?: number | null
           auto_send_delay_min?: number | null
           auto_send_delay_type?: string | null
+          auto_send_domain_blacklist?: string[] | null
+          auto_send_domain_whitelist?: string[] | null
           auto_send_enabled?: boolean | null
+          auto_send_excluded_categories?: string[] | null
+          auto_send_excluded_senders?: string[] | null
+          auto_send_max_replies_per_thread?: number | null
           auto_send_paused?: boolean | null
           auto_send_paused_at?: string | null
+          auto_send_sender_cooldown_minutes?: number | null
           auto_send_time_end?: string | null
           auto_send_time_start?: string | null
+          inbox_type?: string | null
           sync_frequency_minutes?: number | null
           workspace_id: string
           workspace_settings?: Json
@@ -2693,11 +2707,18 @@ export type Database = {
           auto_send_delay_max?: number | null
           auto_send_delay_min?: number | null
           auto_send_delay_type?: string | null
+          auto_send_domain_blacklist?: string[] | null
+          auto_send_domain_whitelist?: string[] | null
           auto_send_enabled?: boolean | null
+          auto_send_excluded_categories?: string[] | null
+          auto_send_excluded_senders?: string[] | null
+          auto_send_max_replies_per_thread?: number | null
           auto_send_paused?: boolean | null
           auto_send_paused_at?: string | null
+          auto_send_sender_cooldown_minutes?: number | null
           auto_send_time_end?: string | null
           auto_send_time_start?: string | null
+          inbox_type?: string | null
           sync_frequency_minutes?: number | null
           workspace_id?: string
           workspace_settings?: Json
