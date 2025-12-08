@@ -51,6 +51,7 @@ import {
   Briefcase,
   Home,
   Shuffle,
+  Inbox,
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
@@ -1543,6 +1544,99 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                       </div>
                     </>
                   )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Inbox Zero Settings Card */}
+            {hasPro && (
+              <Card className="border-green-500/20">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-xl font-bold flex items-center gap-2">
+                    <Inbox className="h-5 w-5 text-green-500" />
+                    Inbox Zero
+                  </CardTitle>
+                  <CardDescription className="text-base">
+                    Automatically archive messages after Aiva handles them
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Master Toggle */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="inbox-zero-enabled">Enable Inbox Zero</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Archive handled messages in Gmail/Outlook to keep your inbox clean
+                      </p>
+                    </div>
+                    <Switch
+                      id="inbox-zero-enabled"
+                      checked={true}
+                      disabled
+                    />
+                  </div>
+
+                  <Separator />
+
+                  {/* Archive Behavior */}
+                  <div className="space-y-3">
+                    <Label>When Aiva handles a message:</Label>
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox id="mark-read" checked disabled />
+                        <Label htmlFor="mark-read" className="text-sm font-normal">
+                          Mark as read
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox id="archive" checked disabled />
+                        <Label htmlFor="archive" className="text-sm font-normal">
+                          Archive (remove from inbox)
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox id="apply-label" checked disabled />
+                        <Label htmlFor="apply-label" className="text-sm font-normal">
+                          Apply &quot;Handled by Aiva&quot; label
+                        </Label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Daily Digest */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label>Daily Digest Email</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Receive a daily summary of Aiva activity
+                        </p>
+                      </div>
+                      <Switch
+                        checked={true}
+                        disabled
+                      />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Label className="text-sm text-muted-foreground">Send at:</Label>
+                      <Input
+                        type="time"
+                        defaultValue="18:00"
+                        className="w-32"
+                        disabled
+                      />
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/30 dark:border-green-800 p-3">
+                    <p className="text-sm text-green-700 dark:text-green-300">
+                      <CheckCircle className="inline h-4 w-4 mr-1" />
+                      With Inbox Zero enabled, your Gmail/Outlook inbox stays clean while 
+                      you manage everything through Aiva.
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
             )}

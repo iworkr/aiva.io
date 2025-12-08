@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
 import { sendReply } from '@/lib/email/send';
 import { getWorkspaceAutoSendSettings, updateQueueItemStatus } from '@/lib/workers/auto-send-worker';
+import { markMessageHandled } from '@/lib/inbox-zero/handler';
 
 // Verify cron secret to prevent unauthorized access
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -324,6 +325,16 @@ export async function GET(request: NextRequest) {
             .from('message_drafts')
             .update({ auto_sent: true, auto_sent_at: new Date().toISOString() })
             .eq('id', item.draft_id);
+
+          // Mark message as handled and archive in provider (Inbox Zero)
+          console.log(`   📥 Marking message as handled and archiving...`);
+          const handleResult = await markMessageHandled(item.message_id, item.workspace_id, {
+            action: 'auto_replied',
+            markRead: true,
+            archive: true,
+            applyLabel: true,
+          });
+          console.log(`   ${handleResult.success ? '✅' : '⚠️'} Handle result: archived=${handleResult.archivedInProvider}`);
 
           results.sent++;
         } else {

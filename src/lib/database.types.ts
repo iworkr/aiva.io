@@ -112,6 +112,63 @@ export type Database = {
           },
         ]
       }
+      aiva_notifications: {
+        Row: {
+          body: string | null
+          created_at: string | null
+          data: Json | null
+          id: string
+          read: boolean | null
+          sent_email: boolean | null
+          sent_push: boolean | null
+          title: string
+          type: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string | null
+          data?: Json | null
+          id?: string
+          read?: boolean | null
+          sent_email?: boolean | null
+          sent_push?: boolean | null
+          title: string
+          type: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string | null
+          data?: Json | null
+          id?: string
+          read?: boolean | null
+          sent_email?: boolean | null
+          sent_push?: boolean | null
+          title?: string
+          type?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aiva_notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aiva_notifications_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_settings: {
         Row: {
           id: boolean
@@ -1918,12 +1975,77 @@ export type Database = {
           },
         ]
       }
+      message_handle_log: {
+        Row: {
+          action: string
+          created_at: string | null
+          error_message: string | null
+          id: string
+          message_id: string
+          metadata: Json | null
+          provider_action: string | null
+          provider_message_id: string | null
+          success: boolean | null
+          user_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_id: string
+          metadata?: Json | null
+          provider_action?: string | null
+          provider_message_id?: string | null
+          success?: boolean | null
+          user_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_id?: string
+          metadata?: Json | null
+          provider_action?: string | null
+          provider_message_id?: string | null
+          success?: boolean | null
+          user_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_handle_log_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_handle_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_handle_log_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           actionability:
             | Database["public"]["Enums"]["message_actionability"]
             | null
           ai_summary_short: string | null
+          archived_in_provider: boolean | null
           attachments: Json | null
           auto_sent: boolean | null
           body: string
@@ -1932,6 +2054,9 @@ export type Database = {
           channel_connection_id: string
           confidence_score: number | null
           created_at: string
+          handle_action: string | null
+          handled_at: string | null
+          handled_by_aiva: boolean | null
           has_draft_reply: boolean | null
           id: string
           is_read: boolean | null
@@ -1965,6 +2090,7 @@ export type Database = {
             | Database["public"]["Enums"]["message_actionability"]
             | null
           ai_summary_short?: string | null
+          archived_in_provider?: boolean | null
           attachments?: Json | null
           auto_sent?: boolean | null
           body: string
@@ -1973,6 +2099,9 @@ export type Database = {
           channel_connection_id: string
           confidence_score?: number | null
           created_at?: string
+          handle_action?: string | null
+          handled_at?: string | null
+          handled_by_aiva?: boolean | null
           has_draft_reply?: boolean | null
           id?: string
           is_read?: boolean | null
@@ -2006,6 +2135,7 @@ export type Database = {
             | Database["public"]["Enums"]["message_actionability"]
             | null
           ai_summary_short?: string | null
+          archived_in_provider?: boolean | null
           attachments?: Json | null
           auto_sent?: boolean | null
           body?: string
@@ -2014,6 +2144,9 @@ export type Database = {
           channel_connection_id?: string
           confidence_score?: number | null
           created_at?: string
+          handle_action?: string | null
+          handled_at?: string | null
+          handled_by_aiva?: boolean | null
           has_draft_reply?: boolean | null
           id?: string
           is_read?: boolean | null
@@ -2695,6 +2828,8 @@ export type Database = {
       }
       workspace_settings: {
         Row: {
+          apply_aiva_label: boolean | null
+          auto_archive_handled: boolean | null
           auto_send_confidence_threshold: number | null
           auto_send_delay_max: number | null
           auto_send_delay_min: number | null
@@ -2710,17 +2845,25 @@ export type Database = {
           auto_send_sender_cooldown_minutes: number | null
           auto_send_time_end: string | null
           auto_send_time_start: string | null
+          daily_digest_enabled: boolean | null
+          daily_digest_time: string | null
           human_review_confidence_threshold: number | null
           human_review_enabled: boolean | null
           human_review_for_commitments: boolean | null
           human_review_for_scheduling: boolean | null
           human_review_for_sensitive: boolean | null
           inbox_type: string | null
+          inbox_zero_enabled: boolean | null
+          notify_on_high_priority: boolean | null
+          notify_on_review_needed: boolean | null
+          push_notifications_enabled: boolean | null
           sync_frequency_minutes: number | null
           workspace_id: string
           workspace_settings: Json
         }
         Insert: {
+          apply_aiva_label?: boolean | null
+          auto_archive_handled?: boolean | null
           auto_send_confidence_threshold?: number | null
           auto_send_delay_max?: number | null
           auto_send_delay_min?: number | null
@@ -2736,17 +2879,25 @@ export type Database = {
           auto_send_sender_cooldown_minutes?: number | null
           auto_send_time_end?: string | null
           auto_send_time_start?: string | null
+          daily_digest_enabled?: boolean | null
+          daily_digest_time?: string | null
           human_review_confidence_threshold?: number | null
           human_review_enabled?: boolean | null
           human_review_for_commitments?: boolean | null
           human_review_for_scheduling?: boolean | null
           human_review_for_sensitive?: boolean | null
           inbox_type?: string | null
+          inbox_zero_enabled?: boolean | null
+          notify_on_high_priority?: boolean | null
+          notify_on_review_needed?: boolean | null
+          push_notifications_enabled?: boolean | null
           sync_frequency_minutes?: number | null
           workspace_id: string
           workspace_settings?: Json
         }
         Update: {
+          apply_aiva_label?: boolean | null
+          auto_archive_handled?: boolean | null
           auto_send_confidence_threshold?: number | null
           auto_send_delay_max?: number | null
           auto_send_delay_min?: number | null
@@ -2762,12 +2913,18 @@ export type Database = {
           auto_send_sender_cooldown_minutes?: number | null
           auto_send_time_end?: string | null
           auto_send_time_start?: string | null
+          daily_digest_enabled?: boolean | null
+          daily_digest_time?: string | null
           human_review_confidence_threshold?: number | null
           human_review_enabled?: boolean | null
           human_review_for_commitments?: boolean | null
           human_review_for_scheduling?: boolean | null
           human_review_for_sensitive?: boolean | null
           inbox_type?: string | null
+          inbox_zero_enabled?: boolean | null
+          notify_on_high_priority?: boolean | null
+          notify_on_review_needed?: boolean | null
+          push_notifications_enabled?: boolean | null
           sync_frequency_minutes?: number | null
           workspace_id?: string
           workspace_settings?: Json
@@ -2853,6 +3010,16 @@ export type Database = {
       get_project_workspace_uuid: {
         Args: { project_id: string }
         Returns: string
+      }
+      get_workspace_daily_stats: {
+        Args: { p_date?: string; p_workspace_id: string }
+        Returns: {
+          auto_replies_sent: number
+          high_priority_unhandled: number
+          messages_handled: number
+          messages_received: number
+          review_queue_count: number
+        }[]
       }
       get_workspace_team_member_admins: {
         Args: { workspace_id: string }

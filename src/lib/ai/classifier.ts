@@ -455,6 +455,19 @@ Be consistent: similar messages should get similar classifications.`,
       processing_time_ms: processingTime,
     });
 
+    // Auto-handle messages that don't need a response (Inbox Zero)
+    // This runs after classification for messages that are informational only
+    if (result.actionability === 'none' && !needsReview) {
+      try {
+        const { handleNoActionNeeded } = await import('@/lib/inbox-zero/handler');
+        await handleNoActionNeeded(messageId, workspaceId);
+        console.log(`[Classifier] Auto-handled no-action message: ${messageId}`);
+      } catch (handleError) {
+        // Don't fail classification if handling fails
+        console.error('[Classifier] Failed to auto-handle message:', handleError);
+      }
+    }
+
     // Return result with human review detection
     return {
       ...result,

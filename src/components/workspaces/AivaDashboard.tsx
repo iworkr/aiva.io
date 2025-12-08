@@ -1,11 +1,15 @@
 /**
- * Aiva Dashboard
- * Main dashboard showing Aiva.io stats and quick actions
+ * Aiva Dashboard - Inbox Zero Experience
+ * Main dashboard showing what needs attention, stats, and daily briefing
  */
 
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Inbox,
   Calendar,
@@ -15,291 +19,403 @@ import {
   TrendingUp,
   Clock,
   ArrowRight,
+  CheckCircle2,
+  AlertCircle,
+  Star,
+  User,
+  MessageSquare,
+  Timer,
+  Percent,
+  ExternalLink,
 } from 'lucide-react';
 import Link from 'next/link';
-import { getUser } from '@/utils/server/serverSessionUtils';
-import { createSupabaseUserServerComponentClient } from '@/supabase-clients/user/createSupabaseUserServerComponentClient';
+import { formatDistanceToNow } from 'date-fns';
+import {
+  getDashboardStats,
+  getNeedsAttentionItems,
+  getDailyBriefing,
+  type DashboardStats,
+  type AttentionItem,
+  type DailyBriefing,
+} from '@/data/user/dashboard-stats';
 
-export async function AivaDashboard() {
-  const { data: { user } } = await getUser();
-  
-  if (!user) {
-    return null;
-  }
+interface AivaDashboardProps {
+  workspaceId: string;
+  userId: string;
+  userName?: string;
+}
 
-  const supabase = await createSupabaseUserServerComponentClient();
-  
-  // Get user's workspaces via workspace_members junction table
-  const { data: workspaceMembers } = await supabase
-    .from('workspace_members')
-    .select('workspace_id')
-    .eq('workspace_member_id', user.id)
-    .limit(1)
-    .single();
-  
-  if (!workspaceMembers) {
-    return null;
-  }
+function StatCard({
+  title,
+  value,
+  icon: Icon,
+  description,
+  trend,
+  color = 'text-primary',
+}: {
+  title: string;
+  value: string | number;
+  icon: React.ComponentType<{ className?: string }>;
+  description?: string;
+  trend?: string;
+  color?: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-sm text-muted-foreground">{title}</p>
+            <p className="text-3xl font-bold mt-1">{value}</p>
+            {description && (
+              <p className="text-xs text-muted-foreground mt-1">{description}</p>
+            )}
+          </div>
+          <div className={`p-3 rounded-full bg-muted/50 ${color}`}>
+            <Icon className="h-5 w-5" />
+          </div>
+        </div>
+        {trend && (
+          <div className="flex items-center gap-1 mt-3 text-xs text-green-600">
+            <TrendingUp className="h-3 w-3" />
+            {trend}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
-  const { data: workspace } = await supabase
-    .from('workspaces')
-    .select('*')
-    .eq('id', workspaceMembers.workspace_id)
-    .single();
+function AttentionItemCard({ item, onClick }: { item: AttentionItem; onClick?: () => void }) {
+  const typeConfig = {
+    review: { color: 'text-amber-500', bg: 'bg-amber-100 dark:bg-amber-900/30', label: 'Needs Review' },
+    high_priority: { color: 'text-red-500', bg: 'bg-red-100 dark:bg-red-900/30', label: 'High Priority' },
+    scheduling: { color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/30', label: 'Scheduling' },
+    unhandled: { color: 'text-gray-500', bg: 'bg-gray-100 dark:bg-gray-900/30', label: 'Unhandled' },
+  };
 
-  if (!workspace) {
-    return null;
-  }
-
-  // Fetch stats using the same supabase client
-
-  const [
-    { count: totalMessages },
-    { count: unreadMessages },
-    { count: upcomingEvents },
-    { count: todayEvents },
-    { count: connectedChannels },
-  ] = await Promise.all([
-    supabase
-      .from('messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('workspace_id', workspace.id),
-    supabase
-      .from('messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('workspace_id', workspace.id)
-      .eq('is_read', false),
-    supabase
-      .from('events')
-      .select('*', { count: 'exact', head: true })
-      .eq('workspace_id', workspace.id)
-      .gte('start_time', new Date().toISOString()),
-    supabase
-      .from('events')
-      .select('*', { count: 'exact', head: true })
-      .eq('workspace_id', workspace.id)
-      .gte('start_time', new Date().toISOString())
-      .lte('start_time', new Date(new Date().setHours(23, 59, 59, 999)).toISOString()),
-    supabase
-      .from('channel_connections')
-      .select('*', { count: 'exact', head: true })
-      .eq('workspace_id', workspace.id)
-      .eq('status', 'active'),
-  ]);
-
-  const stats = [
-    {
-      title: 'Unread Messages',
-      value: unreadMessages || 0,
-      total: totalMessages || 0,
-      icon: Inbox,
-      href: '/inbox',
-      color: 'text-primary',
-      bgColor: 'bg-primary/10',
-    },
-    {
-      title: "Today's Events",
-      value: todayEvents || 0,
-      icon: Calendar,
-      href: '/calendar',
-      color: 'text-sky-600',
-      bgColor: 'bg-sky-100 dark:bg-sky-900/20',
-    },
-    {
-      title: 'Upcoming Events',
-      value: upcomingEvents || 0,
-      icon: Calendar,
-      href: '/calendar',
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-100 dark:bg-purple-900/20',
-    },
-    {
-      title: 'Connected Channels',
-      value: connectedChannels || 0,
-      icon: Zap,
-      href: '/channels',
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-100 dark:bg-orange-900/20',
-    },
-  ];
-
-  const quickActions = [
-    {
-      title: 'Check Inbox',
-      description: 'View your unified inbox with AI insights',
-      icon: Inbox,
-      href: '/inbox',
-      badge: unreadMessages ? `${unreadMessages} unread` : null,
-    },
-    {
-      title: 'View Calendar',
-      description: 'See your upcoming events',
-      icon: Calendar,
-      href: '/calendar',
-      badge: upcomingEvents ? `${upcomingEvents} upcoming` : null,
-    },
-    {
-      title: 'Connect Channels',
-      description: 'Add more communication channels',
-      icon: Zap,
-      href: '/channels',
-      badge: connectedChannels ? `${connectedChannels} connected` : 'Get started',
-    },
-  ];
+  const config = typeConfig[item.type];
 
   return (
-    <div className="space-y-8">
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          const isEmpty = stat.value === 0;
-          return (
-            <Link key={stat.title} href={stat.href}>
-              <Card className={`transition-all hover:shadow-md cursor-pointer ${isEmpty ? 'opacity-60' : ''}`}>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">
-                        {stat.title}
-                      </p>
-                      <div className="flex items-baseline gap-2">
-                        {isEmpty ? (
-                          <p className="text-2xl font-semibold text-muted-foreground">
-                            No {stat.title.toLowerCase()} yet
-                          </p>
-                        ) : (
-                          <>
-                            <p className="text-3xl font-bold">{stat.value}</p>
-                            {stat.total !== undefined && (
-                              <p className="text-sm text-muted-foreground">
-                                of {stat.total}
-                              </p>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${isEmpty ? 'bg-muted' : stat.bgColor}`}>
-                      <Icon className={`h-6 w-6 ${isEmpty ? 'text-muted-foreground' : stat.color}`} />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* Quick Actions */}
-      <div>
-        <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          {quickActions.map((action) => {
-            const Icon = action.icon;
-            return (
-              <Link key={action.title} href={action.href}>
-                <Card className="transition-all hover:shadow-md cursor-pointer">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-4">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                          <Icon className="h-5 w-5 text-primary" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-semibold">{action.title}</h3>
-                            {action.badge && (
-                              <Badge variant="secondary" className="text-xs">
-                                {action.badge}
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            {action.description}
-                          </p>
-                        </div>
-                      </div>
-                      <ArrowRight className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* AI Features Highlight */}
-      <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            <CardTitle>AI-Powered Features</CardTitle>
+    <Link href={`/inbox?message=${item.messageId}`}>
+      <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+        <CardContent className="py-4">
+          <div className="flex items-start gap-3">
+            <div className={`p-2 rounded-full ${config.bg}`}>
+              {item.type === 'review' && <AlertCircle className={`h-4 w-4 ${config.color}`} />}
+              {item.type === 'high_priority' && <Star className={`h-4 w-4 ${config.color}`} />}
+              {item.type === 'scheduling' && <Calendar className={`h-4 w-4 ${config.color}`} />}
+              {item.type === 'unhandled' && <Mail className={`h-4 w-4 ${config.color}`} />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <Badge variant="outline" className={`text-xs ${config.color}`}>
+                  {config.label}
+                </Badge>
+                {item.provider && (
+                  <Badge variant="secondary" className="text-xs">
+                    {item.provider}
+                  </Badge>
+                )}
+              </div>
+              <h4 className="font-medium truncate">{item.subject}</h4>
+              <p className="text-sm text-muted-foreground truncate">
+                {item.senderName || item.senderEmail}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
+              </p>
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
           </div>
-          <CardDescription>
-            Aiva.io uses advanced AI to make your communication smarter
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                <Mail className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <h4 className="font-medium text-sm">Smart Classification</h4>
-                <p className="text-xs text-muted-foreground">
-                  Auto-categorize messages by priority and type
-                </p>
-              </div>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
+
+function InboxZeroState() {
+  return (
+    <Card className="border-green-200 dark:border-green-800 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30">
+      <CardContent className="py-12 text-center">
+        <div className="flex justify-center mb-4">
+          <div className="p-4 rounded-full bg-green-100 dark:bg-green-900/50">
+            <CheckCircle2 className="h-12 w-12 text-green-600" />
+          </div>
+        </div>
+        <h3 className="text-2xl font-bold text-green-700 dark:text-green-400 mb-2">
+          Inbox Zero! 🎉
+        </h3>
+        <p className="text-green-600 dark:text-green-500 max-w-md mx-auto">
+          Amazing work! You have no messages that need your attention right now.
+          Aiva is handling everything.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function AivaDashboard({ workspaceId, userId, userName }: AivaDashboardProps) {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [attentionItems, setAttentionItems] = useState<AttentionItem[]>([]);
+  const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const loadDashboardData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [statsData, itemsData, briefingData] = await Promise.all([
+        getDashboardStats(workspaceId, userId),
+        getNeedsAttentionItems(workspaceId, userId, 5),
+        getDailyBriefing(workspaceId, userId),
+      ]);
+      setStats(statsData);
+      setAttentionItems(itemsData);
+      setBriefing(briefingData);
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [workspaceId, userId]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-24 w-full" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+        </div>
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  const needsAttention = (stats?.reviewQueueCount || 0) + (stats?.highPriorityUnhandled || 0);
+
+  return (
+    <div className="space-y-6">
+      {/* Greeting Header */}
+      <Card className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-primary/20">
+        <CardContent className="py-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold">
+                {briefing?.greeting || `Welcome back${userName ? `, ${userName}` : ''}!`}
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                {briefing?.summary || 'Loading your daily briefing...'}
+              </p>
             </div>
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                <TrendingUp className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <h4 className="font-medium text-sm">Reply Suggestions</h4>
-                <p className="text-xs text-muted-foreground">
-                  Generate context-aware replies in multiple tones
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                <Clock className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <h4 className="font-medium text-sm">Auto-Tasks & Events</h4>
-                <p className="text-xs text-muted-foreground">
-                  Extract tasks and create events automatically
-                </p>
-              </div>
+            <div className="flex items-center gap-3">
+              {needsAttention > 0 ? (
+                <Badge variant="destructive" className="text-base px-4 py-2">
+                  {needsAttention} need{needsAttention !== 1 ? '' : 's'} attention
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-base px-4 py-2 border-green-500 text-green-600">
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  All caught up
+                </Badge>
+              )}
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Getting Started */}
-      {connectedChannels === 0 && (
-        <Card className="border-dashed">
-          <CardHeader>
-            <CardTitle>Get Started with Aiva.io</CardTitle>
-            <CardDescription>
-              Connect your first communication channel to start using AI-powered features
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/channels">
-              <Button size="lg">
-                <Zap className="mr-2 h-4 w-4" />
-                Connect Your First Channel
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      )}
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard
+          title="Handled Today"
+          value={stats?.messagesHandledToday || 0}
+          icon={CheckCircle2}
+          description={`of ${stats?.messagesReceivedToday || 0} received`}
+          color="text-green-600"
+        />
+        <StatCard
+          title="Auto-Replies"
+          value={stats?.autoRepliesSentToday || 0}
+          icon={Zap}
+          description="sent automatically"
+          color="text-amber-600"
+        />
+        <StatCard
+          title="Time Saved"
+          value={`${stats?.timeSavedMinutes || 0}m`}
+          icon={Timer}
+          description="estimated today"
+          color="text-blue-600"
+        />
+        <StatCard
+          title="Inbox Reduction"
+          value={`${stats?.inboxReductionPercent || 0}%`}
+          icon={Percent}
+          description="of emails handled"
+          color="text-purple-600"
+        />
+      </div>
+
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Needs Attention Section - Takes 2 columns */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              What Needs Your Attention
+            </h2>
+            {attentionItems.length > 0 && (
+              <Link href="/inbox?filter=needs_attention">
+                <Button variant="ghost" size="sm">
+                  View All
+                  <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
+              </Link>
+            )}
+          </div>
+
+          {attentionItems.length === 0 ? (
+            <InboxZeroState />
+          ) : (
+            <div className="space-y-3">
+              {attentionItems.map((item) => (
+                <AttentionItemCard key={item.id} item={item} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Right Sidebar */}
+        <div className="space-y-4">
+          {/* Key Contacts */}
+          {briefing?.keyContacts && briefing.keyContacts.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Key Contacts Today
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {briefing.keyContacts.slice(0, 4).map((contact, i) => (
+                  <div key={contact.email} className="flex items-center justify-between">
+                    <div className="min-w-0">
+                      <p className="font-medium truncate text-sm">
+                        {contact.name || contact.email}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {contact.latestSubject}
+                      </p>
+                    </div>
+                    <Badge variant="secondary" className="ml-2 flex-shrink-0">
+                      {contact.messageCount}
+                    </Badge>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Upcoming Events */}
+          {briefing?.upcomingEvents && briefing.upcomingEvents.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Upcoming Today
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {briefing.upcomingEvents.slice(0, 3).map((event, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <div className="text-xs text-muted-foreground whitespace-nowrap">
+                      {new Date(event.startTime).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{event.title}</p>
+                      {event.attendees && event.attendees.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          with {event.attendees.slice(0, 2).join(', ')}
+                          {event.attendees.length > 2 && ` +${event.attendees.length - 2}`}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <Link href="/calendar">
+                  <Button variant="outline" size="sm" className="w-full mt-2">
+                    View Calendar
+                    <ExternalLink className="h-3 w-3 ml-2" />
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Quick Stats */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Sparkles className="h-4 w-4" />
+                Aiva Activity
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Active Conversations</span>
+                <span className="font-medium">{stats?.activeConversations || 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Review Queue</span>
+                <span className="font-medium">{stats?.reviewQueueCount || 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">High Priority</span>
+                <span className="font-medium">{stats?.highPriorityUnhandled || 0}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick Actions */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Link href="/inbox" className="block">
+                <Button variant="outline" className="w-full justify-start">
+                  <Inbox className="h-4 w-4 mr-2" />
+                  Go to Inbox
+                </Button>
+              </Link>
+              <Link href="/calendar" className="block">
+                <Button variant="outline" className="w-full justify-start">
+                  <Calendar className="h-4 w-4 mr-2" />
+                  View Calendar
+                </Button>
+              </Link>
+              <Link href="/settings" className="block">
+                <Button variant="outline" className="w-full justify-start">
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  AI Settings
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
 
+export default AivaDashboard;
