@@ -2,9 +2,9 @@
 
 import { EmailConfirmationPendingCard } from "@/components/Auth/EmailConfirmationPendingCard";
 import { RedirectingPleaseWaitCard } from "@/components/Auth/RedirectingPleaseWaitCard";
-import { RenderProviders } from "@/components/Auth/RenderProviders";
-import { OAuthWithChannelButtons } from "@/components/Auth/OAuthWithChannelButtons";
+import { google, azure } from "@/components/Auth/Icons";
 import { Link } from "@/components/intl-link";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -15,11 +15,8 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { signInWithProviderAction } from "@/data/auth/auth";
-import { useAction } from "next-safe-action/hooks";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
-import { toast } from "sonner";
+import { useState } from "react";
 import { MagicLinkLoginForm } from "./MagicLinkLoginForm";
 import { PasswordLoginForm } from "./PasswordLoginForm";
 
@@ -35,7 +32,6 @@ export function Login({
   >(null);
   const [redirectInProgress, setRedirectInProgress] = useState(false);
   const router = useRouter();
-  const toastRef = useRef<string | number | undefined>(undefined);
 
   function redirectToDashboard() {
     if (next) {
@@ -45,29 +41,13 @@ export function Login({
     }
   }
 
-  const { execute: executeProvider, status: providerStatus } = useAction(
-    signInWithProviderAction,
-    {
-      onExecute: () => {
-        toastRef.current = toast.loading("Requesting login...");
-      },
-      onSuccess: ({ data }) => {
-        if (data) {
-          toast.success("Redirecting...", {
-            id: toastRef.current,
-          });
-          toastRef.current = undefined;
-          window.location.href = data.url;
-        }
-      },
-      onError: (error) => {
-        toast.error("Failed to login", {
-          id: toastRef.current,
-        });
-        toastRef.current = undefined;
-      },
-    },
-  );
+  const handleGoogleSignIn = () => {
+    window.location.href = "/api/auth/google-signin";
+  };
+
+  const handleOutlookSignIn = () => {
+    window.location.href = "/api/auth/outlook-signin";
+  };
 
   if (emailSentSuccessMessage) {
     return (
@@ -121,33 +101,45 @@ export function Login({
         <Separator className="my-4" />
         <div className="space-y-3">
           <div className="text-sm text-center text-muted-foreground">
-            Sign in with your email provider to automatically connect your inbox
+            Or sign in with your email provider
           </div>
-          <OAuthWithChannelButtons />
-          <Separator className="my-4" />
-          <div className="text-sm text-center text-muted-foreground">
-            Or sign in with other providers
+          <div className="flex justify-between gap-3">
+            <Button
+              variant="outline"
+              size="default"
+              onClick={handleGoogleSignIn}
+              className="flex-1 bg-background text-foreground border h-10 border-input rounded-lg"
+            >
+              <div className="mr-2">
+                {google()}
+              </div>
+              <span>Google</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="default"
+              onClick={handleOutlookSignIn}
+              className="flex-1 bg-background text-foreground border h-10 border-input rounded-lg"
+            >
+              <div className="mr-2">
+                {azure()}
+              </div>
+              <span>Outlook</span>
+            </Button>
           </div>
-          <RenderProviders
-            providers={["github", "twitter"]}
-            isLoading={providerStatus === "executing"}
-            onProviderLoginRequested={(provider) =>
-              executeProvider({ provider, next })
-            }
-          />
         </div>
       </CardContent>
       <CardFooter className="flex justify-between">
         <Link
           href="/forgot-password"
-          className="text-sm text-blue-600 hover:underline"
+          className="text-sm text-primary hover:underline"
           aria-label="Forgot password? Reset your password"
         >
           Forgot password?
         </Link>
         <Link
           href="/sign-up"
-          className="text-sm font-medium text-blue-600 hover:underline"
+          className="text-sm font-medium text-primary hover:underline"
         >
           Don&apos;t have an account? Start free trial
         </Link>

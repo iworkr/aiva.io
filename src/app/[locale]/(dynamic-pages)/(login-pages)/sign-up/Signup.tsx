@@ -1,8 +1,9 @@
 "use client";
 
 import { EmailConfirmationPendingCard } from "@/components/Auth/EmailConfirmationPendingCard";
-import { OAuthWithChannelButtons } from "@/components/Auth/OAuthWithChannelButtons";
+import { google, azure } from "@/components/Auth/Icons";
 import { Link } from "@/components/intl-link";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -16,7 +17,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { MagicLinkSignupForm } from "./MagicLinkSignupForm";
 import { PasswordSignupForm } from "./PasswordSignupForm";
-import { ProviderSignupForm } from "./ProviderSignupForm";
 import { Mail, Calendar, Sparkles, Shield, CheckCircle2 } from "lucide-react";
 
 interface SignUpProps {
@@ -49,6 +49,14 @@ const features = [
 
 export function SignUp({ next, nextActionType }: SignUpProps) {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const handleGoogleSignIn = () => {
+    window.location.href = "/api/auth/google-signin";
+  };
+
+  const handleOutlookSignIn = () => {
+    window.location.href = "/api/auth/outlook-signin";
+  };
 
   return (
     <div
@@ -135,14 +143,32 @@ export function SignUp({ next, nextActionType }: SignUpProps) {
               <Separator className="my-4" />
               <div className="space-y-3">
                 <div className="text-sm text-center text-muted-foreground">
-                  Sign up with your email provider to automatically connect your inbox
+                  Or sign up with your email provider
                 </div>
-                <OAuthWithChannelButtons />
-                <Separator className="my-4" />
-                <div className="text-sm text-center text-muted-foreground">
-                  Or sign up with other providers
+                <div className="flex justify-between gap-3">
+                  <Button
+                    variant="outline"
+                    size="default"
+                    onClick={handleGoogleSignIn}
+                    className="flex-1 bg-background text-foreground border h-10 border-input rounded-lg"
+                  >
+                    <div className="mr-2">
+                      {google()}
+                    </div>
+                    <span>Google</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="default"
+                    onClick={handleOutlookSignIn}
+                    className="flex-1 bg-background text-foreground border h-10 border-input rounded-lg"
+                  >
+                    <div className="mr-2">
+                      {azure()}
+                    </div>
+                    <span>Outlook</span>
+                  </Button>
                 </div>
-                <ProviderSignupForm next={next} />
               </div>
             </CardContent>
             <CardFooter>
