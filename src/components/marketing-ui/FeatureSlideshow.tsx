@@ -1,12 +1,12 @@
 /**
  * FeatureSlideshow - Marketing Component
- * Auto-rotating carousel of feature vignettes with smooth crossfade transitions
+ * Auto-rotating carousel of feature vignettes with smooth transitions
  */
 
 'use client';
 
 import { cn } from '@/lib/utils';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { AITriageVignette } from './vignettes/AITriageVignette';
 import { InboxZeroVignette } from './vignettes/InboxZeroVignette';
 import { AutoReplyVignette } from './vignettes/AutoReplyVignette';
@@ -57,23 +57,34 @@ export function FeatureSlideshow({
   compact = false,
 }: FeatureSlideshowProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const goToSlide = useCallback((index: number) => {
-    setCurrentIndex(index);
-  }, []);
+    if (isTransitioning) return;
+    setIsTransitioning(true);
+    
+    // Short transition period
+    setTimeout(() => {
+      setCurrentIndex(index);
+      setTimeout(() => setIsTransitioning(false), 100);
+    }, 400);
+  }, [isTransitioning]);
 
   const goToNext = useCallback(() => {
-    setCurrentIndex((prev) => (prev + 1) % slides.length);
-  }, []);
+    goToSlide((currentIndex + 1) % slides.length);
+  }, [currentIndex, goToSlide]);
 
   const goToPrev = useCallback(() => {
-    setCurrentIndex((prev) => (prev - 1 + slides.length) % slides.length);
-  }, []);
+    goToSlide((currentIndex - 1 + slides.length) % slides.length);
+  }, [currentIndex, goToSlide]);
 
-  // Auto-advance - always running, no pause on hover
+  // Auto-advance timer
   useEffect(() => {
-    const timer = setInterval(goToNext, autoPlayInterval);
-    return () => clearInterval(timer);
+    timerRef.current = setInterval(goToNext, autoPlayInterval);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [goToNext, autoPlayInterval]);
 
   // Keyboard navigation
@@ -87,49 +98,50 @@ export function FeatureSlideshow({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [goToNext, goToPrev]);
 
+  const currentSlide = slides[currentIndex];
+  const SlideComponent = currentSlide.component;
+
   return (
     <div className={cn('relative group', className)}>
-      {/* Slide content container with fixed height */}
+      {/* Main container with fixed dimensions */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-background via-background to-secondary/30 border shadow-xl">
-        {/* Header - always visible */}
+        {/* Header */}
         <div className="px-8 pt-8 pb-4 text-center space-y-2">
-          <h3 className="text-2xl font-bold tracking-tight transition-opacity duration-500">
-            {slides[currentIndex].title}
+          <h3 
+            className={cn(
+              'text-2xl font-bold tracking-tight transition-opacity duration-300',
+              isTransitioning ? 'opacity-0' : 'opacity-100'
+            )}
+          >
+            {currentSlide.title}
           </h3>
-          <p className="text-base text-muted-foreground max-w-md mx-auto transition-opacity duration-500">
-            {slides[currentIndex].description}
+          <p 
+            className={cn(
+              'text-base text-muted-foreground max-w-md mx-auto transition-opacity duration-300',
+              isTransitioning ? 'opacity-0' : 'opacity-100'
+            )}
+          >
+            {currentSlide.description}
           </p>
         </div>
 
-        {/* Vignette container - fixed height with stacked slides for crossfade */}
-        <div className="relative px-6 pb-8 min-h-[420px]">
-          {slides.map((slide, index) => {
-            const SlideComponent = slide.component;
-            const isActive = index === currentIndex;
-            
-            return (
-              <div
-                key={slide.id}
-                className={cn(
-                  'transition-all duration-700 ease-in-out',
-                  isActive 
-                    ? 'opacity-100 relative z-10' 
-                    : 'opacity-0 absolute inset-0 px-6 z-0 pointer-events-none'
-                )}
-                aria-hidden={!isActive}
-              >
-                {/* Only render active slide's animations */}
-                <SlideComponent 
-                  compact={compact} 
-                  autoPlay={isActive} 
-                  loop={false} 
-                />
-              </div>
-            );
-          })}
+        {/* Vignette container - FIXED HEIGHT */}
+        <div className="relative h-[480px] px-6 pb-8 overflow-hidden">
+          <div 
+            className={cn(
+              'w-full h-full transition-opacity duration-500',
+              isTransitioning ? 'opacity-0' : 'opacity-100'
+            )}
+          >
+            <SlideComponent 
+              compact={compact} 
+              autoPlay={true} 
+              loop={true} 
+            />
+          </div>
         </div>
 
-        {/* Navigation controls - visible on hover */}
+        {/* Navigation controls */}
         {showControls && (
           <>
             <Button
@@ -176,21 +188,21 @@ export function FeatureSlideshow({
       {/* Progress bar */}
       <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted/50 overflow-hidden rounded-b-2xl">
         <div
-          className="h-full bg-primary/60 rounded-full"
+          key={currentIndex}
+          className="h-full bg-primary/60 rounded-full animate-progress"
           style={{
-            animation: `progress ${autoPlayInterval}ms linear infinite`,
+            animationDuration: `${autoPlayInterval}ms`,
           }}
         />
       </div>
 
       <style jsx>{`
         @keyframes progress {
-          from {
-            width: 0%;
-          }
-          to {
-            width: 100%;
-          }
+          from { width: 0%; }
+          to { width: 100%; }
+        }
+        .animate-progress {
+          animation: progress linear forwards;
         }
       `}</style>
     </div>

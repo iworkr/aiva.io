@@ -6,7 +6,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { MockEmailCard } from '../base/MockEmailCard';
 import { MockAISuggestionPanel } from '../base/MockAISuggestionPanel';
 import { FloatingBadge } from '../base/FloatingBadge';
@@ -59,7 +59,7 @@ const demoSuggestions = [
   },
 ];
 
-type AnimationPhase = 'idle' | 'email-arrive' | 'analyzing' | 'suggestions' | 'complete';
+type AnimationPhase = 'email-arrive' | 'analyzing' | 'suggestions' | 'complete';
 
 export function AITriageVignette({
   className,
@@ -67,30 +67,40 @@ export function AITriageVignette({
   loop = true,
   compact = false,
 }: AITriageVignetteProps) {
-  const [phase, setPhase] = useState<AnimationPhase>('idle');
+  const [phase, setPhase] = useState<AnimationPhase>('email-arrive');
   const [emailPriority, setEmailPriority] = useState<'urgent' | 'high' | 'normal' | 'low' | undefined>(undefined);
   const [emailCategory, setEmailCategory] = useState<string | undefined>(undefined);
   const [showApplied, setShowApplied] = useState(false);
+  const animationRef = useRef<NodeJS.Timeout[]>([]);
+
+  const clearTimers = useCallback(() => {
+    animationRef.current.forEach(clearTimeout);
+    animationRef.current = [];
+  }, []);
 
   const runAnimation = useCallback(() => {
+    clearTimers();
+    
     // Reset state
-    setPhase('idle');
+    setPhase('email-arrive');
     setEmailPriority(undefined);
     setEmailCategory(undefined);
     setShowApplied(false);
 
-    // Phase 1: Email arrives (slow fade in)
-    setTimeout(() => setPhase('email-arrive'), 500);
+    // Phase 2: Analyzing
+    animationRef.current.push(setTimeout(() => setPhase('analyzing'), 2500));
 
-    // Phase 2: Analyzing (give time to read the email)
-    setTimeout(() => setPhase('analyzing'), 3000);
+    // Phase 3: Show suggestions
+    animationRef.current.push(setTimeout(() => setPhase('suggestions'), 5000));
 
-    // Phase 3: Show suggestions (give time to see analyzing)
-    setTimeout(() => setPhase('suggestions'), 5500);
-
-    // Phase 4: Complete (give time to read suggestions)
-    setTimeout(() => setPhase('complete'), 10000);
-  }, []);
+    // Phase 4: Complete - apply suggestions
+    animationRef.current.push(setTimeout(() => {
+      setPhase('complete');
+      setEmailPriority('high');
+      setEmailCategory('Work - Finance');
+      setShowApplied(true);
+    }, 9000));
+  }, [clearTimers]);
 
   useEffect(() => {
     if (autoPlay) {
@@ -98,110 +108,94 @@ export function AITriageVignette({
 
       if (loop) {
         const interval = setInterval(runAnimation, 14000);
-        return () => clearInterval(interval);
+        return () => {
+          clearInterval(interval);
+          clearTimers();
+        };
       }
     }
-  }, [autoPlay, loop, runAnimation]);
-
-  const handleApplyAll = () => {
-    setEmailPriority('high');
-    setEmailCategory('Work - Finance');
-    setShowApplied(true);
-  };
+    return clearTimers;
+  }, [autoPlay, loop, runAnimation, clearTimers]);
 
   return (
-    <div className={cn('relative', className)}>
-      {/* Floating badge */}
-      <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20">
+    <div className={cn('relative w-full h-full', className)}>
+      {/* Floating badge - overlapping top */}
+      <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-30">
         <FloatingBadge
           label="AI Triage"
           icon={Sparkles}
           variant="primary"
           size="md"
           glow
-          animate={phase !== 'idle'}
           pulse={phase === 'analyzing'}
         />
       </div>
 
-      {/* Main content - items-start prevents vertical stretching */}
-      <div
-        className={cn(
-          'grid gap-4 items-start', // items-start is key!
-          compact ? 'grid-cols-1' : 'md:grid-cols-2',
-          'pt-6'
-        )}
-      >
-        {/* Email Card - wrapped in div to constrain GlowingCard */}
-        <div className="relative">
+      {/* Main content - consistent full width layout */}
+      <div className="w-full grid grid-cols-1 lg:grid-cols-5 gap-4 pt-6">
+        {/* Email Card - takes 3 columns */}
+        <div className="lg:col-span-3 relative">
           <GlowingCard
             glowColor={phase === 'analyzing' ? 'info' : 'primary'}
-            glowIntensity="subtle"
+            glowIntensity="medium"
             hoverEffect={false}
-            animate={phase === 'email-arrive'}
           >
-            <div className="p-4 relative">
+            <div className="p-5 relative min-h-[200px]">
               <MockEmailCard
                 {...demoEmail}
                 priority={emailPriority}
                 category={emailCategory}
-                animate={phase === 'email-arrive'}
                 labels={showApplied ? ['Needs Review'] : []}
               />
 
               {/* Analyzing overlay */}
               {phase === 'analyzing' && (
-                <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-sm rounded-xl animate-in fade-in duration-500">
+                <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-sm rounded-xl">
                   <div className="flex flex-col items-center gap-3">
                     <div className="relative">
-                      <div className="w-12 h-12 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
-                      <Zap className="absolute inset-0 m-auto w-5 h-5 text-primary" />
+                      <div className="w-14 h-14 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                      <Zap className="absolute inset-0 m-auto w-6 h-6 text-primary" />
                     </div>
-                    <span className="text-sm text-muted-foreground animate-pulse">
+                    <span className="text-sm font-medium text-muted-foreground animate-pulse">
                       Analyzing email...
                     </span>
                   </div>
                 </div>
               )}
-
-              {/* Applied badge */}
-              {showApplied && (
-                <div className="absolute top-6 right-6 animate-in zoom-in duration-300">
-                  <FloatingBadge
-                    label="Applied"
-                    icon={CheckCircle}
-                    variant="success"
-                    size="sm"
-                  />
-                </div>
-              )}
             </div>
           </GlowingCard>
+
+          {/* Applied badge - overlapping card */}
+          {showApplied && (
+            <div className="absolute -bottom-3 -right-3 z-20 animate-in zoom-in slide-in-from-bottom-2 duration-500">
+              <div className="bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 font-medium">
+                <CheckCircle className="w-4 h-4" />
+                Applied!
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* AI Suggestions Panel */}
-        {!compact && (
-          <div
-            className={cn(
-              'transition-all duration-700 ease-out',
-              phase === 'suggestions' || phase === 'complete'
-                ? 'opacity-100 translate-x-0'
-                : 'opacity-0 translate-x-4 pointer-events-none'
-            )}
-          >
-            <MockAISuggestionPanel
-              suggestions={demoSuggestions}
-              animate={phase === 'suggestions'}
-              showAnalyzing={false}
-              onApplyAll={handleApplyAll}
-            />
-          </div>
-        )}
+        {/* AI Suggestions Panel - takes 2 columns */}
+        <div 
+          className={cn(
+            'lg:col-span-2 transition-all duration-700',
+            phase === 'suggestions' || phase === 'complete'
+              ? 'opacity-100 translate-y-0'
+              : 'opacity-30 translate-y-4'
+          )}
+        >
+          <MockAISuggestionPanel
+            suggestions={demoSuggestions}
+            animate={phase === 'suggestions'}
+            showAnalyzing={false}
+          />
+        </div>
       </div>
 
       {/* Compact mode suggestion summary */}
       {compact && (phase === 'suggestions' || phase === 'complete') && (
-        <div className="mt-4 p-3 rounded-lg bg-primary/5 border border-primary/20 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="mt-4 p-3 rounded-lg bg-primary/5 border border-primary/20">
           <div className="flex items-center gap-2 text-sm">
             <Sparkles className="w-4 h-4 text-primary" />
             <span className="font-medium">AI Suggestion:</span>
