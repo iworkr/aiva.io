@@ -20,6 +20,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { MagicLinkLoginForm } from "./MagicLinkLoginForm";
 import { PasswordLoginForm } from "./PasswordLoginForm";
+import { FeatureSlideshow } from "@/components/marketing-ui/FeatureSlideshow";
 
 export function Login({
   next,
@@ -71,98 +72,125 @@ export function Login({
   }
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader className="text-center space-y-4">
-        <div className="flex justify-center">
-          <Image
-            src="/logos/aiva-logo-dark.svg"
-            width={140}
-            height={40}
-            alt="Aiva logo"
-            className="block dark:hidden"
-          />
-          <Image
-            src="/logos/aiva-logo-light.svg"
-            width={140}
-            height={40}
-            alt="Aiva logo"
-            className="hidden dark:block"
+    <div className="container max-w-6xl mx-auto px-4 py-8">
+      <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center w-full">
+        {/* Left side - Interactive Feature Slideshow */}
+        <div className="hidden lg:flex flex-col space-y-6">
+          <div className="space-y-3">
+            <h2 className="text-3xl font-bold tracking-tight">
+              Welcome back to Aiva
+            </h2>
+            <p className="text-lg text-muted-foreground">
+              Your AI-powered inbox has been busy. Let&apos;s see what&apos;s happening.
+            </p>
+          </div>
+          
+          {/* Interactive Slideshow */}
+          <FeatureSlideshow 
+            className="group"
+            autoPlayInterval={8000}
+            pauseOnHover={true}
+            showControls={true}
+            showIndicators={true}
+            compact={false}
           />
         </div>
-        <div>
-          <CardTitle className="text-2xl">Log in to Aiva.io</CardTitle>
-          <CardDescription className="mt-1">
-            Access your unified AI inbox, messages, and calendar in one place.
-          </CardDescription>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="password">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="password">Password</TabsTrigger>
-            <TabsTrigger value="magic-link">Magic Link</TabsTrigger>
-          </TabsList>
-          <TabsContent value="password">
-            <PasswordLoginForm
-              next={next}
-              redirectToDashboard={redirectToDashboard}
-              setRedirectInProgress={setRedirectInProgress}
-            />
-          </TabsContent>
 
-          <TabsContent value="magic-link">
-            <MagicLinkLoginForm
-              next={next}
-              setEmailSentSuccessMessage={setEmailSentSuccessMessage}
-            />
-          </TabsContent>
-        </Tabs>
-        <Separator className="my-4" />
-        <div className="space-y-3">
-          <div className="text-sm text-center text-muted-foreground">
-            Or sign in with your email provider
-          </div>
-          <div className="flex justify-between gap-3">
-            <Button
-              variant="outline"
-              size="default"
-              onClick={handleGoogleSignIn}
-              className="flex-1 bg-background text-foreground border h-10 border-input rounded-lg"
-            >
+        {/* Right side - Login Form */}
+        <Card className="w-full max-w-md mx-auto border-2 shadow-lg">
+          <CardHeader className="text-center space-y-4">
+            <div className="flex justify-center">
               <Image
-                src={CHANNEL_LOGOS.gmail}
-                width={20}
-                height={20}
-                alt="Google"
-                className="mr-2"
+                src="/logos/aiva-logo-dark.svg"
+                width={140}
+                height={40}
+                alt="Aiva logo"
+                className="block dark:hidden"
               />
-              <span>Google</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="default"
-              onClick={handleOutlookSignIn}
-              className="flex-1 bg-background text-foreground border h-10 border-input rounded-lg"
-            >
               <Image
-                src={CHANNEL_LOGOS.outlook}
-                width={20}
-                height={20}
-                alt="Outlook"
-                className="mr-2"
+                src="/logos/aiva-logo-light.svg"
+                width={140}
+                height={40}
+                alt="Aiva logo"
+                className="hidden dark:block"
               />
-              <span>Outlook</span>
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-      <CardFooter className="flex flex-col gap-4">
-        <Link href="/sign-up" className="w-full">
-          <Button variant="outline" className="w-full">
-            Don&apos;t have an account? Start free trial
-          </Button>
-        </Link>
-      </CardFooter>
-    </Card>
+            </div>
+            <div>
+              <CardTitle className="text-2xl">Log in to Aiva.io</CardTitle>
+              <CardDescription className="mt-1">
+                Access your unified AI inbox, messages, and calendar in one place.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="password">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="password">Password</TabsTrigger>
+                <TabsTrigger value="magic-link">Magic Link</TabsTrigger>
+              </TabsList>
+              <TabsContent value="password">
+                <PasswordLoginForm
+                  next={next}
+                  redirectToDashboard={redirectToDashboard}
+                  setRedirectInProgress={setRedirectInProgress}
+                />
+              </TabsContent>
+
+              <TabsContent value="magic-link">
+                <MagicLinkLoginForm
+                  next={next}
+                  setEmailSentSuccessMessage={setEmailSentSuccessMessage}
+                />
+              </TabsContent>
+            </Tabs>
+            <Separator className="my-4" />
+            <div className="space-y-3">
+              <div className="text-sm text-center text-muted-foreground">
+                Or sign in with your email provider
+              </div>
+              <div className="flex justify-between gap-3">
+                <Button
+                  variant="outline"
+                  size="default"
+                  onClick={handleGoogleSignIn}
+                  className="flex-1 bg-background text-foreground border h-10 border-input rounded-lg"
+                >
+                  <Image
+                    src={CHANNEL_LOGOS.gmail}
+                    width={20}
+                    height={20}
+                    alt="Google"
+                    className="mr-2"
+                  />
+                  <span>Google</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="default"
+                  onClick={handleOutlookSignIn}
+                  className="flex-1 bg-background text-foreground border h-10 border-input rounded-lg"
+                >
+                  <Image
+                    src={CHANNEL_LOGOS.outlook}
+                    width={20}
+                    height={20}
+                    alt="Outlook"
+                    className="mr-2"
+                  />
+                  <span>Outlook</span>
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter className="flex flex-col gap-4">
+            <Link href="/sign-up" className="w-full">
+              <Button variant="outline" className="w-full">
+                Don&apos;t have an account? Start free trial
+              </Button>
+            </Link>
+          </CardFooter>
+        </Card>
+      </div>
+    </div>
   );
 }

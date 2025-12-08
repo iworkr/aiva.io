@@ -1,9 +1,11 @@
+"use client";
+
 import { Link } from "@/components/intl-link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, ChevronRight, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
-import Image from "next/image";
 import { AvatarCirclesDemo } from "./AvatarCirclesDemo";
+import { AITriageVignette } from "@/components/marketing-ui/vignettes/AITriageVignette";
 
 export default function HeroSection() {
   const t = useTranslations("HomePage");
@@ -70,15 +72,17 @@ export default function HeroSection() {
         <div className="flex justify-center items-center pt-2">
           <AvatarCirclesDemo />
         </div>
-        <div className="relative w-full aspect-21/9 rounded-lg border-2 border-border shadow-xl overflow-hidden">
-          <Image
-            alt="Aiva.io unified inbox dashboard showing AI-powered message management across Gmail, Outlook, Slack, and other communication channels"
-            src="/images/hero.jpeg"
-            fill
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            className="object-cover"
-            priority
-          />
+        
+        {/* Interactive AI Triage Demo */}
+        <div className="relative w-full max-w-4xl mx-auto">
+          <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 via-primary/5 to-primary/20 blur-3xl opacity-30 rounded-3xl" />
+          <div className="relative rounded-2xl border-2 border-border bg-card/50 backdrop-blur-sm shadow-2xl p-6 lg:p-8">
+            <AITriageVignette 
+              autoPlay={true} 
+              loop={true} 
+              compact={false}
+            />
+          </div>
         </div>
       </div>
     </section>
