@@ -11,7 +11,7 @@ import { MockEmailCard } from '../base/MockEmailCard';
 import { FloatingBadge } from '../base/FloatingBadge';
 import { AnimatedCounter } from '../base/AnimatedCounter';
 import { GlowingCard } from '../base/GlowingCard';
-import { CheckCircle2, Inbox, Sparkles, Clock, Zap, TrendingUp } from 'lucide-react';
+import { CheckCircle2, Inbox, Sparkles, Zap } from 'lucide-react';
 import Image from 'next/image';
 
 interface InboxZeroVignetteProps {
@@ -135,11 +135,11 @@ export function InboxZeroVignette({
 
       <GlowingCard
         glowColor={phase === 'zero' || phase === 'stats' ? 'success' : 'primary'}
-        glowIntensity="medium"
+        glowIntensity="subtle"
         hoverEffect={false}
         className="pt-6"
       >
-        <div className="p-4 min-h-[300px] relative">
+        <div className="p-4 min-h-[320px] relative">
           {/* Cluttered inbox state */}
           {(phase === 'cluttered' || phase === 'processing' || phase === 'clearing') && (
             <div className="space-y-2">
@@ -148,21 +148,21 @@ export function InboxZeroVignette({
                 <span className="text-sm font-medium text-muted-foreground">
                   Inbox
                 </span>
-                <span className="px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs font-medium">
+                <span className="px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs font-medium transition-all duration-300">
                   {visibleEmails.length} unread
                 </span>
               </div>
 
               {/* Email list */}
               <div className="space-y-2 relative">
-                {clutterEmails.map((email, index) => (
+                {clutterEmails.map((email) => (
                   <div
                     key={email.id}
                     className={cn(
-                      'transition-all duration-400',
+                      'transition-all duration-500 ease-out',
                       visibleEmails.includes(email.id)
-                        ? 'opacity-100 translate-x-0'
-                        : 'opacity-0 translate-x-full'
+                        ? 'opacity-100 translate-x-0 scale-100'
+                        : 'opacity-0 translate-x-8 scale-95'
                     )}
                   >
                     <MockEmailCard
@@ -180,16 +180,11 @@ export function InboxZeroVignette({
 
               {/* Processing overlay */}
               {phase === 'processing' && (
-                <div className="absolute inset-0 flex items-center justify-center bg-background/70 backdrop-blur-sm rounded-xl animate-in fade-in duration-300">
+                <div className="absolute inset-0 flex items-center justify-center bg-background/70 backdrop-blur-sm rounded-xl animate-in fade-in duration-500">
                   <div className="flex flex-col items-center gap-3">
                     <div className="relative">
-                      <Image
-                        src="/logos/aiva-mark.svg"
-                        width={48}
-                        height={48}
-                        alt="Aiva"
-                        className="animate-pulse"
-                      />
+                      <div className="w-14 h-14 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                      <Sparkles className="absolute inset-0 m-auto w-6 h-6 text-primary" />
                     </div>
                     <span className="text-sm font-medium">Aiva is handling your inbox...</span>
                   </div>
@@ -200,7 +195,7 @@ export function InboxZeroVignette({
 
           {/* Inbox Zero state */}
           {(phase === 'zero' || phase === 'stats') && (
-            <div className="flex flex-col items-center justify-center min-h-[260px] animate-in fade-in zoom-in-95 duration-500">
+            <div className="flex flex-col items-center justify-center min-h-[280px] animate-in fade-in zoom-in-95 duration-700">
               <div className="relative mb-4">
                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 flex items-center justify-center">
                   <CheckCircle2 className="w-10 h-10 text-green-600" />
@@ -219,7 +214,7 @@ export function InboxZeroVignette({
 
               {/* Stats */}
               {phase === 'stats' && (
-                <div className="grid grid-cols-3 gap-4 mt-6 w-full animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="grid grid-cols-3 gap-4 mt-6 w-full animate-in fade-in slide-in-from-bottom-2 duration-500">
                   <div className="text-center p-3 rounded-lg bg-primary/5">
                     <div className="text-2xl font-bold text-primary">
                       <AnimatedCounter value={127} />
@@ -245,7 +240,7 @@ export function InboxZeroVignette({
 
           {/* Processing counter */}
           {phase === 'clearing' && processedCount > 0 && (
-            <div className="absolute bottom-4 right-4 animate-in fade-in duration-200">
+            <div className="absolute bottom-4 right-4 animate-in fade-in duration-300">
               <FloatingBadge
                 label={`${processedCount} handled`}
                 icon={Zap}
@@ -261,4 +256,3 @@ export function InboxZeroVignette({
 }
 
 export default InboxZeroVignette;
-

@@ -16,8 +16,7 @@ export function ClientLayout({ children }: { children: ReactNode }) {
       <div className="hidden lg:flex w-3/5 border-l-2 items-center relative justify-center h-full bg-gradient-to-br from-background to-secondary/30">
         <div className="w-full max-w-2xl px-12">
           <FeatureSlideshow 
-            autoPlayInterval={12000}
-            pauseOnHover={true}
+            autoPlayInterval={14000}
             showControls={true}
             showIndicators={true}
             compact={false}

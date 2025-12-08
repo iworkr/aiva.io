@@ -106,35 +106,37 @@ export function AutoReplyVignette({
 
       <div className={cn('space-y-4 pt-6', compact && 'space-y-3')}>
         {/* Incoming Email */}
-        <GlowingCard
-          glowColor="info"
-          glowIntensity="subtle"
-          hoverEffect={false}
-          animate={phase === 'email-arrive'}
-        >
-          <div className="p-3">
-            <div className="flex items-center gap-2 mb-2 px-1">
-              <span className="text-xs font-medium text-muted-foreground">Incoming</span>
-              {phase === 'analyzing' && (
-                <span className="text-xs text-primary animate-pulse ml-auto">
-                  AI analyzing...
-                </span>
-              )}
+        <div className="relative">
+          <GlowingCard
+            glowColor="info"
+            glowIntensity="subtle"
+            hoverEffect={false}
+            animate={phase === 'email-arrive'}
+          >
+            <div className="p-3 relative">
+              <div className="flex items-center gap-2 mb-2 px-1">
+                <span className="text-xs font-medium text-muted-foreground">Incoming</span>
+                {phase === 'analyzing' && (
+                  <span className="text-xs text-primary animate-pulse ml-auto">
+                    AI analyzing...
+                  </span>
+                )}
+              </div>
+              <MockEmailCard
+                {...incomingEmail}
+                className="text-sm"
+                animate={phase === 'email-arrive'}
+              />
             </div>
-            <MockEmailCard
-              {...incomingEmail}
-              className="text-sm"
-              animate={phase === 'email-arrive'}
-            />
-          </div>
-        </GlowingCard>
+          </GlowingCard>
+        </div>
 
         {/* Typing indicator / Draft */}
         {(phase === 'typing' || phase === 'complete' || phase === 'sent') && (
-          <div className="animate-in slide-in-from-bottom-4 duration-500">
+          <div className="animate-in slide-in-from-bottom-4 duration-700 relative">
             <GlowingCard
               glowColor={phase === 'sent' ? 'success' : 'primary'}
-              glowIntensity="medium"
+              glowIntensity="subtle"
               hoverEffect={false}
             >
               <div className="p-3 relative">
@@ -155,12 +157,12 @@ export function AutoReplyVignette({
                   confidence={0.94}
                   tone="Professional"
                   animate={phase === 'typing' && showTyping}
-                  typingSpeed={15}
+                  typingSpeed={35}
                 />
 
                 {/* Sent overlay */}
                 {phase === 'sent' && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-green-500/10 backdrop-blur-sm rounded-xl animate-in fade-in zoom-in-95 duration-300">
+                  <div className="absolute inset-0 flex items-center justify-center bg-green-500/10 backdrop-blur-sm rounded-xl animate-in fade-in zoom-in-95 duration-500">
                     <div className="flex flex-col items-center gap-2 text-green-700 dark:text-green-400">
                       <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
                         <Send className="w-8 h-8" />
@@ -177,7 +179,7 @@ export function AutoReplyVignette({
 
         {/* Compact mode - condensed view */}
         {compact && phase === 'analyzing' && (
-          <div className="flex items-center justify-center gap-2 py-4 animate-pulse">
+          <div className="flex items-center justify-center gap-2 py-4">
             <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
             <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
             <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
@@ -189,4 +191,3 @@ export function AutoReplyVignette({
 }
 
 export default AutoReplyVignette;
-

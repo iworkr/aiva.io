@@ -1,6 +1,6 @@
 /**
  * FeatureSlideshow - Marketing Component
- * Auto-rotating carousel of feature vignettes
+ * Auto-rotating carousel of feature vignettes with smooth crossfade transitions
  */
 
 'use client';
@@ -44,7 +44,6 @@ const slides: Slide[] = [
 interface FeatureSlideshowProps {
   className?: string;
   autoPlayInterval?: number;
-  pauseOnHover?: boolean;
   showControls?: boolean;
   showIndicators?: boolean;
   compact?: boolean;
@@ -52,38 +51,30 @@ interface FeatureSlideshowProps {
 
 export function FeatureSlideshow({
   className,
-  autoPlayInterval = 14000, // Slower default for readability
-  pauseOnHover = true,
+  autoPlayInterval = 14000,
   showControls = true,
   showIndicators = true,
   compact = false,
 }: FeatureSlideshowProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
-  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const goToSlide = useCallback((index: number) => {
-    if (isTransitioning) return;
-    setIsTransitioning(true);
     setCurrentIndex(index);
-    setTimeout(() => setIsTransitioning(false), 500);
-  }, [isTransitioning]);
+  }, []);
 
   const goToNext = useCallback(() => {
-    goToSlide((currentIndex + 1) % slides.length);
-  }, [currentIndex, goToSlide]);
+    setCurrentIndex((prev) => (prev + 1) % slides.length);
+  }, []);
 
   const goToPrev = useCallback(() => {
-    goToSlide((currentIndex - 1 + slides.length) % slides.length);
-  }, [currentIndex, goToSlide]);
+    setCurrentIndex((prev) => (prev - 1 + slides.length) % slides.length);
+  }, []);
 
-  // Auto-advance
+  // Auto-advance - always running, no pause on hover
   useEffect(() => {
-    if (isPaused) return;
-
     const timer = setInterval(goToNext, autoPlayInterval);
     return () => clearInterval(timer);
-  }, [isPaused, goToNext, autoPlayInterval]);
+  }, [goToNext, autoPlayInterval]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -96,43 +87,55 @@ export function FeatureSlideshow({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [goToNext, goToPrev]);
 
-  const currentSlide = slides[currentIndex];
-  const SlideComponent = currentSlide.component;
-
   return (
-    <div
-      className={cn('relative', className)}
-      onMouseEnter={() => pauseOnHover && setIsPaused(true)}
-      onMouseLeave={() => pauseOnHover && setIsPaused(false)}
-    >
-      {/* Slide content */}
+    <div className={cn('relative group', className)}>
+      {/* Slide content container with fixed height */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-background via-background to-secondary/30 border shadow-xl">
-        {/* Header */}
+        {/* Header - always visible */}
         <div className="px-8 pt-8 pb-4 text-center space-y-2">
-          <h3 className="text-2xl font-bold tracking-tight">{currentSlide.title}</h3>
-          <p className="text-base text-muted-foreground max-w-md mx-auto">{currentSlide.description}</p>
+          <h3 className="text-2xl font-bold tracking-tight transition-opacity duration-500">
+            {slides[currentIndex].title}
+          </h3>
+          <p className="text-base text-muted-foreground max-w-md mx-auto transition-opacity duration-500">
+            {slides[currentIndex].description}
+          </p>
         </div>
 
-        {/* Vignette container */}
-        <div className="relative px-6 pb-8">
-          <div
-            key={currentSlide.id}
-            className={cn(
-              'transition-all duration-700 ease-out',
-              isTransitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
-            )}
-          >
-            <SlideComponent compact={compact} autoPlay={!isPaused} loop={false} />
-          </div>
+        {/* Vignette container - fixed height with stacked slides for crossfade */}
+        <div className="relative px-6 pb-8 min-h-[420px]">
+          {slides.map((slide, index) => {
+            const SlideComponent = slide.component;
+            const isActive = index === currentIndex;
+            
+            return (
+              <div
+                key={slide.id}
+                className={cn(
+                  'transition-all duration-700 ease-in-out',
+                  isActive 
+                    ? 'opacity-100 relative z-10' 
+                    : 'opacity-0 absolute inset-0 px-6 z-0 pointer-events-none'
+                )}
+                aria-hidden={!isActive}
+              >
+                {/* Only render active slide's animations */}
+                <SlideComponent 
+                  compact={compact} 
+                  autoPlay={isActive} 
+                  loop={false} 
+                />
+              </div>
+            );
+          })}
         </div>
 
-        {/* Navigation controls */}
+        {/* Navigation controls - visible on hover */}
         {showControls && (
           <>
             <Button
               variant="ghost"
               size="icon"
-              className="absolute left-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity bg-background/80 backdrop-blur-sm"
+              className="absolute left-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-background/80 backdrop-blur-sm hover:bg-background/90 z-20"
               onClick={goToPrev}
               aria-label="Previous slide"
             >
@@ -141,7 +144,7 @@ export function FeatureSlideshow({
             <Button
               variant="ghost"
               size="icon"
-              className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity bg-background/80 backdrop-blur-sm"
+              className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-background/80 backdrop-blur-sm hover:bg-background/90 z-20"
               onClick={goToNext}
               aria-label="Next slide"
             >
@@ -159,10 +162,10 @@ export function FeatureSlideshow({
               key={slide.id}
               onClick={() => goToSlide(index)}
               className={cn(
-                'w-2 h-2 rounded-full transition-all duration-300',
+                'h-2 rounded-full transition-all duration-500 ease-out',
                 index === currentIndex
-                  ? 'w-6 bg-primary'
-                  : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'
+                  ? 'w-8 bg-primary'
+                  : 'w-2 bg-muted-foreground/30 hover:bg-muted-foreground/50'
               )}
               aria-label={`Go to slide ${index + 1}: ${slide.title}`}
             />
@@ -171,25 +174,22 @@ export function FeatureSlideshow({
       )}
 
       {/* Progress bar */}
-      {!isPaused && (
-        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-muted overflow-hidden rounded-b-2xl">
-          <div
-            className="h-full bg-primary transition-all ease-linear"
-            style={{
-              width: '100%',
-              animation: `shrink ${autoPlayInterval}ms linear infinite`,
-            }}
-          />
-        </div>
-      )}
+      <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted/50 overflow-hidden rounded-b-2xl">
+        <div
+          className="h-full bg-primary/60 rounded-full"
+          style={{
+            animation: `progress ${autoPlayInterval}ms linear infinite`,
+          }}
+        />
+      </div>
 
       <style jsx>{`
-        @keyframes shrink {
+        @keyframes progress {
           from {
-            width: 100%;
+            width: 0%;
           }
           to {
-            width: 0%;
+            width: 100%;
           }
         }
       `}</style>
@@ -198,4 +198,3 @@ export function FeatureSlideshow({
 }
 
 export default FeatureSlideshow;
-

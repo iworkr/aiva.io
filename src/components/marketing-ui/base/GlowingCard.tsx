@@ -1,6 +1,6 @@
 /**
  * GlowingCard - Marketing UI Component
- * Card wrapper with ambient glow animation
+ * Card wrapper with soft ambient glow - no hard edges or cutoffs
  */
 
 'use client';
@@ -18,19 +18,6 @@ interface GlowingCardProps {
   animationDelay?: number;
 }
 
-const glowColors = {
-  primary: 'before:bg-primary/20 after:bg-primary/10',
-  success: 'before:bg-green-500/20 after:bg-green-500/10',
-  warning: 'before:bg-amber-500/20 after:bg-amber-500/10',
-  info: 'before:bg-blue-500/20 after:bg-blue-500/10',
-};
-
-const glowIntensities = {
-  subtle: 'before:blur-xl after:blur-2xl',
-  medium: 'before:blur-2xl after:blur-3xl',
-  strong: 'before:blur-3xl after:blur-[100px]',
-};
-
 export function GlowingCard({
   children,
   className,
@@ -40,44 +27,85 @@ export function GlowingCard({
   animate = false,
   animationDelay = 0,
 }: GlowingCardProps) {
+  // Color configurations with soft radial gradients
+  const glowStyles = {
+    primary: {
+      background: 'radial-gradient(ellipse at center, hsl(var(--primary) / 0.15) 0%, transparent 70%)',
+      hoverBackground: 'radial-gradient(ellipse at center, hsl(var(--primary) / 0.25) 0%, transparent 70%)',
+    },
+    success: {
+      background: 'radial-gradient(ellipse at center, hsl(142 76% 36% / 0.15) 0%, transparent 70%)',
+      hoverBackground: 'radial-gradient(ellipse at center, hsl(142 76% 36% / 0.25) 0%, transparent 70%)',
+    },
+    warning: {
+      background: 'radial-gradient(ellipse at center, hsl(38 92% 50% / 0.15) 0%, transparent 70%)',
+      hoverBackground: 'radial-gradient(ellipse at center, hsl(38 92% 50% / 0.25) 0%, transparent 70%)',
+    },
+    info: {
+      background: 'radial-gradient(ellipse at center, hsl(217 91% 60% / 0.15) 0%, transparent 70%)',
+      hoverBackground: 'radial-gradient(ellipse at center, hsl(217 91% 60% / 0.25) 0%, transparent 70%)',
+    },
+  };
+
+  // Blur amounts for different intensities
+  const blurAmounts = {
+    subtle: 'blur-xl',
+    medium: 'blur-2xl',
+    strong: 'blur-3xl',
+  };
+
+  // Scale amounts for glow spread
+  const scaleAmounts = {
+    subtle: 'scale-100',
+    medium: 'scale-105',
+    strong: 'scale-110',
+  };
+
+  const colors = glowStyles[glowColor];
+  const blur = blurAmounts[glowIntensity];
+  const scale = scaleAmounts[glowIntensity];
+
   return (
     <div
       className={cn(
-        'relative group',
-        animate && 'animate-in fade-in slide-in-from-bottom-4 duration-500',
+        'relative w-fit h-fit', // Constrain to content size
+        animate && 'animate-in fade-in slide-in-from-bottom-2 duration-500',
         className
       )}
       style={{ animationDelay: animate ? `${animationDelay}ms` : undefined }}
     >
-      {/* Glow layers */}
+      {/* Soft glow layer - uses radial gradient for natural falloff */}
       <div
         className={cn(
-          'absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-700',
-          'before:absolute before:inset-0 before:rounded-2xl',
-          'after:absolute after:inset-0 after:rounded-2xl',
-          glowColors[glowColor],
-          glowIntensities[glowIntensity],
-          hoverEffect && 'group-hover:opacity-100',
-          !hoverEffect && 'opacity-50'
+          'absolute inset-0 rounded-2xl transition-all duration-700 pointer-events-none',
+          blur,
+          scale,
+          hoverEffect ? 'opacity-0 group-hover:opacity-100' : 'opacity-60'
         )}
+        style={{
+          background: hoverEffect ? colors.hoverBackground : colors.background,
+        }}
       />
 
-      {/* Animated glow ring */}
-      <div
-        className={cn(
-          'absolute -inset-px rounded-2xl opacity-0 transition-opacity duration-500',
-          'bg-gradient-to-r from-transparent via-primary/20 to-transparent',
-          hoverEffect && 'group-hover:opacity-100',
-          !hoverEffect && 'opacity-30 animate-pulse'
-        )}
-      />
+      {/* Static subtle glow always visible */}
+      {!hoverEffect && (
+        <div
+          className={cn(
+            'absolute inset-0 rounded-2xl pointer-events-none',
+            'blur-xl opacity-40'
+          )}
+          style={{
+            background: colors.background,
+          }}
+        />
+      )}
 
-      {/* Content */}
+      {/* Content card */}
       <div
         className={cn(
-          'relative rounded-xl border bg-card/80 backdrop-blur-sm',
+          'relative rounded-xl border bg-card/95 backdrop-blur-sm',
           'transition-all duration-300',
-          hoverEffect && 'group-hover:border-primary/30 group-hover:shadow-lg'
+          hoverEffect && 'group-hover:border-primary/20 group-hover:shadow-lg'
         )}
       >
         {children}
@@ -87,4 +115,3 @@ export function GlowingCard({
 }
 
 export default GlowingCard;
-
