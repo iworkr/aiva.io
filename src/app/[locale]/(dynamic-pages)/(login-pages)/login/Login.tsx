@@ -2,7 +2,6 @@
 
 import { EmailConfirmationPendingCard } from "@/components/Auth/EmailConfirmationPendingCard";
 import { RedirectingPleaseWaitCard } from "@/components/Auth/RedirectingPleaseWaitCard";
-import { google, azure } from "@/components/Auth/Icons";
 import { Link } from "@/components/intl-link";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,8 +14,10 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CHANNEL_LOGOS } from "@/constants/channel-logos";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import Image from "next/image";
 import { MagicLinkLoginForm } from "./MagicLinkLoginForm";
 import { PasswordLoginForm } from "./PasswordLoginForm";
 
@@ -70,12 +71,30 @@ export function Login({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Log in to Aiva.io</CardTitle>
-        <CardDescription>
-          Access your unified AI inbox, messages, and calendar in one place.
-        </CardDescription>
+    <Card className="w-full max-w-md">
+      <CardHeader className="text-center space-y-4">
+        <div className="flex justify-center">
+          <Image
+            src="/logos/aiva-logo-dark.svg"
+            width={140}
+            height={40}
+            alt="Aiva logo"
+            className="block dark:hidden"
+          />
+          <Image
+            src="/logos/aiva-logo-light.svg"
+            width={140}
+            height={40}
+            alt="Aiva logo"
+            className="hidden dark:block"
+          />
+        </div>
+        <div>
+          <CardTitle className="text-2xl">Log in to Aiva.io</CardTitle>
+          <CardDescription className="mt-1">
+            Access your unified AI inbox, messages, and calendar in one place.
+          </CardDescription>
+        </div>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="password">
@@ -110,9 +129,13 @@ export function Login({
               onClick={handleGoogleSignIn}
               className="flex-1 bg-background text-foreground border h-10 border-input rounded-lg"
             >
-              <div className="mr-2">
-                {google()}
-              </div>
+              <Image
+                src={CHANNEL_LOGOS.gmail}
+                width={20}
+                height={20}
+                alt="Google"
+                className="mr-2"
+              />
               <span>Google</span>
             </Button>
             <Button
@@ -121,27 +144,23 @@ export function Login({
               onClick={handleOutlookSignIn}
               className="flex-1 bg-background text-foreground border h-10 border-input rounded-lg"
             >
-              <div className="mr-2">
-                {azure()}
-              </div>
+              <Image
+                src={CHANNEL_LOGOS.outlook}
+                width={20}
+                height={20}
+                alt="Outlook"
+                className="mr-2"
+              />
               <span>Outlook</span>
             </Button>
           </div>
         </div>
       </CardContent>
-      <CardFooter className="flex justify-between">
-        <Link
-          href="/forgot-password"
-          className="text-sm text-primary hover:underline"
-          aria-label="Forgot password? Reset your password"
-        >
-          Forgot password?
-        </Link>
-        <Link
-          href="/sign-up"
-          className="text-sm font-medium text-primary hover:underline"
-        >
-          Don&apos;t have an account? Start free trial
+      <CardFooter className="flex flex-col gap-4">
+        <Link href="/sign-up" className="w-full">
+          <Button variant="outline" className="w-full">
+            Don&apos;t have an account? Start free trial
+          </Button>
         </Link>
       </CardFooter>
     </Card>

@@ -1,7 +1,6 @@
 "use client";
 
 import { EmailConfirmationPendingCard } from "@/components/Auth/EmailConfirmationPendingCard";
-import { google, azure } from "@/components/Auth/Icons";
 import { Link } from "@/components/intl-link";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,7 +13,9 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CHANNEL_LOGOS } from "@/constants/channel-logos";
 import { useState } from "react";
+import Image from "next/image";
 import { MagicLinkSignupForm } from "./MagicLinkSignupForm";
 import { PasswordSignupForm } from "./PasswordSignupForm";
 import { Mail, Calendar, Sparkles, Shield, CheckCircle2 } from "lucide-react";
@@ -114,11 +115,29 @@ export function SignUp({ next, nextActionType }: SignUpProps) {
 
           {/* Right side - Sign up form */}
           <Card className="border-2 shadow-lg">
-            <CardHeader className="space-y-1">
-              <CardTitle className="text-2xl">Create your Aiva.io account</CardTitle>
-              <CardDescription>
-                Start your AI-powered unified inbox by creating an Aiva.io workspace.
-              </CardDescription>
+            <CardHeader className="text-center space-y-4">
+              <div className="flex justify-center lg:hidden">
+                <Image
+                  src="/logos/aiva-logo-dark.svg"
+                  width={140}
+                  height={40}
+                  alt="Aiva logo"
+                  className="block dark:hidden"
+                />
+                <Image
+                  src="/logos/aiva-logo-light.svg"
+                  width={140}
+                  height={40}
+                  alt="Aiva logo"
+                  className="hidden dark:block"
+                />
+              </div>
+              <div>
+                <CardTitle className="text-2xl">Create your Aiva.io account</CardTitle>
+                <CardDescription className="mt-1">
+                  Start your AI-powered unified inbox by creating an Aiva.io workspace.
+                </CardDescription>
+              </div>
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="password">
@@ -152,9 +171,13 @@ export function SignUp({ next, nextActionType }: SignUpProps) {
                     onClick={handleGoogleSignIn}
                     className="flex-1 bg-background text-foreground border h-10 border-input rounded-lg"
                   >
-                    <div className="mr-2">
-                      {google()}
-                    </div>
+                    <Image
+                      src={CHANNEL_LOGOS.gmail}
+                      width={20}
+                      height={20}
+                      alt="Google"
+                      className="mr-2"
+                    />
                     <span>Google</span>
                   </Button>
                   <Button
@@ -163,9 +186,13 @@ export function SignUp({ next, nextActionType }: SignUpProps) {
                     onClick={handleOutlookSignIn}
                     className="flex-1 bg-background text-foreground border h-10 border-input rounded-lg"
                   >
-                    <div className="mr-2">
-                      {azure()}
-                    </div>
+                    <Image
+                      src={CHANNEL_LOGOS.outlook}
+                      width={20}
+                      height={20}
+                      alt="Outlook"
+                      className="mr-2"
+                    />
                     <span>Outlook</span>
                   </Button>
                 </div>

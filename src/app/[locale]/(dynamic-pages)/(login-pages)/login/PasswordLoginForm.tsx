@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { AuthFormInput } from "@/components/auth-form-components/AuthFormInput";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
+import { Link } from "@/components/intl-link";
 import { signInWithPasswordAction } from "@/data/auth/auth";
 import {
   signInWithPasswordSchema,
@@ -92,6 +93,15 @@ export function PasswordLoginForm({
             autoComplete: "current-password",
           }}
         />
+        <div className="flex justify-end -mt-2">
+          <Link
+            href="/forgot-password"
+            className="text-sm text-primary hover:underline"
+            aria-label="Forgot password? Reset your password"
+          >
+            Forgot password?
+          </Link>
+        </div>
         <Button
           className="w-full"
           type="submit"
