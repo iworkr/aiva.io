@@ -8,6 +8,7 @@
 import { createSupabaseUserServerActionClient } from "@/supabase-clients/user/createSupabaseUserServerActionClient";
 import { supabaseAdminClient } from "@/supabase-clients/admin/supabaseAdminClient";
 import { OpenAI } from "openai";
+import { verifySchedulingConfirmation, isSchedulingConfirmation, CalendarVerificationResult } from './calendar-verifier';
 
 // Lazy-load OpenAI client to avoid crashes on missing API key
 let openaiClient: OpenAI | null = null;
@@ -55,6 +56,11 @@ interface ReplyDraftResult {
   tone: string;
   toneReasoning?: ToneReasoning;
   error?: string;
+  // Human review fields
+  holdForReview?: boolean;
+  reviewReason?: string;
+  calendarContext?: CalendarVerificationResult;
+  aiUncertaintyNotes?: string;
 }
 
 /**
@@ -142,6 +148,66 @@ export async function generateReplyDraft(
       maxLength = 500,
       context = "",
     } = options;
+
+    // ============================================
+    // HUMAN REVIEW DETECTION
+    // ============================================
+    let needsHumanReview = false;
+    let reviewReason: string | undefined;
+    let calendarContext: CalendarVerificationResult | undefined;
+    let aiUncertaintyNotes: string | undefined;
+
+    // Check if message was already flagged for review by classifier
+    if (message.requires_human_review) {
+      needsHumanReview = true;
+      reviewReason = message.review_reason || 'flagged_by_classifier';
+      aiUncertaintyNotes = (message.review_context as any)?.reason || 'Message flagged during classification';
+      console.log('[AI Reply] Message flagged for human review:', reviewReason);
+    }
+
+    // Check for scheduling confirmation (even if not flagged by classifier)
+    const schedulingCheck = await isSchedulingConfirmation(
+      message.subject || '',
+      message.body || ''
+    );
+
+    if (schedulingCheck.isConfirmation && schedulingCheck.confidence >= 0.6) {
+      console.log('[AI Reply] Detected scheduling confirmation, verifying calendar...');
+      
+      try {
+        calendarContext = await verifySchedulingConfirmation(
+          messageId,
+          workspaceId,
+          message.sender_email,
+          message.sender_name || undefined,
+          { useAdminClient: options.useAdminClient }
+        );
+
+        console.log('[AI Reply] Calendar verification result:', {
+          hasMatchingEvent: calendarContext.hasMatchingEvent,
+          suggestedAction: calendarContext.suggestedAction,
+          confidence: calendarContext.confidence,
+        });
+
+        // If no matching event found, require human review
+        if (!calendarContext.hasMatchingEvent || calendarContext.suggestedAction === 'ask_human') {
+          needsHumanReview = true;
+          reviewReason = 'calendar_mismatch';
+          aiUncertaintyNotes = calendarContext.context;
+        } else if (calendarContext.suggestedAction === 'no_calendar') {
+          needsHumanReview = true;
+          reviewReason = 'no_calendar_connected';
+          aiUncertaintyNotes = 'No calendar connected to verify this scheduling confirmation';
+        }
+      } catch (calError) {
+        console.error('[AI Reply] Calendar verification error:', calError);
+        // Don't block on calendar errors, just flag for review
+        needsHumanReview = true;
+        reviewReason = 'calendar_check_failed';
+        aiUncertaintyNotes = 'Could not verify calendar for scheduling confirmation';
+      }
+    }
+    // ============================================
 
     // Prepare conversation context and count previous interactions
     let conversationContext = "";
@@ -354,6 +420,21 @@ IMPORTANT: Always return valid, complete JSON. Keep replies concise.`,
     // Get the user_id from the channel connection (the user who connected this channel)
     const connectionUserId = (message.channel_connection as any)?.user_id;
     
+    // Determine if draft should be held for human review
+    // Hold if: message flagged, calendar mismatch, or low confidence
+    const shouldHoldForReview = needsHumanReview || result.confidenceScore < 0.55;
+    const finalReviewReason = reviewReason || (result.confidenceScore < 0.55 ? 'low_confidence' : undefined);
+    const finalUncertaintyNotes = aiUncertaintyNotes || (result.confidenceScore < 0.55 
+      ? `AI confidence is ${Math.round(result.confidenceScore * 100)}% - below threshold for auto-send`
+      : undefined);
+
+    console.log('[AI Reply] Human review check:', {
+      needsHumanReview,
+      reviewReason: finalReviewReason,
+      confidenceScore: result.confidenceScore,
+      shouldHoldForReview,
+    });
+
     // Store draft in database
     const draftInsert = {
         workspace_id: workspaceId,
@@ -371,6 +452,17 @@ IMPORTANT: Always return valid, complete JSON. Keep replies concise.`,
         senderEmail: message.sender_email,
         senderName: message.sender_name,
       } as any,
+      // Human review fields
+      hold_for_review: shouldHoldForReview,
+      review_reason: finalReviewReason || null,
+      calendar_context: calendarContext ? {
+        hasMatchingEvent: calendarContext.hasMatchingEvent,
+        matchedEventTitle: calendarContext.matchedEvent?.title,
+        suggestedAction: calendarContext.suggestedAction,
+        context: calendarContext.context,
+        searchedDateRange: calendarContext.searchedDateRange,
+      } : null,
+      ai_uncertainty_notes: finalUncertaintyNotes || null,
     };
 
     const { data: draft, error: draftError } = await supabase
@@ -424,13 +516,17 @@ IMPORTANT: Always return valid, complete JSON. Keep replies concise.`,
 
         // Queue for auto-send if:
         // 1. Auto-send is enabled for workspace
-        // 2. Confidence meets threshold (primary gate)
-        // 3. AI marked it as auto-sendable OR confidence is very high (>= 0.80)
+        // 2. NOT held for human review
+        // 3. Confidence meets threshold (primary gate)
+        // 4. AI marked it as auto-sendable OR confidence is very high (>= 0.80)
         const shouldQueue = autoSendEnabled && 
+          !shouldHoldForReview &&
           result.confidenceScore >= threshold && 
           (result.isAutoSendable || result.confidenceScore >= 0.80);
 
-        if (shouldQueue) {
+        if (shouldHoldForReview) {
+          console.log('[AI Reply] Draft held for human review, not auto-sending:', finalReviewReason);
+        } else if (shouldQueue) {
           const { queueAutoSend } = await import('@/lib/workers/auto-send-worker');
           const queueResult = await queueAutoSend(
             workspaceId,
@@ -490,6 +586,11 @@ IMPORTANT: Always return valid, complete JSON. Keep replies concise.`,
       confidenceScore: result.confidenceScore,
       tone,
       toneReasoning,
+      // Human review fields
+      holdForReview: shouldHoldForReview,
+      reviewReason: finalReviewReason,
+      calendarContext,
+      aiUncertaintyNotes: finalUncertaintyNotes,
     };
   } catch (error) {
     console.error("[AI Reply] Generation error:", error);

@@ -144,6 +144,16 @@ function getOpenAIClient(): OpenAI {
   return openaiClient;
 }
 
+// Review reason codes for human intervention
+export type ReviewReason = 
+  | 'calendar_mismatch'      // Scheduling confirmation but no matching calendar event
+  | 'commitment_confirmation' // Asking to confirm deliverables, deadlines, promises
+  | 'low_confidence'         // AI confidence below threshold
+  | 'sensitive_topic'        // Legal, HR, complaints requiring escalation
+  | 'personal_relationship'  // Friends/family context AI shouldn't assume
+  | 'uncertain_context'      // Multiple valid interpretations
+  | 'scheduling_confirmation'; // Asking to confirm existing plans
+
 interface ClassificationResult {
   priority: MessagePriority;
   category: MessageCategory;
@@ -153,6 +163,10 @@ interface ClassificationResult {
   summaryShort?: string; // Short summary for inbox list (max 180 chars)
   keyPoints?: string[];
   confidenceScore: number;
+  // Human review detection
+  requiresHumanReview?: boolean;
+  reviewReason?: ReviewReason;
+  reviewContext?: string;
 }
 
 /**
@@ -257,6 +271,28 @@ Calculate based on these factors:
 Short/vague messages like "Test", "Hi", or single words should have LOW confidence (0.40-0.60).
 Generic messages without clear business context should be "notification" or "personal" with moderate confidence.
 
+HUMAN REVIEW DETECTION (CRITICAL - set requiresHumanReview to true if ANY apply):
+
+1. scheduling_confirmation: Message is asking to CONFIRM an existing meeting/plan/appointment
+   Examples: "Are we still on for lunch Thursday?", "Can you confirm our 3pm meeting?", "Just checking we're meeting tomorrow"
+   DO NOT flag new meeting requests, only CONFIRMATIONS of supposedly existing plans
+
+2. commitment_confirmation: Asking about deliverables, deadlines, prices, availability, promises
+   Examples: "Is the report ready?", "Can you deliver by Friday?", "What's the final price?"
+   The AI cannot verify these without checking external systems
+
+3. sensitive_topic: Legal matters, HR issues, complaints requiring escalation, contract terms
+   Examples: Legal threats, employment issues, formal complaints, liability discussions
+
+4. personal_relationship: Friends/family asking personal questions the AI shouldn't answer for the user
+   Examples: Personal plans, relationship questions, family matters where context is needed
+
+5. uncertain_context: Message has multiple valid interpretations or requires context AI doesn't have
+   Examples: Vague requests, inside jokes, references to past conversations not in context
+
+NOTE: Do NOT flag routine business emails, simple questions, or informational messages.
+Only flag when a WRONG auto-reply could cause real problems (missed meetings, broken promises, etc.)
+
 Respond with ONLY valid JSON:
 {
   "category": "<category>",
@@ -266,7 +302,10 @@ Respond with ONLY valid JSON:
   "summary": "<1-2 sentence summary>",
   "summaryShort": "<concise 1-line summary max 180 chars for inbox list - focus on key action/info, no greetings>",
   "keyPoints": ["<key point 1>", "<key point 2>"],
-  "confidenceScore": <number between 0.35 and 1.0>
+  "confidenceScore": <number between 0.35 and 1.0>,
+  "requiresHumanReview": <true/false>,
+  "reviewReason": "<scheduling_confirmation|commitment_confirmation|sensitive_topic|personal_relationship|uncertain_context|null>",
+  "reviewContext": "<brief explanation of what human needs to verify, or null if no review needed>"
 }`;
 
     const startTime = Date.now();
@@ -358,6 +397,13 @@ Be consistent: similar messages should get similar classifications.`,
       shortSummary = result.summary.substring(0, 177) + (result.summary.length > 177 ? '...' : '');
     }
 
+    // Determine if human review is needed (either AI detected or low confidence)
+    const needsReview = result.requiresHumanReview || result.confidenceScore < 0.6;
+    const reviewReason = result.reviewReason || (result.confidenceScore < 0.6 ? 'low_confidence' : null);
+    const reviewContext = result.reviewContext || (result.confidenceScore < 0.6 
+      ? `AI confidence is ${Math.round(result.confidenceScore * 100)}%, below threshold for auto-reply`
+      : null);
+
     // Update message with classification
     const { error: updateError } = await supabase
       .from("messages")
@@ -370,6 +416,10 @@ Be consistent: similar messages should get similar classifications.`,
         ai_summary_short: shortSummary, // Short summary for inbox list
         key_points: result.keyPoints || [],
         confidence_score: result.confidenceScore,
+        // Human review fields
+        requires_human_review: needsReview,
+        review_reason: reviewReason,
+        review_context: reviewContext ? { reason: reviewContext } : null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", messageId);
@@ -395,12 +445,23 @@ Be consistent: similar messages should get similar classifications.`,
         sender: message.sender_email,
         bodyLength: message.body.length,
       } as any,
-      output_data: result as any,
+      output_data: {
+        ...result,
+        requiresHumanReview: needsReview,
+        reviewReason,
+        reviewContext,
+      } as any,
       success: true,
       processing_time_ms: processingTime,
     });
 
-    return result;
+    // Return result with human review detection
+    return {
+      ...result,
+      requiresHumanReview: needsReview,
+      reviewReason: reviewReason as ReviewReason | undefined,
+      reviewContext: reviewContext || undefined,
+    };
   } catch (error) {
     console.error("Message classification error:", error);
     throw error;

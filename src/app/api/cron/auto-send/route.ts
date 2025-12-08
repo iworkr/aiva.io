@@ -181,7 +181,7 @@ export async function GET(request: NextRequest) {
         console.log(`   📝 Fetching draft ${item.draft_id?.substring(0, 8)}...`);
         const { data: draft, error: draftError } = await supabase
           .from('message_drafts')
-          .select('body')
+          .select('body, hold_for_review, review_reason')
           .eq('id', item.draft_id)
           .single();
 
@@ -196,11 +196,31 @@ export async function GET(request: NextRequest) {
         }
         console.log(`   ✅ Draft found, body length: ${draft.body?.length || 0} chars`);
 
+        // Check if draft is held for human review
+        if (draft.hold_for_review) {
+          console.log(`   ⏸️ Draft held for human review: ${draft.review_reason || 'unspecified'}`);
+          await updateQueueItemStatus(item.id, 'cancelled', {
+            errorMessage: `Held for human review: ${draft.review_reason || 'unspecified'}`,
+          });
+          
+          await supabase.from('auto_send_log').insert({
+            workspace_id: item.workspace_id,
+            message_id: item.message_id,
+            draft_id: item.draft_id,
+            action: 'held_for_review',
+            confidence_score: item.confidence_score,
+            details: { reason: draft.review_reason || 'held_for_human_review' },
+          });
+
+          results.skipped++;
+          continue;
+        }
+
         // Get the original message for threading info
         console.log(`   📧 Fetching original message ${item.message_id?.substring(0, 8)}...`);
         const { data: message, error: messageError } = await supabase
           .from('messages')
-          .select('provider_message_id, provider_thread_id, sender_email, subject, raw_data')
+          .select('provider_message_id, provider_thread_id, sender_email, subject, raw_data, requires_human_review, review_reason')
           .eq('id', item.message_id)
           .single();
 
@@ -214,6 +234,26 @@ export async function GET(request: NextRequest) {
           continue;
         }
         console.log(`   ✅ Message found: "${message.subject?.substring(0, 40)}..." from ${message.sender_email}`);
+
+        // Check if message is flagged for human review
+        if (message.requires_human_review) {
+          console.log(`   ⏸️ Message requires human review: ${message.review_reason || 'unspecified'}`);
+          await updateQueueItemStatus(item.id, 'cancelled', {
+            errorMessage: `Message requires human review: ${message.review_reason || 'unspecified'}`,
+          });
+          
+          await supabase.from('auto_send_log').insert({
+            workspace_id: item.workspace_id,
+            message_id: item.message_id,
+            draft_id: item.draft_id,
+            action: 'held_for_review',
+            confidence_score: item.confidence_score,
+            details: { reason: message.review_reason || 'message_requires_human_review' },
+          });
+
+          results.skipped++;
+          continue;
+        }
 
         // Get connection for provider info
         console.log(`   🔗 Fetching connection ${item.connection_id?.substring(0, 8)}...`);

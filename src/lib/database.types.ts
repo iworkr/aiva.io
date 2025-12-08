@@ -1826,18 +1826,22 @@ export type Database = {
       }
       message_drafts: {
         Row: {
+          ai_uncertainty_notes: string | null
           auto_sent: boolean | null
           auto_sent_at: string | null
           body: string
           body_html: string | null
+          calendar_context: Json | null
           confidence_score: number | null
           context_data: Json | null
           created_at: string
           edited_by_user: boolean | null
           generated_by_ai: boolean | null
+          hold_for_review: boolean | null
           id: string
           is_auto_sendable: boolean | null
           message_id: string
+          review_reason: string | null
           tone: string | null
           tone_reasoning: Json | null
           updated_at: string
@@ -1845,18 +1849,22 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          ai_uncertainty_notes?: string | null
           auto_sent?: boolean | null
           auto_sent_at?: string | null
           body: string
           body_html?: string | null
+          calendar_context?: Json | null
           confidence_score?: number | null
           context_data?: Json | null
           created_at?: string
           edited_by_user?: boolean | null
           generated_by_ai?: boolean | null
+          hold_for_review?: boolean | null
           id?: string
           is_auto_sendable?: boolean | null
           message_id: string
+          review_reason?: string | null
           tone?: string | null
           tone_reasoning?: Json | null
           updated_at?: string
@@ -1864,18 +1872,22 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          ai_uncertainty_notes?: string | null
           auto_sent?: boolean | null
           auto_sent_at?: string | null
           body?: string
           body_html?: string | null
+          calendar_context?: Json | null
           confidence_score?: number | null
           context_data?: Json | null
           created_at?: string
           edited_by_user?: boolean | null
           generated_by_ai?: boolean | null
+          hold_for_review?: boolean | null
           id?: string
           is_auto_sendable?: boolean | null
           message_id?: string
+          review_reason?: string | null
           tone?: string | null
           tone_reasoning?: Json | null
           updated_at?: string
@@ -1931,6 +1943,11 @@ export type Database = {
           provider_thread_id: string | null
           raw_data: Json | null
           recipients: Json | null
+          requires_human_review: boolean | null
+          review_context: Json | null
+          review_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
           sender_email: string
           sender_name: string | null
           sentiment: Database["public"]["Enums"]["message_sentiment"] | null
@@ -1967,6 +1984,11 @@ export type Database = {
           provider_thread_id?: string | null
           raw_data?: Json | null
           recipients?: Json | null
+          requires_human_review?: boolean | null
+          review_context?: Json | null
+          review_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           sender_email: string
           sender_name?: string | null
           sentiment?: Database["public"]["Enums"]["message_sentiment"] | null
@@ -2003,6 +2025,11 @@ export type Database = {
           provider_thread_id?: string | null
           raw_data?: Json | null
           recipients?: Json | null
+          requires_human_review?: boolean | null
+          review_context?: Json | null
+          review_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           sender_email?: string
           sender_name?: string | null
           sentiment?: Database["public"]["Enums"]["message_sentiment"] | null
@@ -2021,6 +2048,13 @@ export type Database = {
             columns: ["channel_connection_id"]
             isOneToOne: false
             referencedRelation: "channel_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
           {
@@ -2676,6 +2710,11 @@ export type Database = {
           auto_send_sender_cooldown_minutes: number | null
           auto_send_time_end: string | null
           auto_send_time_start: string | null
+          human_review_confidence_threshold: number | null
+          human_review_enabled: boolean | null
+          human_review_for_commitments: boolean | null
+          human_review_for_scheduling: boolean | null
+          human_review_for_sensitive: boolean | null
           inbox_type: string | null
           sync_frequency_minutes: number | null
           workspace_id: string
@@ -2697,6 +2736,11 @@ export type Database = {
           auto_send_sender_cooldown_minutes?: number | null
           auto_send_time_end?: string | null
           auto_send_time_start?: string | null
+          human_review_confidence_threshold?: number | null
+          human_review_enabled?: boolean | null
+          human_review_for_commitments?: boolean | null
+          human_review_for_scheduling?: boolean | null
+          human_review_for_sensitive?: boolean | null
           inbox_type?: string | null
           sync_frequency_minutes?: number | null
           workspace_id: string
@@ -2718,6 +2762,11 @@ export type Database = {
           auto_send_sender_cooldown_minutes?: number | null
           auto_send_time_end?: string | null
           auto_send_time_start?: string | null
+          human_review_confidence_threshold?: number | null
+          human_review_enabled?: boolean | null
+          human_review_for_commitments?: boolean | null
+          human_review_for_scheduling?: boolean | null
+          human_review_for_sensitive?: boolean | null
           inbox_type?: string | null
           sync_frequency_minutes?: number | null
           workspace_id?: string

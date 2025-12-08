@@ -241,14 +241,16 @@ export async function GET(request: NextRequest) {
           // Get messages that need drafts:
           // - Any actionability type that might need a response (excluding 'none')
           // - No existing draft
+          // - NOT flagged for human review (those need manual handling)
           // - Recent (last 24 hours)
           // - Include sender_email, category, provider_thread_id, labels for filtering
           const { data: actionableMessages } = await supabase
             .from('messages')
-            .select('id, subject, actionability, has_draft_reply, sender_email, category, provider_thread_id, labels')
+            .select('id, subject, actionability, has_draft_reply, sender_email, category, provider_thread_id, labels, requires_human_review')
             .eq('workspace_id', connection.workspace_id)
             .in('actionability', ['question', 'request', 'fyi', 'scheduling_intent', 'task']) // All types except 'none'
             .eq('has_draft_reply', false)
+            .or('requires_human_review.is.null,requires_human_review.eq.false') // Skip messages flagged for human review
             .gte('timestamp', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
             .order('timestamp', { ascending: false })
             .limit(15); // Limit to avoid timeouts, increased slightly to account for filtering
