@@ -242,10 +242,10 @@ export async function GET(request: NextRequest) {
           // - Any actionability type that might need a response (excluding 'none')
           // - No existing draft
           // - Recent (last 24 hours)
-          // - Include sender_email, category, provider_thread_id for filtering
+          // - Include sender_email, category, provider_thread_id, labels for filtering
           const { data: actionableMessages } = await supabase
             .from('messages')
-            .select('id, subject, actionability, has_draft_reply, sender_email, category, provider_thread_id')
+            .select('id, subject, actionability, has_draft_reply, sender_email, category, provider_thread_id, labels')
             .eq('workspace_id', connection.workspace_id)
             .in('actionability', ['question', 'request', 'fyi', 'scheduling_intent', 'task']) // All types except 'none'
             .eq('has_draft_reply', false)
@@ -257,10 +257,47 @@ export async function GET(request: NextRequest) {
             console.log(`      📝 Found ${actionableMessages.length} actionable messages without drafts`);
             
             let skippedByFilter = 0;
+            const connectionEmailLower = (filterSettings.connectionEmail || '').toLowerCase();
             
             for (const msg of actionableMessages) {
               try {
-                // *** SMART FILTER CHECK ***
+                const senderEmailLower = (msg.sender_email || '').toLowerCase();
+                const labels = (msg.labels as string[]) || [];
+                
+                // *** IMMEDIATE CHECKS - Skip without full filter check ***
+                
+                // Check 1: Skip SENT messages (our own outgoing messages)
+                if (labels.some(l => l.toUpperCase() === 'SENT')) {
+                  skippedByFilter++;
+                  console.log(`      ⏭️ SKIPPED (SENT label): ${msg.subject?.substring(0, 30) || 'No subject'}`);
+                  continue;
+                }
+                
+                // Check 2: Skip if sender is our own email (self-reply prevention)
+                if (connectionEmailLower && senderEmailLower === connectionEmailLower) {
+                  skippedByFilter++;
+                  console.log(`      ⏭️ SKIPPED (self-email): ${msg.subject?.substring(0, 30) || 'No subject'}`);
+                  // Mark has_draft_reply to prevent re-processing
+                  await supabase
+                    .from('messages')
+                    .update({ has_draft_reply: true })
+                    .eq('id', msg.id);
+                  continue;
+                }
+                
+                // Check 3: Skip if sender contains our email domain's username part
+                // e.g., if connection is "aivaioapp@gmail.com", skip "aivaioapp" from any domain
+                if (connectionEmailLower) {
+                  const ourUsername = connectionEmailLower.split('@')[0];
+                  const senderUsername = senderEmailLower.split('@')[0];
+                  if (ourUsername && senderUsername && ourUsername === senderUsername) {
+                    skippedByFilter++;
+                    console.log(`      ⏭️ SKIPPED (username match): ${msg.subject?.substring(0, 30) || 'No subject'}`);
+                    continue;
+                  }
+                }
+                
+                // *** FULL SMART FILTER CHECK ***
                 // Check if this message should receive an auto-reply
                 const filterResult = await checkAutoReplyEligibility(
                   {

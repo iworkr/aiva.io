@@ -198,6 +198,22 @@ export async function syncGmailMessages(
         // Parse to normalized format
         const parsed = parseGmailMessage(gmailMessage);
 
+        // CRITICAL: Skip SENT messages - they should not be processed for auto-reply
+        // This prevents the infinite reply loop where we reply to our own sent messages
+        if (parsed.labels.some((l: string) => l.toUpperCase() === 'SENT')) {
+          console.log(`📥 Skipping SENT message: ${parsed.subject?.substring(0, 30) || messageId}`);
+          skippedCount++;
+          continue;
+        }
+
+        // Also skip if sender is our own account (connection email)
+        const connectionEmail = connection.provider_account_id?.toLowerCase() || '';
+        if (connectionEmail && parsed.senderEmail?.toLowerCase() === connectionEmail) {
+          console.log(`📥 Skipping self-sent message: ${parsed.subject?.substring(0, 30) || messageId}`);
+          skippedCount++;
+          continue;
+        }
+
         // Store message in database directly (no need to check exists - we already did above)
         const { data: inserted, error: insertError } = await supabase
           .from("messages")
