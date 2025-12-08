@@ -29,7 +29,7 @@ export function MockDraftReply({
   tone = 'Professional',
   className,
   animate = false,
-  typingSpeed = 20,
+  typingSpeed = 35, // Slower, more readable typing
   onSend,
   onEdit,
 }: MockDraftReplyProps) {

@@ -79,17 +79,17 @@ export function AITriageVignette({
     setEmailCategory(undefined);
     setShowApplied(false);
 
-    // Phase 1: Email arrives
-    setTimeout(() => setPhase('email-arrive'), 300);
+    // Phase 1: Email arrives (slow fade in)
+    setTimeout(() => setPhase('email-arrive'), 500);
 
-    // Phase 2: Analyzing
-    setTimeout(() => setPhase('analyzing'), 1200);
+    // Phase 2: Analyzing (give time to read the email)
+    setTimeout(() => setPhase('analyzing'), 3000);
 
-    // Phase 3: Show suggestions
-    setTimeout(() => setPhase('suggestions'), 2200);
+    // Phase 3: Show suggestions (give time to see analyzing)
+    setTimeout(() => setPhase('suggestions'), 5500);
 
-    // Phase 4: Complete
-    setTimeout(() => setPhase('complete'), 4500);
+    // Phase 4: Complete (give time to read suggestions)
+    setTimeout(() => setPhase('complete'), 10000);
   }, []);
 
   useEffect(() => {
@@ -97,7 +97,7 @@ export function AITriageVignette({
       runAnimation();
 
       if (loop) {
-        const interval = setInterval(runAnimation, 8000);
+        const interval = setInterval(runAnimation, 14000);
         return () => clearInterval(interval);
       }
     }

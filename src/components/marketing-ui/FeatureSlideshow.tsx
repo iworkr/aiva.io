@@ -52,7 +52,7 @@ interface FeatureSlideshowProps {
 
 export function FeatureSlideshow({
   className,
-  autoPlayInterval = 8000,
+  autoPlayInterval = 14000, // Slower default for readability
   pauseOnHover = true,
   showControls = true,
   showIndicators = true,
@@ -106,19 +106,19 @@ export function FeatureSlideshow({
       onMouseLeave={() => pauseOnHover && setIsPaused(false)}
     >
       {/* Slide content */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-background to-secondary/20 border">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-background via-background to-secondary/30 border shadow-xl">
         {/* Header */}
-        <div className="px-6 pt-6 pb-2 text-center">
-          <h3 className="text-lg font-semibold">{currentSlide.title}</h3>
-          <p className="text-sm text-muted-foreground mt-1">{currentSlide.description}</p>
+        <div className="px-8 pt-8 pb-4 text-center space-y-2">
+          <h3 className="text-2xl font-bold tracking-tight">{currentSlide.title}</h3>
+          <p className="text-base text-muted-foreground max-w-md mx-auto">{currentSlide.description}</p>
         </div>
 
         {/* Vignette container */}
-        <div className="relative px-4 pb-6">
+        <div className="relative px-6 pb-8">
           <div
             key={currentSlide.id}
             className={cn(
-              'transition-all duration-500',
+              'transition-all duration-700 ease-out',
               isTransitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
             )}
           >

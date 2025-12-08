@@ -80,31 +80,31 @@ export function InboxZeroVignette({
     setVisibleEmails([]);
     setProcessedCount(0);
 
-    // Phase 1: Show cluttered inbox
+    // Phase 1: Show cluttered inbox (time to see the mess)
     setTimeout(() => {
       setPhase('cluttered');
       setVisibleEmails(clutterEmails.map((e) => e.id));
-    }, 300);
+    }, 500);
 
-    // Phase 2: Start processing
-    setTimeout(() => setPhase('processing'), 1500);
+    // Phase 2: Start processing (time to see cluttered inbox)
+    setTimeout(() => setPhase('processing'), 3500);
 
-    // Phase 3: Clear emails one by one
+    // Phase 3: Clear emails one by one (slower, more satisfying)
     setTimeout(() => {
       setPhase('clearing');
       clutterEmails.forEach((_, index) => {
         setTimeout(() => {
           setVisibleEmails((prev) => prev.slice(1));
           setProcessedCount((prev) => prev + 1);
-        }, index * 400);
+        }, index * 800); // Slower clearing
       });
-    }, 2500);
+    }, 5500);
 
-    // Phase 4: Show inbox zero
-    setTimeout(() => setPhase('zero'), 4800);
+    // Phase 4: Show inbox zero (after emails clear)
+    setTimeout(() => setPhase('zero'), 10000);
 
-    // Phase 5: Show stats
-    setTimeout(() => setPhase('stats'), 5500);
+    // Phase 5: Show stats (time to enjoy inbox zero)
+    setTimeout(() => setPhase('stats'), 11500);
   }, []);
 
   useEffect(() => {
@@ -112,7 +112,7 @@ export function InboxZeroVignette({
       runAnimation();
 
       if (loop) {
-        const interval = setInterval(runAnimation, 10000);
+        const interval = setInterval(runAnimation, 16000);
         return () => clearInterval(interval);
       }
     }

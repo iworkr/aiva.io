@@ -59,23 +59,23 @@ export function AutoReplyVignette({
     setPhase('idle');
     setShowTyping(false);
 
-    // Phase 1: Email arrives
-    setTimeout(() => setPhase('email-arrive'), 300);
+    // Phase 1: Email arrives (time to read incoming email)
+    setTimeout(() => setPhase('email-arrive'), 500);
 
-    // Phase 2: Analyzing
-    setTimeout(() => setPhase('analyzing'), 1500);
+    // Phase 2: Analyzing (time to see email content)
+    setTimeout(() => setPhase('analyzing'), 3500);
 
-    // Phase 3: Start typing
+    // Phase 3: Start typing (time to see analyzing)
     setTimeout(() => {
       setPhase('typing');
       setShowTyping(true);
-    }, 2500);
+    }, 5500);
 
-    // Phase 4: Complete typing
-    setTimeout(() => setPhase('complete'), 5500);
+    // Phase 4: Complete typing (wait for typing animation)
+    setTimeout(() => setPhase('complete'), 10000);
 
-    // Phase 5: Sent
-    setTimeout(() => setPhase('sent'), 7000);
+    // Phase 5: Sent (time to see completed draft)
+    setTimeout(() => setPhase('sent'), 12500);
   }, []);
 
   useEffect(() => {
@@ -83,7 +83,7 @@ export function AutoReplyVignette({
       runAnimation();
 
       if (loop) {
-        const interval = setInterval(runAnimation, 10000);
+        const interval = setInterval(runAnimation, 16000);
         return () => clearInterval(interval);
       }
     }

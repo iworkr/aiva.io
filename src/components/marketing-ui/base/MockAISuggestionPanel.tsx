@@ -96,16 +96,16 @@ export function MockAISuggestionPanel({
       setVisibleSuggestions([]);
       setIsAnalyzing(true);
 
-      // Show analyzing state
+      // Show analyzing state (longer to read)
       const analyzeTimer = setTimeout(() => {
         setIsAnalyzing(false);
-        // Then reveal suggestions one by one
+        // Then reveal suggestions one by one (slower stagger)
         suggestions.forEach((suggestion, index) => {
           setTimeout(() => {
             setVisibleSuggestions((prev) => [...prev, suggestion.id]);
-          }, index * 300);
+          }, index * 800); // Much slower reveal
         });
-      }, 1000);
+      }, 1500);
 
       return () => clearTimeout(analyzeTimer);
     } else {
