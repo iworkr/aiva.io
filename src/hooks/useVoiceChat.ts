@@ -243,8 +243,16 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
       console.log('[Voice] API response status:', response.status);
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        const errorText = await response.text();
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          errorMessage = errorText || errorMessage;
+        }
+        console.error('[Voice] API error:', response.status, errorMessage);
+        throw new Error(errorMessage);
       }
 
       // Handle Server-Sent Events
@@ -431,25 +439,37 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
       };
 
       mediaRecorder.onstop = async () => {
-        console.log('[Voice] MediaRecorder stopped, chunks collected:', audioChunksRef.current.length);
-        setIsRecording(false);
-        isRecordingRef.current = false;
+        try {
+          console.log('[Voice] MediaRecorder stopped, chunks collected:', audioChunksRef.current.length);
+          setIsRecording(false);
+          isRecordingRef.current = false;
 
-        // Process the recorded audio
-        if (audioChunksRef.current.length > 0) {
-          const audioBlob = new Blob(audioChunksRef.current, {
-            type: mimeType || 'audio/webm',
-          });
-          console.log('[Voice] Created audio blob, size:', audioBlob.size);
-          
-          // Store chunks before cleanup clears them
-          const blobToProcess = audioBlob;
+          // Process the recorded audio
+          if (audioChunksRef.current.length > 0) {
+            const audioBlob = new Blob(audioChunksRef.current, {
+              type: mimeType || 'audio/webm',
+            });
+            console.log('[Voice] Created audio blob, size:', audioBlob.size, 'type:', audioBlob.type);
+            
+            // Store blob before cleanup
+            const blobToProcess = audioBlob;
+            cleanup();
+            
+            // Process audio (this can throw)
+            await processAudio(blobToProcess);
+          } else {
+            console.warn('[Voice] No audio chunks to process!');
+            cleanup();
+            setStatus('idle');
+            toast.error('No audio recorded. Please try speaking louder.');
+          }
+        } catch (err) {
+          console.error('[Voice] Error in onstop handler:', err);
           cleanup();
-          await processAudio(blobToProcess);
-        } else {
-          console.warn('[Voice] No audio chunks to process!');
-          cleanup();
-          setStatus('idle');
+          setStatus('error');
+          const errorMsg = err instanceof Error ? err.message : 'Recording failed';
+          setError(errorMsg);
+          toast.error(errorMsg);
         }
       };
 
