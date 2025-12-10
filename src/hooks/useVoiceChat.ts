@@ -391,39 +391,43 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
 
                 case 'done':
                   console.log('[Voice] Response complete:', fullText);
-                  setStreamingResponse(''); // Clear streaming state
-                  setPendingUserMessage(''); // Clear any pending
+                  setStreamingResponse('');
+                  setPendingUserMessage('');
                   onResponse?.(fullText);
-                  // Add assistant message
                   setMessages((prev) => [
                     ...prev,
                     { role: 'assistant', content: fullText, timestamp: new Date() },
                   ]);
                   
-                  // Schedule auto-restart - check repeatedly until audio is done
-                  const checkAndRestart = () => {
-                    console.log('[Voice] checkAndRestart: isPlaying=', isPlayingRef.current, 'shouldRestart=', shouldAutoRestartRef.current);
-                    if (!isPlayingRef.current && shouldAutoRestartRef.current && autoRestartAfterResponse) {
-                      console.log('[Voice] 🔄 Triggering auto-restart NOW');
-                      shouldAutoRestartRef.current = false;
+                  // ALWAYS restart listening after response - poll until audio is done
+                  const restartPoll = setInterval(() => {
+                    console.log('[Voice] Poll restart: isPlaying=', isPlayingRef.current);
+                    if (!isPlayingRef.current) {
+                      clearInterval(restartPoll);
+                      console.log('[Voice] 🔄 Audio finished - restarting listening');
                       setStatus('idle');
                       setCurrentTranscript('');
-                      // Directly restart after a short delay using the ref
                       setTimeout(() => {
-                        console.log('[Voice] 🎤 Calling startListening via ref');
+                        console.log('[Voice] 🎤 Calling startListening NOW');
                         if (startListeningRef.current) {
                           startListeningRef.current();
+                        } else {
+                          console.error('[Voice] ERROR: startListeningRef is null');
                         }
-                      }, 300);
-                    } else if (isPlayingRef.current) {
-                      // Audio still playing, check again soon
-                      console.log('[Voice] Audio still playing, checking again...');
-                      setTimeout(checkAndRestart, 200);
-                    } else {
-                      console.log('[Voice] Not restarting: shouldRestart=', shouldAutoRestartRef.current, 'autoRestart=', autoRestartAfterResponse);
+                      }, 200);
                     }
-                  };
-                  setTimeout(checkAndRestart, 300);
+                  }, 100);
+                  
+                  // Safety: force restart after 10 seconds no matter what
+                  setTimeout(() => {
+                    clearInterval(restartPoll);
+                    if (!isListeningRef.current && !isRecordingRef.current) {
+                      console.log('[Voice] 🔄 SAFETY: Force restarting listening');
+                      if (startListeningRef.current) {
+                        startListeningRef.current();
+                      }
+                    }
+                  }, 10000);
                   break;
 
                 case 'error':

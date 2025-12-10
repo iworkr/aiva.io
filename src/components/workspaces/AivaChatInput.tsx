@@ -332,8 +332,35 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
                   )}
                 </span>
               </div>
+            ) : isListening ? (
+              // Listening but no sound detected yet
+              <div className="flex items-center gap-2 flex-1">
+                <div className="flex items-center gap-0.5 flex-shrink-0">
+                  {[...Array(7)].map((_, i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        'w-1 rounded-full transition-all duration-75',
+                        audioLevel > i * 0.12 
+                          ? 'bg-primary' 
+                          : 'bg-primary/30'
+                      )}
+                      style={{
+                        height: audioLevel > i * 0.12 
+                          ? `${Math.min(16, 4 + audioLevel * 24)}px` 
+                          : '4px'
+                      }}
+                    />
+                  ))}
+                </div>
+                <span className="text-sm text-primary animate-pulse">Ready - just speak...</span>
+              </div>
             ) : (
-              <span className="text-sm text-muted-foreground">Tap mic to speak to Aiva</span>
+              // Starting up listening
+              <div className="flex items-center gap-2 flex-1">
+                <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                <span className="text-sm text-muted-foreground">Starting voice...</span>
+              </div>
             )}
           </div>
         ) : (
@@ -395,29 +422,20 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
                   <Loader2 className="h-4 w-4 animate-spin" />
                 </button>
               ) : isRecording ? (
-                <button
-                  type="button"
-                  onClick={stopRecording}
-                  className="h-8 w-8 rounded-lg flex items-center justify-center bg-red-500 text-white hover:bg-red-600 shadow-sm transition-all animate-pulse"
-                >
-                  <MicOff className="h-4 w-4" />
-                </button>
-              ) : isListening ? (
-                <button
-                  type="button"
-                  onClick={stopListening}
-                  className="h-8 w-8 rounded-lg flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all"
-                >
-                  <Mic className="h-4 w-4 animate-pulse" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={startListening}
-                  className="h-8 w-8 rounded-lg flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all"
-                >
+                // Recording - show red pulsing mic
+                <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-red-500 text-white shadow-sm animate-pulse">
                   <Mic className="h-4 w-4" />
-                </button>
+                </div>
+              ) : isListening ? (
+                // Listening - show active mic
+                <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-primary text-primary-foreground shadow-sm">
+                  <Mic className="h-4 w-4 animate-pulse" />
+                </div>
+              ) : (
+                // Starting up - show loader
+                <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-muted text-muted-foreground shadow-sm">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
               )}
             </>
           ) : (
