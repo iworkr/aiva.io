@@ -41,6 +41,7 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
     isSpeaking,
     messages: voiceMessages,
     audioLevel,
+    currentTranscript,
     startRecording,
     stopRecording,
     cancelRecording,
@@ -48,13 +49,13 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
     stopSpeaking,
   } = useVoiceChat({
     onTranscription: (text) => {
-      console.log('Transcription:', text);
+      console.log('[AivaChat] Transcription:', text);
     },
     onResponse: (text) => {
-      console.log('Voice response:', text);
+      console.log('[AivaChat] Voice response:', text);
     },
     onError: (error) => {
-      console.error('Voice error:', error);
+      console.error('[AivaChat] Voice error:', error);
     },
   });
 
@@ -223,20 +224,29 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
           // Voice Mode Input
           <div className="pl-10 pr-24 h-11 bg-background border-2 border-border/50 hover:border-primary/30 rounded-xl flex items-center">
             {isRecording ? (
-              <div className="flex items-center gap-2 flex-1">
-                {/* Audio level visualization */}
-                <div className="flex items-center gap-0.5">
-                  {[...Array(5)].map((_, i) => (
+              <div className="flex items-center gap-2 flex-1 overflow-hidden">
+                {/* Audio level visualization - more bars, more responsive */}
+                <div className="flex items-center gap-0.5 flex-shrink-0">
+                  {[...Array(7)].map((_, i) => (
                     <div
                       key={i}
                       className={cn(
-                        'w-1 rounded-full bg-primary transition-all duration-75',
-                        audioLevel > i * 0.2 ? 'h-4' : 'h-1'
+                        'w-1 rounded-full transition-all duration-75',
+                        audioLevel > i * 0.14 
+                          ? 'bg-primary h-4' 
+                          : 'bg-primary/30 h-1'
                       )}
+                      style={{
+                        height: audioLevel > i * 0.14 
+                          ? `${Math.min(16, 4 + audioLevel * 20)}px` 
+                          : '4px'
+                      }}
                     />
                   ))}
                 </div>
-                <span className="text-sm text-primary animate-pulse">Listening...</span>
+                <span className="text-sm text-primary animate-pulse truncate">
+                  Listening... {audioLevel > 0.1 && '🎤'}
+                </span>
               </div>
             ) : isSpeaking ? (
               <div className="flex items-center gap-2 flex-1">
@@ -244,9 +254,11 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
                 <span className="text-sm text-primary">Aiva is speaking...</span>
               </div>
             ) : voiceStatus === 'processing' ? (
-              <div className="flex items-center gap-2 flex-1">
-                <Loader2 className="h-4 w-4 text-primary animate-spin" />
-                <span className="text-sm text-muted-foreground">Processing...</span>
+              <div className="flex items-center gap-2 flex-1 overflow-hidden">
+                <Loader2 className="h-4 w-4 text-primary animate-spin flex-shrink-0" />
+                <span className="text-sm text-muted-foreground truncate">
+                  {currentTranscript ? `"${currentTranscript}"` : 'Transcribing...'}
+                </span>
               </div>
             ) : (
               <span className="text-sm text-muted-foreground">Tap mic to speak to Aiva</span>

@@ -238,27 +238,36 @@ export class AudioChunkPlayer {
 /**
  * Voice Activity Detection (VAD) helper
  * Detects when the user is speaking vs silent
+ * Enhanced with minimum recording duration and better thresholds
  */
 export class VoiceActivityDetector {
   private analyser: AnalyserNode | null = null;
   private threshold: number;
   private silenceTimeout: number;
+  private minRecordingDuration: number;
   private lastSpeechTime = 0;
+  private recordingStartTime = 0;
   private isSpeaking = false;
+  private hasSpeechStarted = false; // Track if any speech was detected
   private onSpeechStart?: () => void;
   private onSpeechEnd?: () => void;
+  private onAudioLevel?: (level: number) => void;
   private checkInterval: NodeJS.Timeout | null = null;
 
   constructor(options: {
-    threshold?: number; // Volume threshold (0-1), default 0.05
+    threshold?: number; // Volume threshold (0-1), default 0.12 (higher for better detection)
     silenceTimeout?: number; // Ms of silence before speech ends, default 1500
+    minRecordingDuration?: number; // Minimum ms before auto-stop, default 1000
     onSpeechStart?: () => void;
     onSpeechEnd?: () => void;
+    onAudioLevel?: (level: number) => void;
   } = {}) {
-    this.threshold = options.threshold ?? 0.05;
+    this.threshold = options.threshold ?? 0.12; // Increased from 0.05 for better detection
     this.silenceTimeout = options.silenceTimeout ?? 1500;
+    this.minRecordingDuration = options.minRecordingDuration ?? 1000;
     this.onSpeechStart = options.onSpeechStart;
     this.onSpeechEnd = options.onSpeechEnd;
+    this.onAudioLevel = options.onAudioLevel;
   }
 
   setAnalyser(analyser: AnalyserNode) {
@@ -268,21 +277,37 @@ export class VoiceActivityDetector {
   start() {
     if (!this.analyser) return;
 
+    this.recordingStartTime = Date.now();
+    this.hasSpeechStarted = false;
+    this.isSpeaking = false;
+    this.lastSpeechTime = 0;
+
     this.checkInterval = setInterval(() => {
       const level = calculateAudioLevel(this.analyser!);
       const now = Date.now();
+      const recordingDuration = now - this.recordingStartTime;
+
+      // Report audio level for visualization
+      this.onAudioLevel?.(level);
 
       if (level > this.threshold) {
         this.lastSpeechTime = now;
         if (!this.isSpeaking) {
           this.isSpeaking = true;
+          this.hasSpeechStarted = true;
           this.onSpeechStart?.();
         }
       } else if (this.isSpeaking && now - this.lastSpeechTime > this.silenceTimeout) {
-        this.isSpeaking = false;
-        this.onSpeechEnd?.();
+        // Only trigger speech end if:
+        // 1. We were speaking
+        // 2. Silence timeout exceeded
+        // 3. Minimum recording duration met
+        if (recordingDuration >= this.minRecordingDuration) {
+          this.isSpeaking = false;
+          this.onSpeechEnd?.();
+        }
       }
-    }, 100); // Check every 100ms
+    }, 50); // Check every 50ms for more responsive detection
   }
 
   stop() {
@@ -291,10 +316,22 @@ export class VoiceActivityDetector {
       this.checkInterval = null;
     }
     this.isSpeaking = false;
+    this.hasSpeechStarted = false;
   }
 
   getIsSpeaking(): boolean {
     return this.isSpeaking;
+  }
+
+  getHasSpeechStarted(): boolean {
+    return this.hasSpeechStarted;
+  }
+
+  /**
+   * Update the threshold dynamically
+   */
+  setThreshold(threshold: number) {
+    this.threshold = Math.max(0, Math.min(1, threshold));
   }
 }
 

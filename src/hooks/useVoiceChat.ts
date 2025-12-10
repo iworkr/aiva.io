@@ -48,6 +48,7 @@ export interface UseVoiceChatReturn {
   messages: VoiceChatMessage[];
   audioLevel: number;
   error: string | null;
+  currentTranscript: string; // Live transcript of current recording
   startRecording: () => Promise<void>;
   stopRecording: () => Promise<void>;
   cancelRecording: () => void;
@@ -63,7 +64,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
     voiceId,
     autoStopOnSilence = true,
     silenceTimeout = 1500,
-    voiceThreshold = 0.05,
+    voiceThreshold = 0.12, // Increased from 0.05 for better speech detection
   } = options;
 
   // State
@@ -73,6 +74,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
   const [messages, setMessages] = useState<VoiceChatMessage[]>([]);
   const [audioLevel, setAudioLevel] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [currentTranscript, setCurrentTranscript] = useState<string>(''); // Live transcript
 
   // Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -85,12 +87,16 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
   const audioQueueRef = useRef<ArrayBuffer[]>([]);
   const isPlayingRef = useRef(false);
   const animationFrameRef = useRef<number | null>(null);
+  const isRecordingRef = useRef(false); // Ref for immediate recording state access
 
   // Check browser support
   const isSupported = typeof window !== 'undefined' && isVoiceRecordingSupported();
 
   // Cleanup function
   const cleanup = useCallback(() => {
+    // Stop recording ref first to stop animation loop
+    isRecordingRef.current = false;
+    
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
@@ -131,23 +137,29 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
     };
   }, [cleanup]);
 
-  // Update audio level visualization
+  // Update audio level visualization - uses ref for immediate state access
   const updateAudioLevel = useCallback(() => {
-    if (!analyserRef.current || !isRecording) return;
+    // Use ref instead of state to avoid closure issues
+    if (!analyserRef.current || !isRecordingRef.current) {
+      return;
+    }
 
     const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
     analyserRef.current.getByteFrequencyData(dataArray);
 
-    // Calculate RMS
+    // Calculate RMS (root mean square) for audio level
     let sum = 0;
     for (let i = 0; i < dataArray.length; i++) {
       sum += dataArray[i] * dataArray[i];
     }
     const rms = Math.sqrt(sum / dataArray.length);
-    setAudioLevel(rms / 255);
+    const normalizedLevel = rms / 255;
+    
+    setAudioLevel(normalizedLevel);
 
+    // Continue animation loop while recording
     animationFrameRef.current = requestAnimationFrame(updateAudioLevel);
-  }, [isRecording]);
+  }, []); // No dependencies needed - uses refs
 
   // Play audio chunks
   const playAudioChunks = useCallback(async () => {
@@ -204,11 +216,14 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
 
   // Process recorded audio
   const processAudio = useCallback(async (audioBlob: Blob) => {
+    console.log('[Voice] Processing audio, size:', audioBlob.size, 'type:', audioBlob.type);
     setStatus('processing');
+    setCurrentTranscript(''); // Clear previous transcript
 
     try {
       // Convert blob to base64
       const base64Audio = await blobToBase64(audioBlob);
+      console.log('[Voice] Audio converted to base64, length:', base64Audio.length);
 
       // Send to API
       const response = await fetch('/api/voice', {
@@ -225,6 +240,8 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
         }),
       });
 
+      console.log('[Voice] API response status:', response.status);
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `HTTP ${response.status}`);
@@ -239,23 +256,32 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
       const decoder = new TextDecoder();
       let fullText = '';
       let userText = '';
+      let buffer = ''; // Buffer for incomplete SSE lines
       setStatus('speaking');
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n\n');
+        // Append new data to buffer
+        buffer += decoder.decode(value, { stream: true });
+        
+        // Process complete SSE messages (separated by \n\n)
+        const messages_arr = buffer.split('\n\n');
+        buffer = messages_arr.pop() || ''; // Keep incomplete message in buffer
 
-        for (const line of lines) {
+        for (const line of messages_arr) {
           if (line.startsWith('data: ')) {
             try {
-              const data = JSON.parse(line.slice(6));
+              const jsonStr = line.slice(6);
+              const data = JSON.parse(jsonStr);
+              console.log('[Voice] SSE event:', data.type);
 
               switch (data.type) {
                 case 'transcription':
                   userText = data.text;
+                  console.log('[Voice] Transcription received:', data.text);
+                  setCurrentTranscript(data.text); // Show transcript immediately
                   onTranscription?.(data.text);
                   // Add user message
                   setMessages((prev) => [
@@ -269,12 +295,14 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
                   break;
 
                 case 'audio_chunk':
+                  console.log('[Voice] Audio chunk received');
                   const audioBuffer = base64ToArrayBuffer(data.audio);
                   audioQueueRef.current.push(audioBuffer);
                   playAudioChunks();
                   break;
 
                 case 'done':
+                  console.log('[Voice] Response complete:', fullText);
                   onResponse?.(fullText);
                   // Add assistant message
                   setMessages((prev) => [
@@ -284,16 +312,18 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
                   break;
 
                 case 'error':
+                  console.error('[Voice] Error from server:', data.error);
                   throw new Error(data.error);
               }
             } catch (parseError) {
-              console.error('Error parsing SSE data:', parseError);
+              console.error('[Voice] Error parsing SSE data:', parseError, 'Line:', line);
             }
           }
         }
       }
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Voice processing failed');
+      console.error('[Voice] Processing error:', error);
       setError(error.message);
       setStatus('error');
       onError?.(error);
@@ -338,12 +368,21 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
         source.connect(analyser);
         analyserRef.current = analyser;
 
-        // Set up voice activity detection
+        // Set up voice activity detection with enhanced options
         if (autoStopOnSilence) {
           vadRef.current = new VoiceActivityDetector({
-            threshold: voiceThreshold,
+            threshold: voiceThreshold || 0.12, // Higher default for better detection
             silenceTimeout,
+            minRecordingDuration: 1000, // Minimum 1 second before auto-stop
+            onAudioLevel: (level) => {
+              // VAD provides continuous level updates
+              setAudioLevel(level);
+            },
+            onSpeechStart: () => {
+              console.log('[Voice] Speech started');
+            },
             onSpeechEnd: () => {
+              console.log('[Voice] Speech ended - auto-stopping recording');
               // Auto-stop recording after silence
               if (mediaRecorderRef.current?.state === 'recording') {
                 stopRecording();
@@ -390,12 +429,13 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
         cleanup();
       };
 
-      // Start recording
+      // Start recording - set ref BEFORE state for animation loop
       mediaRecorder.start(100); // Collect data every 100ms
+      isRecordingRef.current = true; // Set ref first for immediate access
       setIsRecording(true);
       setStatus('listening');
 
-      // Start audio level visualization
+      // Start audio level visualization (now works because ref is already true)
       updateAudioLevel();
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to start recording');
@@ -452,6 +492,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
     messages,
     audioLevel,
     error,
+    currentTranscript,
     startRecording,
     stopRecording,
     cancelRecording,
