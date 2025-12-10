@@ -45,7 +45,6 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
     currentTranscript,
     liveTranscript,
     streamingResponse,
-    pendingUserMessage,
     startRecording,
     stopRecording,
     startListening,
@@ -190,7 +189,7 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
       // Scroll on any voice-related update
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [isVoiceMode, isOpen, voiceMessages, liveTranscript, streamingResponse, pendingUserMessage]);
+  }, [isVoiceMode, isOpen, voiceMessages, liveTranscript, streamingResponse, currentTranscript]);
 
   // Handle voice mode toggle
   const handleVoiceModeToggle = useCallback(async () => {
@@ -321,13 +320,13 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
                   )}
                 </span>
               </div>
-            ) : voiceStatus === 'processing' || pendingUserMessage ? (
+            ) : voiceStatus === 'processing' ? (
               // Processing user's message
               <div className="flex items-center gap-2 flex-1 overflow-hidden">
                 <Loader2 className="h-4 w-4 text-primary animate-spin flex-shrink-0" />
                 <span className="text-sm text-muted-foreground truncate">
-                  {pendingUserMessage || currentTranscript ? (
-                    <span>&quot;{pendingUserMessage || currentTranscript}&quot; - Thinking...</span>
+                  {currentTranscript ? (
+                    <span>&quot;{currentTranscript}&quot; - Thinking...</span>
                   ) : (
                     'Thinking...'
                   )}
@@ -648,7 +647,7 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
                   ))}
                   
                   {/* Live User Transcript - shows word-by-word as user speaks */}
-                  {isVoiceMode && (isRecording || liveTranscript) && liveTranscript && (
+                  {isVoiceMode && isRecording && liveTranscript && (
                     <div className="flex flex-col gap-1 items-end">
                       <div className="flex gap-2 flex-row-reverse">
                         <div className="max-w-[80%] rounded-2xl rounded-br-md px-3 py-2 text-sm leading-normal bg-primary/20 text-foreground">
@@ -658,20 +657,6 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
                       </div>
                       <span className="text-[10px] text-muted-foreground pr-1">
                         recording...
-                      </span>
-                    </div>
-                  )}
-                  
-                  {/* Pending User Message - shows after recording while AI processes */}
-                  {isVoiceMode && !isRecording && !liveTranscript && pendingUserMessage && !streamingResponse && (
-                    <div className="flex flex-col gap-1 items-end">
-                      <div className="flex gap-2 flex-row-reverse">
-                        <div className="max-w-[80%] rounded-2xl rounded-br-md px-3 py-2 text-sm leading-normal bg-primary text-primary-foreground">
-                          {pendingUserMessage}
-                        </div>
-                      </div>
-                      <span className="text-[10px] text-muted-foreground pr-1">
-                        just now
                       </span>
                     </div>
                   )}
@@ -706,7 +691,7 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
                   )}
                   
                   {/* Loading/Processing indicator - only show when actually processing */}
-                  {(isLoading || (isVoiceMode && voiceStatus === 'processing' && !streamingResponse && !pendingUserMessage)) && (
+                  {(isLoading || (isVoiceMode && voiceStatus === 'processing' && !streamingResponse)) && (
                     <div className="flex gap-2">
                       <div className="flex-shrink-0 relative h-6 w-6">
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-primary/25 blur-sm" />

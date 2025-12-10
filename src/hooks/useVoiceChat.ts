@@ -110,6 +110,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
   const isListeningRef = useRef(false); // Ref for listening state
   const shouldAutoRestartRef = useRef(false); // Track if we should auto-restart after speaking
   const speechRecognitionRef = useRef<SpeechRecognition | null>(null); // Web Speech API for live transcript
+  const startListeningRef = useRef<(() => Promise<void>) | null>(null); // Ref for startListening function
 
   // Check browser support
   const isSupported = typeof window !== 'undefined' && isVoiceRecordingSupported();
@@ -364,9 +365,9 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
                   console.log('[Voice] Transcription received:', data.text);
                   setLiveTranscript(''); // Clear live transcript
                   setCurrentTranscript(data.text); // Show final transcript
-                  setPendingUserMessage(data.text); // Keep showing user's message during processing
+                  // Don't set pendingUserMessage - message goes directly to array
                   onTranscription?.(data.text);
-                  // Add user message
+                  // Add user message immediately to the array
                   setMessages((prev) => [
                     ...prev,
                     { role: 'user', content: data.text, timestamp: new Date() },
@@ -391,6 +392,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
                 case 'done':
                   console.log('[Voice] Response complete:', fullText);
                   setStreamingResponse(''); // Clear streaming state
+                  setPendingUserMessage(''); // Clear any pending
                   onResponse?.(fullText);
                   // Add assistant message
                   setMessages((prev) => [
@@ -398,15 +400,30 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
                     { role: 'assistant', content: fullText, timestamp: new Date() },
                   ]);
                   
-                  // If audio has already finished or there was no audio, trigger auto-restart now
-                  // Use a small delay to let any remaining audio finish
-                  setTimeout(() => {
+                  // Schedule auto-restart - check repeatedly until audio is done
+                  const checkAndRestart = () => {
+                    console.log('[Voice] checkAndRestart: isPlaying=', isPlayingRef.current, 'shouldRestart=', shouldAutoRestartRef.current);
                     if (!isPlayingRef.current && shouldAutoRestartRef.current && autoRestartAfterResponse) {
-                      console.log('[Voice] 🔄 Audio done, triggering auto-restart from done event');
+                      console.log('[Voice] 🔄 Triggering auto-restart NOW');
                       shouldAutoRestartRef.current = false;
-                      setPendingAutoRestart(true);
+                      setStatus('idle');
+                      setCurrentTranscript('');
+                      // Directly restart after a short delay using the ref
+                      setTimeout(() => {
+                        console.log('[Voice] 🎤 Calling startListening via ref');
+                        if (startListeningRef.current) {
+                          startListeningRef.current();
+                        }
+                      }, 300);
+                    } else if (isPlayingRef.current) {
+                      // Audio still playing, check again soon
+                      console.log('[Voice] Audio still playing, checking again...');
+                      setTimeout(checkAndRestart, 200);
+                    } else {
+                      console.log('[Voice] Not restarting: shouldRestart=', shouldAutoRestartRef.current, 'autoRestart=', autoRestartAfterResponse);
                     }
-                  }, 500);
+                  };
+                  setTimeout(checkAndRestart, 300);
                   break;
 
                 case 'error':
@@ -960,26 +977,22 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
     setStatus('idle');
   }, []);
 
-  // Auto-restart listening after AI finishes speaking
+  // Store startListening in ref for access from callbacks
   useEffect(() => {
-    console.log('[Voice] Auto-restart check:', { 
-      pendingAutoRestart, 
-      isSpeaking, 
-      isRecording, 
-      isListening,
-      shouldRestart: pendingAutoRestart && !isSpeaking && !isRecording && !isListening 
-    });
-    
+    startListeningRef.current = startListening;
+  }, [startListening]);
+
+  // Auto-restart listening after AI finishes speaking (backup mechanism)
+  useEffect(() => {
     if (pendingAutoRestart && !isSpeaking && !isRecording && !isListening) {
-      console.log('[Voice] ✅ Conditions met for auto-restart');
+      console.log('[Voice] ✅ Backup auto-restart triggered via useEffect');
       setPendingAutoRestart(false);
-      setPendingUserMessage(''); // Clear pending message
-      setCurrentTranscript(''); // Clear transcript
-      setStatus('idle'); // Reset status before restarting
+      setPendingUserMessage('');
+      setCurrentTranscript('');
+      setStatus('idle');
       
-      // Small delay to ensure clean state transition
       const timer = setTimeout(() => {
-        console.log('[Voice] 🎤 Auto-restarting listening mode now');
+        console.log('[Voice] 🎤 Auto-restarting listening mode (backup)');
         if (autoDetectVoice) {
           startListening();
         } else {
