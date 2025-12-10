@@ -76,6 +76,26 @@ export async function transcribeAudio(
 }
 
 /**
+ * Extract clean extension from MIME type
+ * Handles formats like "audio/webm;codecs=opus" -> "webm"
+ */
+function getExtensionFromMimeType(mimeType: string): string {
+  // Remove codec info (e.g., ";codecs=opus")
+  const cleanMime = mimeType.split(';')[0];
+  // Extract extension from "audio/webm" -> "webm"
+  const extension = cleanMime.split('/')[1] || 'webm';
+  return extension;
+}
+
+/**
+ * Get clean MIME type without codec info
+ * "audio/webm;codecs=opus" -> "audio/webm"
+ */
+function getCleanMimeType(mimeType: string): string {
+  return mimeType.split(';')[0];
+}
+
+/**
  * Transcribe audio from a base64 encoded string
  * @param base64Audio - Base64 encoded audio data
  * @param mimeType - MIME type of the audio (default: audio/webm)
@@ -94,10 +114,19 @@ export async function transcribeBase64Audio(
   const client = getOpenAIClient();
 
   try {
-    // Determine file extension from MIME type
-    const extension = mimeType.split('/')[1] || 'webm';
+    // Get clean extension and MIME type
+    const extension = getExtensionFromMimeType(mimeType);
+    const cleanMimeType = getCleanMimeType(mimeType);
+    
+    console.log('[STT] Processing audio:', {
+      originalMime: mimeType,
+      cleanMime: cleanMimeType,
+      extension,
+      bufferSize: audioBuffer.length,
+    });
+
     const file = await toFile(audioBuffer, `audio.${extension}`, {
-      type: mimeType,
+      type: cleanMimeType,
     });
 
     const response = await client.audio.transcriptions.create({
@@ -108,13 +137,19 @@ export async function transcribeBase64Audio(
       response_format: 'verbose_json',
     });
 
+    console.log('[STT] Transcription successful:', {
+      text: response.text.substring(0, 50) + '...',
+      duration: response.duration,
+      language: response.language,
+    });
+
     return {
       text: response.text,
       duration: response.duration,
       language: response.language,
     };
   } catch (error) {
-    console.error('Whisper transcription error:', error);
+    console.error('[STT] Whisper transcription error:', error);
     throw new Error(
       error instanceof Error
         ? `Transcription failed: ${error.message}`
@@ -129,4 +164,3 @@ export async function transcribeBase64Audio(
 export function isSTTConfigured(): boolean {
   return !!process.env.OPENAI_API_KEY;
 }
-
