@@ -551,3 +551,13 @@
 .stagger-fade-in > *:nth-child(8) { animation-delay: 350ms; }
 .stagger-fade-in > *:nth-child(9) { animation-delay: 400ms; }
 .stagger-fade-in > *:nth-child(10) { animation-delay: 450ms; }
+
+/* Typing cursor blink animation for voice streaming */
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.animate-blink {
+  animation: blink 1s infinite;
+}

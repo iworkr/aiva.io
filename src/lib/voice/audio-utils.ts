@@ -59,6 +59,39 @@ export function isVoiceRecordingSupported(): boolean {
 }
 
 /**
+ * Check if Web Speech API is supported for real-time transcription
+ */
+export function isSpeechRecognitionSupported(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+
+/**
+ * Create a SpeechRecognition instance for real-time transcription
+ * @returns SpeechRecognition instance or null if not supported
+ */
+export function createSpeechRecognition(): SpeechRecognition | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognitionAPI) {
+    return null;
+  }
+
+  const recognition = new SpeechRecognitionAPI();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+  recognition.maxAlternatives = 1;
+
+  return recognition;
+}
+
+/**
  * Convert an ArrayBuffer to a base64 string
  */
 export function arrayBufferToBase64(buffer: ArrayBuffer): string {

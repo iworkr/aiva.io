@@ -42,6 +42,8 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
     messages: voiceMessages,
     audioLevel,
     currentTranscript,
+    liveTranscript,
+    streamingResponse,
     startRecording,
     stopRecording,
     cancelRecording,
@@ -244,20 +246,30 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
                     />
                   ))}
                 </div>
-                <span className="text-sm text-primary animate-pulse truncate">
-                  Listening... {audioLevel > 0.1 && '🎤'}
+                <span className="text-sm text-primary truncate">
+                  {liveTranscript ? (
+                    <span className="italic">&quot;{liveTranscript}&quot;</span>
+                  ) : (
+                    <span className="animate-pulse">Listening... {audioLevel > 0.1 && '🎤'}</span>
+                  )}
                 </span>
               </div>
-            ) : isSpeaking ? (
-              <div className="flex items-center gap-2 flex-1">
-                <Volume2 className="h-4 w-4 text-primary animate-pulse" />
-                <span className="text-sm text-primary">Aiva is speaking...</span>
+            ) : isSpeaking || streamingResponse ? (
+              <div className="flex items-center gap-2 flex-1 overflow-hidden">
+                <Volume2 className="h-4 w-4 text-primary animate-pulse flex-shrink-0" />
+                <span className="text-sm text-primary truncate">
+                  {streamingResponse ? (
+                    <span className="italic">&quot;{streamingResponse.slice(0, 40)}{streamingResponse.length > 40 ? '...' : ''}&quot;</span>
+                  ) : (
+                    'Aiva is speaking...'
+                  )}
+                </span>
               </div>
             ) : voiceStatus === 'processing' ? (
               <div className="flex items-center gap-2 flex-1 overflow-hidden">
                 <Loader2 className="h-4 w-4 text-primary animate-spin flex-shrink-0" />
                 <span className="text-sm text-muted-foreground truncate">
-                  {currentTranscript ? `"${currentTranscript}"` : 'Transcribing...'}
+                  {currentTranscript ? `"${currentTranscript}"` : 'Thinking...'}
                 </span>
               </div>
             ) : (
@@ -563,8 +575,53 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
                     </div>
                   ))}
                   
+                  {/* Live User Transcript - shows word-by-word as user speaks */}
+                  {isVoiceMode && isRecording && liveTranscript && (
+                    <div className="flex flex-col gap-1 items-end">
+                      <div className="flex gap-2 flex-row-reverse">
+                        {/* User's live transcript bubble */}
+                        <div className="max-w-[80%] rounded-2xl rounded-br-md px-3 py-2 text-sm leading-normal bg-primary/20 text-foreground">
+                          <span className="italic">{liveTranscript}</span>
+                          <span className="inline-block w-0.5 h-4 bg-primary/60 ml-1 animate-pulse" />
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground pr-1">
+                        listening...
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Streaming AI Response - shows word-by-word as AI generates */}
+                  {isVoiceMode && streamingResponse && (
+                    <div className="flex flex-col gap-1 items-start">
+                      <div className="flex gap-2">
+                        {/* Avatar */}
+                        <div className="flex-shrink-0 relative h-6 w-6">
+                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-primary/25 blur-sm" />
+                          <div className="relative h-6 w-6 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+                            <Image
+                              src="/logos/aiva-mark.svg"
+                              alt="Aiva"
+                              width={12}
+                              height={12}
+                              className="object-contain"
+                            />
+                          </div>
+                        </div>
+                        {/* Streaming text bubble */}
+                        <div className="max-w-[80%] rounded-2xl rounded-bl-md px-3 py-2 text-sm leading-normal bg-muted">
+                          <span>{streamingResponse}</span>
+                          <span className="inline-block w-0.5 h-4 bg-primary ml-1 animate-pulse" />
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground ml-8">
+                        typing...
+                      </span>
+                    </div>
+                  )}
+                  
                   {/* Loading/Processing indicator */}
-                  {(isLoading || (isVoiceMode && (voiceStatus === 'processing' || isRecording || isSpeaking))) && (
+                  {(isLoading || (isVoiceMode && !streamingResponse && (voiceStatus === 'processing' || isRecording || isSpeaking))) && (
                     <div className="flex gap-2">
                       <div className="flex-shrink-0 relative h-6 w-6">
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-primary/25 blur-sm" />

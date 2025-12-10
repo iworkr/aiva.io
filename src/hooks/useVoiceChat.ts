@@ -14,6 +14,7 @@ import {
   base64ToArrayBuffer,
   createAudioContext,
   VoiceActivityDetector,
+  createSpeechRecognition,
 } from '@/lib/voice/audio-utils';
 
 export interface VoiceChatMessage {
@@ -49,7 +50,9 @@ export interface UseVoiceChatReturn {
   messages: VoiceChatMessage[];
   audioLevel: number;
   error: string | null;
-  currentTranscript: string; // Live transcript of current recording
+  currentTranscript: string; // Final transcript from Whisper
+  liveTranscript: string; // Real-time transcript from Web Speech API
+  streamingResponse: string; // AI's streaming response text
   startRecording: () => Promise<void>;
   stopRecording: () => Promise<void>;
   cancelRecording: () => void;
@@ -76,7 +79,9 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
   const [messages, setMessages] = useState<VoiceChatMessage[]>([]);
   const [audioLevel, setAudioLevel] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [currentTranscript, setCurrentTranscript] = useState<string>(''); // Live transcript
+  const [currentTranscript, setCurrentTranscript] = useState<string>(''); // Final transcript from Whisper
+  const [liveTranscript, setLiveTranscript] = useState<string>(''); // Real-time transcript from Web Speech API
+  const [streamingResponse, setStreamingResponse] = useState<string>(''); // AI's streaming response
   const [pendingAutoRestart, setPendingAutoRestart] = useState(false); // Trigger for auto-restart
 
   // Refs
@@ -92,6 +97,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
   const animationFrameRef = useRef<number | null>(null);
   const isRecordingRef = useRef(false); // Ref for immediate recording state access
   const shouldAutoRestartRef = useRef(false); // Track if we should auto-restart after speaking
+  const speechRecognitionRef = useRef<SpeechRecognition | null>(null); // Web Speech API for live transcript
 
   // Check browser support
   const isSupported = typeof window !== 'undefined' && isVoiceRecordingSupported();
@@ -125,9 +131,20 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
       vadRef.current.stop();
       vadRef.current = null;
     }
+
+    // Stop Web Speech API
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.stop();
+      } catch {
+        // Already stopped, ignore
+      }
+      speechRecognitionRef.current = null;
+    }
     
     audioChunksRef.current = [];
     setAudioLevel(0);
+    setLiveTranscript(''); // Clear live transcript on cleanup
   }, []);
 
   // Cleanup on unmount
@@ -308,7 +325,8 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
                 case 'transcription':
                   userText = data.text;
                   console.log('[Voice] Transcription received:', data.text);
-                  setCurrentTranscript(data.text); // Show transcript immediately
+                  setLiveTranscript(''); // Clear live transcript, use accurate Whisper result
+                  setCurrentTranscript(data.text); // Show final transcript
                   onTranscription?.(data.text);
                   // Add user message
                   setMessages((prev) => [
@@ -319,6 +337,8 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
 
                 case 'text_delta':
                   fullText += data.text;
+                  setStreamingResponse(fullText); // Display incrementally
+                  setStatus('speaking');
                   break;
 
                 case 'audio_chunk':
@@ -330,6 +350,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
 
                 case 'done':
                   console.log('[Voice] Response complete:', fullText);
+                  setStreamingResponse(''); // Clear streaming state
                   onResponse?.(fullText);
                   // Add assistant message
                   setMessages((prev) => [
@@ -510,6 +531,50 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
 
       // Start audio level visualization (now works because ref is already true)
       updateAudioLevel();
+
+      // Start Web Speech API for real-time transcript display
+      const recognition = createSpeechRecognition();
+      if (recognition) {
+        speechRecognitionRef.current = recognition;
+        
+        recognition.onresult = (event) => {
+          let interimTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (!event.results[i].isFinal) {
+              interimTranscript += transcript;
+            }
+          }
+          if (interimTranscript) {
+            setLiveTranscript(interimTranscript);
+          }
+        };
+
+        recognition.onerror = (event) => {
+          // Don't log 'no-speech' or 'aborted' as errors - they're expected
+          if (event.error !== 'no-speech' && event.error !== 'aborted') {
+            console.log('[Voice] Speech recognition info:', event.error);
+          }
+        };
+
+        recognition.onend = () => {
+          // Recognition ended - may restart if still recording
+          if (isRecordingRef.current && speechRecognitionRef.current) {
+            try {
+              speechRecognitionRef.current.start();
+            } catch {
+              // Already started or stopped, ignore
+            }
+          }
+        };
+
+        try {
+          recognition.start();
+          console.log('[Voice] Web Speech API started for live transcript');
+        } catch (e) {
+          console.log('[Voice] Could not start Web Speech API:', e);
+        }
+      }
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to start recording');
       setError(error.message);
@@ -579,6 +644,8 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
     audioLevel,
     error,
     currentTranscript,
+    liveTranscript,
+    streamingResponse,
     startRecording,
     stopRecording,
     cancelRecording,
