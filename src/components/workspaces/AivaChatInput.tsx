@@ -38,14 +38,18 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
     status: voiceStatus,
     isSupported: isVoiceSupported,
     isRecording,
+    isListening,
     isSpeaking,
     messages: voiceMessages,
     audioLevel,
     currentTranscript,
     liveTranscript,
     streamingResponse,
+    pendingUserMessage,
     startRecording,
     stopRecording,
+    startListening,
+    stopListening,
     cancelRecording,
     clearMessages: clearVoiceMessages,
     stopSpeaking,
@@ -59,6 +63,7 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
     onError: (error) => {
       console.error('[AivaChat] Voice error:', error);
     },
+    autoDetectVoice: true, // Enable auto voice detection
   });
 
   // useChat hook for text mode
@@ -179,7 +184,7 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
   }, [messages]);
 
   // Handle voice mode toggle
-  const handleVoiceModeToggle = useCallback(() => {
+  const handleVoiceModeToggle = useCallback(async () => {
     if (!hasVoiceAccess) {
       toast.error('Voice chat is a Pro feature. Upgrade to access voice conversations!');
       return;
@@ -188,25 +193,41 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
       toast.error('Voice recording is not supported in your browser');
       return;
     }
-    setIsVoiceMode((prev) => !prev);
+    
+    const enteringVoiceMode = !isVoiceMode;
+    setIsVoiceMode(enteringVoiceMode);
     if (!isOpen) setIsOpen(true);
-  }, [hasVoiceAccess, isVoiceSupported, isOpen]);
+    
+    // Auto-start listening when entering voice mode
+    if (enteringVoiceMode && !isListening && !isRecording) {
+      await startListening();
+    } else if (!enteringVoiceMode) {
+      // Stop listening when leaving voice mode
+      stopListening();
+      cancelRecording();
+    }
+  }, [hasVoiceAccess, isVoiceSupported, isOpen, isVoiceMode, isListening, isRecording, startListening, stopListening, cancelRecording]);
 
-  // Handle voice recording toggle
+  // Handle voice recording toggle (manual control)
   const handleVoiceToggle = useCallback(async () => {
     if (isRecording) {
       await stopRecording();
+    } else if (isListening) {
+      // Already listening, just stop
+      stopListening();
     } else {
-      await startRecording();
+      // Start listening (auto-detect mode)
+      await startListening();
       if (!isOpen) setIsOpen(true);
     }
-  }, [isRecording, startRecording, stopRecording, isOpen]);
+  }, [isRecording, isListening, stopRecording, startListening, stopListening, isOpen]);
 
   // Combined messages for display
   const displayMessages = isVoiceMode ? voiceMessages : messages;
   const isProcessing = isVoiceMode 
     ? voiceStatus === 'processing' || voiceStatus === 'connecting'
     : isLoading;
+  const isVoiceActive = isRecording || isListening || isSpeaking || voiceStatus === 'processing';
 
   return (
     <div className={cn('relative', className)}>
@@ -226,35 +247,61 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
           // Voice Mode Input
           <div className="pl-10 pr-24 h-11 bg-background border-2 border-border/50 hover:border-primary/30 rounded-xl flex items-center">
             {isRecording ? (
+              // Recording - show live transcript
               <div className="flex items-center gap-2 flex-1 overflow-hidden">
-                {/* Audio level visualization - more bars, more responsive */}
                 <div className="flex items-center gap-0.5 flex-shrink-0">
                   {[...Array(7)].map((_, i) => (
                     <div
                       key={i}
                       className={cn(
                         'w-1 rounded-full transition-all duration-75',
-                        audioLevel > i * 0.14 
-                          ? 'bg-primary h-4' 
-                          : 'bg-primary/30 h-1'
+                        audioLevel > i * 0.12 
+                          ? 'bg-red-500' 
+                          : 'bg-red-500/30'
                       )}
                       style={{
-                        height: audioLevel > i * 0.14 
-                          ? `${Math.min(16, 4 + audioLevel * 20)}px` 
+                        height: audioLevel > i * 0.12 
+                          ? `${Math.min(16, 4 + audioLevel * 24)}px` 
                           : '4px'
                       }}
                     />
                   ))}
                 </div>
-                <span className="text-sm text-primary truncate">
+                <span className="text-sm text-red-500 truncate">
                   {liveTranscript ? (
                     <span className="italic">&quot;{liveTranscript}&quot;</span>
                   ) : (
-                    <span className="animate-pulse">Listening... {audioLevel > 0.1 && '🎤'}</span>
+                    <span className="animate-pulse">Recording...</span>
                   )}
                 </span>
               </div>
+            ) : isListening ? (
+              // Listening mode - waiting for voice
+              <div className="flex items-center gap-2 flex-1 overflow-hidden">
+                <div className="flex items-center gap-0.5 flex-shrink-0">
+                  {[...Array(7)].map((_, i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        'w-1 rounded-full transition-all duration-75',
+                        audioLevel > i * 0.12 
+                          ? 'bg-primary' 
+                          : 'bg-primary/30'
+                      )}
+                      style={{
+                        height: audioLevel > i * 0.12 
+                          ? `${Math.min(16, 4 + audioLevel * 24)}px` 
+                          : '4px'
+                      }}
+                    />
+                  ))}
+                </div>
+                <span className="text-sm text-primary truncate animate-pulse">
+                  Speak to start...
+                </span>
+              </div>
             ) : isSpeaking || streamingResponse ? (
+              // AI is responding
               <div className="flex items-center gap-2 flex-1 overflow-hidden">
                 <Volume2 className="h-4 w-4 text-primary animate-pulse flex-shrink-0" />
                 <span className="text-sm text-primary truncate">
@@ -265,11 +312,16 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
                   )}
                 </span>
               </div>
-            ) : voiceStatus === 'processing' ? (
+            ) : voiceStatus === 'processing' || pendingUserMessage ? (
+              // Processing user's message
               <div className="flex items-center gap-2 flex-1 overflow-hidden">
                 <Loader2 className="h-4 w-4 text-primary animate-spin flex-shrink-0" />
                 <span className="text-sm text-muted-foreground truncate">
-                  {currentTranscript ? `"${currentTranscript}"` : 'Thinking...'}
+                  {pendingUserMessage || currentTranscript ? (
+                    <span>&quot;{pendingUserMessage || currentTranscript}&quot; - Thinking...</span>
+                  ) : (
+                    'Thinking...'
+                  )}
                 </span>
               </div>
             ) : (
@@ -326,26 +378,37 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
                 >
                   <Square className="h-4 w-4" />
                 </button>
+              ) : voiceStatus === 'processing' ? (
+                <button
+                  type="button"
+                  disabled
+                  className="h-8 w-8 rounded-lg flex items-center justify-center bg-muted text-muted-foreground shadow-sm transition-all"
+                >
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </button>
+              ) : isRecording ? (
+                <button
+                  type="button"
+                  onClick={stopRecording}
+                  className="h-8 w-8 rounded-lg flex items-center justify-center bg-red-500 text-white hover:bg-red-600 shadow-sm transition-all animate-pulse"
+                >
+                  <MicOff className="h-4 w-4" />
+                </button>
+              ) : isListening ? (
+                <button
+                  type="button"
+                  onClick={stopListening}
+                  className="h-8 w-8 rounded-lg flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all"
+                >
+                  <Mic className="h-4 w-4 animate-pulse" />
+                </button>
               ) : (
                 <button
                   type="button"
-                  onClick={handleVoiceToggle}
-                  disabled={voiceStatus === 'processing' || voiceStatus === 'connecting'}
-                  className={cn(
-                    'h-8 w-8 rounded-lg flex items-center justify-center transition-all shadow-sm',
-                    'disabled:opacity-40 disabled:cursor-not-allowed',
-                    isRecording
-                      ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse'
-                      : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  )}
+                  onClick={startListening}
+                  className="h-8 w-8 rounded-lg flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-all"
                 >
-                  {isRecording ? (
-                    <MicOff className="h-4 w-4" />
-                  ) : voiceStatus === 'processing' ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Mic className="h-4 w-4" />
-                  )}
+                  <Mic className="h-4 w-4" />
                 </button>
               )}
             </>
@@ -576,17 +639,30 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
                   ))}
                   
                   {/* Live User Transcript - shows word-by-word as user speaks */}
-                  {isVoiceMode && isRecording && liveTranscript && (
+                  {isVoiceMode && (isRecording || liveTranscript) && liveTranscript && (
                     <div className="flex flex-col gap-1 items-end">
                       <div className="flex gap-2 flex-row-reverse">
-                        {/* User's live transcript bubble */}
                         <div className="max-w-[80%] rounded-2xl rounded-br-md px-3 py-2 text-sm leading-normal bg-primary/20 text-foreground">
                           <span className="italic">{liveTranscript}</span>
                           <span className="inline-block w-0.5 h-4 bg-primary/60 ml-1 animate-pulse" />
                         </div>
                       </div>
                       <span className="text-[10px] text-muted-foreground pr-1">
-                        listening...
+                        recording...
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Pending User Message - shows after recording while AI processes */}
+                  {isVoiceMode && !isRecording && !liveTranscript && pendingUserMessage && !streamingResponse && (
+                    <div className="flex flex-col gap-1 items-end">
+                      <div className="flex gap-2 flex-row-reverse">
+                        <div className="max-w-[80%] rounded-2xl rounded-br-md px-3 py-2 text-sm leading-normal bg-primary text-primary-foreground">
+                          {pendingUserMessage}
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground pr-1">
+                        just now
                       </span>
                     </div>
                   )}
@@ -620,8 +696,8 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
                     </div>
                   )}
                   
-                  {/* Loading/Processing indicator */}
-                  {(isLoading || (isVoiceMode && !streamingResponse && (voiceStatus === 'processing' || isRecording || isSpeaking))) && (
+                  {/* Loading/Processing indicator - only show when actually processing */}
+                  {(isLoading || (isVoiceMode && voiceStatus === 'processing' && !streamingResponse && !pendingUserMessage)) && (
                     <div className="flex gap-2">
                       <div className="flex-shrink-0 relative h-6 w-6">
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-primary/25 blur-sm" />

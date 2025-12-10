@@ -40,12 +40,14 @@ export interface UseVoiceChatOptions {
   silenceTimeout?: number; // ms
   voiceThreshold?: number; // 0-1
   autoRestartAfterResponse?: boolean; // Auto-restart recording after AI finishes speaking
+  autoDetectVoice?: boolean; // Automatically start recording when voice is detected
 }
 
 export interface UseVoiceChatReturn {
   status: VoiceChatStatus;
   isSupported: boolean;
   isRecording: boolean;
+  isListening: boolean; // Passively listening for voice (auto-detect mode)
   isSpeaking: boolean;
   messages: VoiceChatMessage[];
   audioLevel: number;
@@ -53,8 +55,11 @@ export interface UseVoiceChatReturn {
   currentTranscript: string; // Final transcript from Whisper
   liveTranscript: string; // Real-time transcript from Web Speech API
   streamingResponse: string; // AI's streaming response text
+  pendingUserMessage: string; // User's message while AI is processing
   startRecording: () => Promise<void>;
   stopRecording: () => Promise<void>;
+  startListening: () => Promise<void>; // Start auto-detect mode
+  stopListening: () => void; // Stop auto-detect mode
   cancelRecording: () => void;
   clearMessages: () => void;
   stopSpeaking: () => void;
@@ -68,13 +73,15 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
     voiceId,
     autoStopOnSilence = true,
     silenceTimeout = 1500,
-    voiceThreshold = 0.12, // Increased from 0.05 for better speech detection
+    voiceThreshold = 0.08, // Lower threshold for better detection
     autoRestartAfterResponse = true, // Default to continuous conversation
+    autoDetectVoice = true, // Default to auto voice detection
   } = options;
 
   // State
   const [status, setStatus] = useState<VoiceChatStatus>('idle');
   const [isRecording, setIsRecording] = useState(false);
+  const [isListening, setIsListening] = useState(false); // Passive listening mode
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [messages, setMessages] = useState<VoiceChatMessage[]>([]);
   const [audioLevel, setAudioLevel] = useState(0);
@@ -82,6 +89,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
   const [currentTranscript, setCurrentTranscript] = useState<string>(''); // Final transcript from Whisper
   const [liveTranscript, setLiveTranscript] = useState<string>(''); // Real-time transcript from Web Speech API
   const [streamingResponse, setStreamingResponse] = useState<string>(''); // AI's streaming response
+  const [pendingUserMessage, setPendingUserMessage] = useState<string>(''); // User's message during processing
   const [pendingAutoRestart, setPendingAutoRestart] = useState(false); // Trigger for auto-restart
 
   // Refs
@@ -91,19 +99,23 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const listeningStreamRef = useRef<MediaStream | null>(null); // Stream for passive listening
   const vadRef = useRef<VoiceActivityDetector | null>(null);
+  const listeningVadRef = useRef<VoiceActivityDetector | null>(null); // VAD for auto-detect
   const audioQueueRef = useRef<ArrayBuffer[]>([]);
   const isPlayingRef = useRef(false);
   const animationFrameRef = useRef<number | null>(null);
+  const listeningAnimationRef = useRef<number | null>(null); // Animation for listening mode
   const isRecordingRef = useRef(false); // Ref for immediate recording state access
+  const isListeningRef = useRef(false); // Ref for listening state
   const shouldAutoRestartRef = useRef(false); // Track if we should auto-restart after speaking
   const speechRecognitionRef = useRef<SpeechRecognition | null>(null); // Web Speech API for live transcript
 
   // Check browser support
   const isSupported = typeof window !== 'undefined' && isVoiceRecordingSupported();
 
-  // Cleanup function
-  const cleanup = useCallback(() => {
+  // Cleanup recording (not listening mode)
+  const cleanupRecording = useCallback(() => {
     // Stop recording ref first to stop animation loop
     isRecordingRef.current = false;
     
@@ -144,8 +156,33 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
     
     audioChunksRef.current = [];
     setAudioLevel(0);
-    setLiveTranscript(''); // Clear live transcript on cleanup
   }, []);
+
+  // Full cleanup including listening mode
+  const cleanup = useCallback(() => {
+    cleanupRecording();
+    setLiveTranscript('');
+    
+    // Also cleanup listening mode
+    isListeningRef.current = false;
+    
+    if (listeningAnimationRef.current) {
+      cancelAnimationFrame(listeningAnimationRef.current);
+      listeningAnimationRef.current = null;
+    }
+    
+    if (listeningStreamRef.current) {
+      listeningStreamRef.current.getTracks().forEach((track) => track.stop());
+      listeningStreamRef.current = null;
+    }
+    
+    if (listeningVadRef.current) {
+      listeningVadRef.current.stop();
+      listeningVadRef.current = null;
+    }
+    
+    setIsListening(false);
+  }, [cleanupRecording]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -325,19 +362,22 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
                 case 'transcription':
                   userText = data.text;
                   console.log('[Voice] Transcription received:', data.text);
-                  setLiveTranscript(''); // Clear live transcript, use accurate Whisper result
+                  setLiveTranscript(''); // Clear live transcript
                   setCurrentTranscript(data.text); // Show final transcript
+                  setPendingUserMessage(data.text); // Keep showing user's message during processing
                   onTranscription?.(data.text);
                   // Add user message
                   setMessages((prev) => [
                     ...prev,
                     { role: 'user', content: data.text, timestamp: new Date() },
                   ]);
+                  setStatus('processing'); // Show we're processing
                   break;
 
                 case 'text_delta':
                   fullText += data.text;
                   setStreamingResponse(fullText); // Display incrementally
+                  setPendingUserMessage(''); // Clear pending since AI is now responding
                   setStatus('speaking');
                   break;
 
@@ -615,30 +655,318 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
     }
     cleanup();
     setStatus('idle');
+    setPendingUserMessage('');
+    setLiveTranscript('');
   }, [cleanup]);
 
   // Clear messages
   const clearMessages = useCallback(() => {
     setMessages([]);
+    setPendingUserMessage('');
+    setCurrentTranscript('');
+    setStreamingResponse('');
   }, []);
 
-  // Auto-restart recording after AI finishes speaking
+  // Update audio level for listening mode
+  const updateListeningAudioLevel = useCallback(() => {
+    if (!analyserRef.current || !isListeningRef.current) {
+      return;
+    }
+
+    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+    analyserRef.current.getByteFrequencyData(dataArray);
+
+    let sum = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+      sum += dataArray[i] * dataArray[i];
+    }
+    const rms = Math.sqrt(sum / dataArray.length);
+    const normalizedLevel = rms / 255;
+    
+    setAudioLevel(normalizedLevel);
+
+    if (isListeningRef.current) {
+      listeningAnimationRef.current = requestAnimationFrame(updateListeningAudioLevel);
+    }
+  }, []);
+
+  // Start listening mode (auto voice detection)
+  const startListening = useCallback(async () => {
+    if (!isSupported) {
+      toast.error('Voice is not supported in your browser');
+      return;
+    }
+
+    if (isListeningRef.current || isRecordingRef.current) {
+      return; // Already listening or recording
+    }
+
+    console.log('[Voice] Starting listening mode (auto voice detection)...');
+    setError(null);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+
+      listeningStreamRef.current = stream;
+      isListeningRef.current = true;
+      setIsListening(true);
+      setStatus('listening');
+
+      // Set up audio context for VAD
+      if (!audioContextRef.current) {
+        audioContextRef.current = createAudioContext();
+      }
+
+      const audioContext = audioContextRef.current;
+      if (audioContext) {
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume();
+        }
+
+        const source = audioContext.createMediaStreamSource(stream);
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.3;
+        source.connect(analyser);
+        analyserRef.current = analyser;
+
+        // Set up VAD for auto voice detection
+        listeningVadRef.current = new VoiceActivityDetector({
+          threshold: voiceThreshold,
+          silenceTimeout: 800, // Faster detection
+          minRecordingDuration: 500,
+          onAudioLevel: (level) => {
+            setAudioLevel(level);
+          },
+          onSpeechStart: () => {
+            console.log('[Voice] 🎤 Speech detected! Auto-starting recording...');
+            // Stop listening mode and start recording
+            if (isListeningRef.current && !isRecordingRef.current) {
+              // Keep the stream for recording
+              const currentStream = listeningStreamRef.current;
+              
+              // Stop listening VAD but keep stream
+              listeningVadRef.current?.stop();
+              isListeningRef.current = false;
+              setIsListening(false);
+              
+              // Start actual recording with the existing stream
+              startRecordingWithStream(currentStream!);
+            }
+          },
+          onSpeechEnd: () => {
+            // Not used in listening mode - we start recording on speech start
+          },
+        });
+        listeningVadRef.current.setAnalyser(analyser);
+        listeningVadRef.current.start();
+
+        // Start audio level visualization
+        updateListeningAudioLevel();
+      }
+
+      console.log('[Voice] ✅ Listening mode active - speak to start');
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to start listening');
+      console.error('[Voice] Listening error:', error);
+      setError(error.message);
+      isListeningRef.current = false;
+      setIsListening(false);
+      
+      if (error.name === 'NotAllowedError') {
+        toast.error('Microphone access denied');
+      }
+    }
+  }, [isSupported, voiceThreshold, updateListeningAudioLevel]);
+
+  // Start recording with an existing stream (for auto-detect)
+  const startRecordingWithStream = useCallback(async (stream: MediaStream) => {
+    if (isRecordingRef.current) return;
+    
+    console.log('[Voice] Starting recording with existing stream...');
+    
+    streamRef.current = stream;
+    listeningStreamRef.current = null; // Transfer ownership
+    isRecordingRef.current = true;
+    setIsRecording(true);
+    setStatus('listening');
+    setLiveTranscript('');
+
+    // Reuse existing audio context and analyser
+    const audioContext = audioContextRef.current;
+    if (audioContext && analyserRef.current) {
+      // Set up VAD for auto-stop
+      vadRef.current = new VoiceActivityDetector({
+        threshold: voiceThreshold,
+        silenceTimeout,
+        minRecordingDuration: 1000,
+        onAudioLevel: (level) => {
+          setAudioLevel(level);
+        },
+        onSpeechStart: () => {
+          console.log('[Voice] 🎤 Speech started');
+        },
+        onSpeechEnd: () => {
+          console.log('[Voice] 🔇 Speech ended - stopping recording');
+          if (mediaRecorderRef.current?.state === 'recording') {
+            mediaRecorderRef.current.stop();
+          }
+        },
+      });
+      vadRef.current.setAnalyser(analyserRef.current);
+      vadRef.current.start();
+    }
+
+    // Set up media recorder
+    const mimeType = getBestAudioFormat();
+    const mediaRecorder = new MediaRecorder(stream, {
+      mimeType: mimeType || undefined,
+    });
+
+    mediaRecorderRef.current = mediaRecorder;
+    audioChunksRef.current = [];
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunksRef.current.push(event.data);
+      }
+    };
+
+    mediaRecorder.onstop = async () => {
+      try {
+        setIsRecording(false);
+        isRecordingRef.current = false;
+
+        if (audioChunksRef.current.length > 0) {
+          const audioBlob = new Blob(audioChunksRef.current, {
+            type: mimeType || 'audio/webm',
+          });
+          
+          const blobToProcess = audioBlob;
+          cleanupRecording();
+          await processAudio(blobToProcess);
+        } else {
+          cleanupRecording();
+          setStatus('idle');
+          // Restart listening if auto-restart is enabled
+          if (autoRestartAfterResponse && autoDetectVoice) {
+            startListening();
+          }
+        }
+      } catch (err) {
+        console.error('[Voice] Error in onstop:', err);
+        cleanupRecording();
+        setStatus('error');
+      }
+    };
+
+    mediaRecorder.onerror = () => {
+      setStatus('error');
+      cleanupRecording();
+    };
+
+    // Start recording
+    mediaRecorder.start(100);
+
+    // Start Web Speech API for live transcript
+    const recognition = createSpeechRecognition();
+    if (recognition) {
+      speechRecognitionRef.current = recognition;
+      
+      recognition.onresult = (event) => {
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (!event.results[i].isFinal) {
+            interimTranscript += transcript;
+          }
+        }
+        if (interimTranscript) {
+          setLiveTranscript(interimTranscript);
+        }
+      };
+
+      recognition.onerror = (event) => {
+        if (event.error !== 'no-speech' && event.error !== 'aborted') {
+          console.log('[Voice] Speech recognition:', event.error);
+        }
+      };
+
+      recognition.onend = () => {
+        if (isRecordingRef.current && speechRecognitionRef.current) {
+          try {
+            speechRecognitionRef.current.start();
+          } catch {
+            // Ignore
+          }
+        }
+      };
+
+      try {
+        recognition.start();
+      } catch {
+        // Ignore
+      }
+    }
+
+    console.log('[Voice] ✅ Recording started!');
+  }, [voiceThreshold, silenceTimeout, cleanupRecording, processAudio, autoRestartAfterResponse, autoDetectVoice, startListening]);
+
+  // Stop listening mode
+  const stopListening = useCallback(() => {
+    console.log('[Voice] Stopping listening mode');
+    isListeningRef.current = false;
+    setIsListening(false);
+    
+    if (listeningAnimationRef.current) {
+      cancelAnimationFrame(listeningAnimationRef.current);
+      listeningAnimationRef.current = null;
+    }
+    
+    if (listeningStreamRef.current) {
+      listeningStreamRef.current.getTracks().forEach((track) => track.stop());
+      listeningStreamRef.current = null;
+    }
+    
+    if (listeningVadRef.current) {
+      listeningVadRef.current.stop();
+      listeningVadRef.current = null;
+    }
+    
+    setAudioLevel(0);
+    setStatus('idle');
+  }, []);
+
+  // Auto-restart listening after AI finishes speaking
   useEffect(() => {
-    if (pendingAutoRestart && !isSpeaking && !isRecording) {
+    if (pendingAutoRestart && !isSpeaking && !isRecording && !isListening) {
       setPendingAutoRestart(false);
+      setPendingUserMessage(''); // Clear pending message
+      setCurrentTranscript(''); // Clear transcript
       // Small delay to ensure clean state transition
       const timer = setTimeout(() => {
-        console.log('[Voice] 🎤 Starting new recording (auto-restart)');
-        startRecording();
+        console.log('[Voice] 🎤 Auto-restarting listening mode');
+        if (autoDetectVoice) {
+          startListening();
+        } else {
+          startRecording();
+        }
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [pendingAutoRestart, isSpeaking, isRecording, startRecording]);
+  }, [pendingAutoRestart, isSpeaking, isRecording, isListening, startRecording, startListening, autoDetectVoice]);
 
   return {
     status,
     isSupported,
     isRecording,
+    isListening,
     isSpeaking,
     messages,
     audioLevel,
@@ -646,8 +974,11 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
     currentTranscript,
     liveTranscript,
     streamingResponse,
+    pendingUserMessage,
     startRecording,
     stopRecording,
+    startListening,
+    stopListening,
     cancelRecording,
     clearMessages,
     stopSpeaking,
