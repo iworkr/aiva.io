@@ -275,13 +275,19 @@ export class VoiceActivityDetector {
   }
 
   start() {
-    if (!this.analyser) return;
+    if (!this.analyser) {
+      console.error('[VAD] Cannot start - no analyser set!');
+      return;
+    }
 
     this.recordingStartTime = Date.now();
     this.hasSpeechStarted = false;
     this.isSpeaking = false;
     this.lastSpeechTime = 0;
+    
+    console.log('[VAD] Starting with threshold:', this.threshold, 'silenceTimeout:', this.silenceTimeout);
 
+    let logCounter = 0;
     this.checkInterval = setInterval(() => {
       const level = calculateAudioLevel(this.analyser!);
       const now = Date.now();
@@ -290,11 +296,18 @@ export class VoiceActivityDetector {
       // Report audio level for visualization
       this.onAudioLevel?.(level);
 
+      // Log every 500ms to avoid spam
+      logCounter++;
+      if (logCounter % 10 === 0) {
+        console.log('[VAD] Level:', level.toFixed(3), 'threshold:', this.threshold, 'speaking:', this.isSpeaking, 'duration:', Math.round(recordingDuration / 1000) + 's');
+      }
+
       if (level > this.threshold) {
         this.lastSpeechTime = now;
         if (!this.isSpeaking) {
           this.isSpeaking = true;
           this.hasSpeechStarted = true;
+          console.log('[VAD] 🎤 Speech detected! Level:', level.toFixed(3));
           this.onSpeechStart?.();
         }
       } else if (this.isSpeaking && now - this.lastSpeechTime > this.silenceTimeout) {
@@ -303,8 +316,11 @@ export class VoiceActivityDetector {
         // 2. Silence timeout exceeded
         // 3. Minimum recording duration met
         if (recordingDuration >= this.minRecordingDuration) {
+          console.log('[VAD] 🔇 Silence detected, triggering speech end');
           this.isSpeaking = false;
           this.onSpeechEnd?.();
+        } else {
+          console.log('[VAD] Silence detected but min duration not met:', recordingDuration, '<', this.minRecordingDuration);
         }
       }
     }, 50); // Check every 50ms for more responsive detection

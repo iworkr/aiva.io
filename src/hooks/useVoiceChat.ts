@@ -333,6 +333,8 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
 
   // Start recording
   const startRecording = useCallback(async () => {
+    console.log('[Voice] startRecording called, isSupported:', isSupported);
+    
     if (!isSupported) {
       toast.error('Voice recording is not supported in your browser');
       return;
@@ -343,6 +345,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
 
     try {
       // Get microphone access
+      console.log('[Voice] Requesting microphone access...');
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -350,26 +353,38 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
           autoGainControl: true,
         },
       });
+      console.log('[Voice] Microphone access granted, tracks:', stream.getAudioTracks().length);
 
       streamRef.current = stream;
 
       // Set up audio context for visualization
       if (!audioContextRef.current) {
+        console.log('[Voice] Creating new AudioContext...');
         audioContextRef.current = createAudioContext();
       }
 
       const audioContext = audioContextRef.current;
       if (audioContext) {
+        // CRITICAL: Resume AudioContext - browsers start it suspended!
+        if (audioContext.state === 'suspended') {
+          console.log('[Voice] AudioContext was suspended, resuming...');
+          await audioContext.resume();
+        }
+        console.log('[Voice] AudioContext state:', audioContext.state);
+
         const source = audioContext.createMediaStreamSource(stream);
         sourceRef.current = source;
 
         const analyser = audioContext.createAnalyser();
         analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.3; // Faster response
         source.connect(analyser);
         analyserRef.current = analyser;
+        console.log('[Voice] Audio analyser connected, fftSize:', analyser.fftSize);
 
         // Set up voice activity detection with enhanced options
         if (autoStopOnSilence) {
+          console.log('[Voice] Setting up VAD with threshold:', voiceThreshold || 0.12);
           vadRef.current = new VoiceActivityDetector({
             threshold: voiceThreshold || 0.12, // Higher default for better detection
             silenceTimeout,
@@ -379,10 +394,10 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
               setAudioLevel(level);
             },
             onSpeechStart: () => {
-              console.log('[Voice] Speech started');
+              console.log('[Voice] 🎤 Speech STARTED - user is speaking');
             },
             onSpeechEnd: () => {
-              console.log('[Voice] Speech ended - auto-stopping recording');
+              console.log('[Voice] 🔇 Speech ENDED - auto-stopping recording');
               // Auto-stop recording after silence
               if (mediaRecorderRef.current?.state === 'recording') {
                 stopRecording();
@@ -391,11 +406,16 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
           });
           vadRef.current.setAnalyser(analyser);
           vadRef.current.start();
+          console.log('[Voice] VAD started');
         }
+      } else {
+        console.error('[Voice] Failed to create AudioContext!');
       }
 
       // Set up media recorder
       const mimeType = getBestAudioFormat();
+      console.log('[Voice] Using audio format:', mimeType);
+      
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: mimeType || undefined,
       });
@@ -406,19 +426,30 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
+          console.log('[Voice] Audio chunk received, size:', event.data.size, 'total chunks:', audioChunksRef.current.length);
         }
       };
 
       mediaRecorder.onstop = async () => {
+        console.log('[Voice] MediaRecorder stopped, chunks collected:', audioChunksRef.current.length);
         setIsRecording(false);
-        cleanup();
+        isRecordingRef.current = false;
 
         // Process the recorded audio
         if (audioChunksRef.current.length > 0) {
           const audioBlob = new Blob(audioChunksRef.current, {
             type: mimeType || 'audio/webm',
           });
-          await processAudio(audioBlob);
+          console.log('[Voice] Created audio blob, size:', audioBlob.size);
+          
+          // Store chunks before cleanup clears them
+          const blobToProcess = audioBlob;
+          cleanup();
+          await processAudio(blobToProcess);
+        } else {
+          console.warn('[Voice] No audio chunks to process!');
+          cleanup();
+          setStatus('idle');
         }
       };
 
@@ -434,6 +465,9 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
       isRecordingRef.current = true; // Set ref first for immediate access
       setIsRecording(true);
       setStatus('listening');
+
+      console.log('[Voice] ✅ Recording started! MediaRecorder state:', mediaRecorder.state);
+      console.log('[Voice] Speak now... Auto-stop will trigger after', silenceTimeout, 'ms of silence');
 
       // Start audio level visualization (now works because ref is already true)
       updateAudioLevel();
