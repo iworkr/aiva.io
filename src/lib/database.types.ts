@@ -2609,6 +2609,114 @@ export type Database = {
           },
         ]
       }
+      voice_conversations: {
+        Row: {
+          created_at: string | null
+          duration_seconds: number | null
+          id: string
+          messages_count: number | null
+          response_text: string | null
+          session_id: string | null
+          transcription_text: string | null
+          user_id: string
+          voice_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          duration_seconds?: number | null
+          id?: string
+          messages_count?: number | null
+          response_text?: string | null
+          session_id?: string | null
+          transcription_text?: string | null
+          user_id: string
+          voice_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string | null
+          duration_seconds?: number | null
+          id?: string
+          messages_count?: number | null
+          response_text?: string | null
+          session_id?: string | null
+          transcription_text?: string | null
+          user_id?: string
+          voice_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_conversations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_conversations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voice_preferences: {
+        Row: {
+          auto_play: boolean | null
+          created_at: string | null
+          enabled: boolean | null
+          id: string
+          speed: number | null
+          updated_at: string | null
+          user_id: string
+          voice_id: string | null
+          volume: number | null
+          workspace_id: string
+        }
+        Insert: {
+          auto_play?: boolean | null
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          speed?: number | null
+          updated_at?: string | null
+          user_id: string
+          voice_id?: string | null
+          volume?: number | null
+          workspace_id: string
+        }
+        Update: {
+          auto_play?: boolean | null
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          speed?: number | null
+          updated_at?: string | null
+          user_id?: string
+          voice_id?: string | null
+          volume?: number | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_preferences_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_admin_settings: {
         Row: {
           workspace_id: string

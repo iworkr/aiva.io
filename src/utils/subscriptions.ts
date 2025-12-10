@@ -12,6 +12,21 @@ import { toLower } from "lodash";
 export type PlanType = "free" | "basic" | "pro" | "enterprise";
 
 /**
+ * Feature flags for type-safe feature checking
+ */
+export enum FeatureFlag {
+  AutoClassify = "autoClassify",
+  BasicAI = "basicAI",
+  AiDrafts = "aiDrafts",
+  AutoResponses = "autoResponses",
+  AdvancedSearch = "advancedSearch",
+  CustomPrompts = "customPrompts",
+  UnlimitedChannels = "unlimitedChannels",
+  TeamWorkspaces = "teamWorkspaces",
+  VoiceChat = "voiceChat",
+}
+
+/**
  * Feature flags for different plan tiers
  */
 export const PLAN_FEATURES = {
@@ -25,6 +40,7 @@ export const PLAN_FEATURES = {
     customPrompts: false,
     unlimitedChannels: false,
     teamWorkspaces: false,
+    voiceChat: false, // Voice Aiva - NOT available
     maxChannels: 1,
     maxMessagesPerMonth: 100,
   },
@@ -38,6 +54,7 @@ export const PLAN_FEATURES = {
     customPrompts: false,
     unlimitedChannels: false,
     teamWorkspaces: false,
+    voiceChat: false, // Voice Aiva - NOT available
     maxChannels: 3,
     maxMessagesPerMonth: 1000,
   },
@@ -51,6 +68,7 @@ export const PLAN_FEATURES = {
     customPrompts: true,
     unlimitedChannels: true,
     teamWorkspaces: true,
+    voiceChat: true, // Voice Aiva - Available
     maxChannels: -1, // Unlimited
     maxMessagesPerMonth: -1, // Unlimited
   },
@@ -64,6 +82,7 @@ export const PLAN_FEATURES = {
     customPrompts: true,
     unlimitedChannels: true,
     teamWorkspaces: true,
+    voiceChat: true, // Voice Aiva - Available
     maxChannels: -1,
     maxMessagesPerMonth: -1,
   },

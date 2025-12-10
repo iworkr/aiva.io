@@ -1,6 +1,6 @@
 /**
  * Aiva Chat Input Component
- * Minimal AI chat input - matches FloatingAssistant styling
+ * Minimal AI chat input with voice mode support - matches FloatingAssistant styling
  */
 
 'use client';
@@ -10,27 +10,55 @@ import { useChat } from 'ai/react';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Send, X, Loader2, ThumbsUp, ThumbsDown, Flag } from 'lucide-react';
+import { Send, X, Loader2, ThumbsUp, ThumbsDown, Flag, Mic, MicOff, Volume2, Square, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useVoiceChat } from '@/hooks/useVoiceChat';
 
 interface AivaChatInputProps {
   className?: string;
+  hasVoiceAccess?: boolean; // Whether user has Pro plan for voice feature
 }
 
-export function AivaChatInput({ className }: AivaChatInputProps) {
+export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInputProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [chatId] = useState(() => `dashboard-${Date.now()}`);
   const [ratings, setRatings] = useState<Record<string, 'up' | 'down' | null>>({});
   const [reported, setReported] = useState<Set<string>>(new Set());
+  const [isVoiceMode, setIsVoiceMode] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // useChat hook
+  // Voice chat hook
+  const {
+    status: voiceStatus,
+    isSupported: isVoiceSupported,
+    isRecording,
+    isSpeaking,
+    messages: voiceMessages,
+    audioLevel,
+    startRecording,
+    stopRecording,
+    cancelRecording,
+    clearMessages: clearVoiceMessages,
+    stopSpeaking,
+  } = useVoiceChat({
+    onTranscription: (text) => {
+      console.log('Transcription:', text);
+    },
+    onResponse: (text) => {
+      console.log('Voice response:', text);
+    },
+    onError: (error) => {
+      console.error('Voice error:', error);
+    },
+  });
+
+  // useChat hook for text mode
   const { messages, append, isLoading, input, setInput, stop } = useChat({
     id: chatId,
     api: '/api/chat',
@@ -147,9 +175,39 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
     }
   }, [messages]);
 
+  // Handle voice mode toggle
+  const handleVoiceModeToggle = useCallback(() => {
+    if (!hasVoiceAccess) {
+      toast.error('Voice chat is a Pro feature. Upgrade to access voice conversations!');
+      return;
+    }
+    if (!isVoiceSupported) {
+      toast.error('Voice recording is not supported in your browser');
+      return;
+    }
+    setIsVoiceMode((prev) => !prev);
+    if (!isOpen) setIsOpen(true);
+  }, [hasVoiceAccess, isVoiceSupported, isOpen]);
+
+  // Handle voice recording toggle
+  const handleVoiceToggle = useCallback(async () => {
+    if (isRecording) {
+      await stopRecording();
+    } else {
+      await startRecording();
+      if (!isOpen) setIsOpen(true);
+    }
+  }, [isRecording, startRecording, stopRecording, isOpen]);
+
+  // Combined messages for display
+  const displayMessages = isVoiceMode ? voiceMessages : messages;
+  const isProcessing = isVoiceMode 
+    ? voiceStatus === 'processing' || voiceStatus === 'connecting'
+    : isLoading;
+
   return (
     <div className={cn('relative', className)}>
-      {/* Simple Input Bar with Send Button Inside */}
+      {/* Simple Input Bar with Voice Toggle */}
       <form onSubmit={handleSubmit} className="relative">
         <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
           <Image
@@ -160,37 +218,138 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
             className="object-contain opacity-60"
           />
         </div>
-        <Input
-          ref={inputRef}
-          type="text"
-          placeholder="Ask Aiva anything..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onFocus={() => !isOpen && messages.length > 0 && setIsOpen(true)}
-          className="pl-10 pr-12 h-11 text-sm bg-background border-2 border-border/50 hover:border-primary/30 focus:border-primary/50 rounded-xl"
-        />
-        <button 
-          type="submit" 
-          disabled={isLoading || !input.trim()} 
-          className={cn(
-            "absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-8 rounded-lg flex items-center justify-center transition-all",
-            "disabled:opacity-40 disabled:cursor-not-allowed",
-            input.trim() && !isLoading 
-              ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm" 
-              : "bg-muted text-muted-foreground"
+        
+        {isVoiceMode ? (
+          // Voice Mode Input
+          <div className="pl-10 pr-24 h-11 bg-background border-2 border-border/50 hover:border-primary/30 rounded-xl flex items-center">
+            {isRecording ? (
+              <div className="flex items-center gap-2 flex-1">
+                {/* Audio level visualization */}
+                <div className="flex items-center gap-0.5">
+                  {[...Array(5)].map((_, i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        'w-1 rounded-full bg-primary transition-all duration-75',
+                        audioLevel > i * 0.2 ? 'h-4' : 'h-1'
+                      )}
+                    />
+                  ))}
+                </div>
+                <span className="text-sm text-primary animate-pulse">Listening...</span>
+              </div>
+            ) : isSpeaking ? (
+              <div className="flex items-center gap-2 flex-1">
+                <Volume2 className="h-4 w-4 text-primary animate-pulse" />
+                <span className="text-sm text-primary">Aiva is speaking...</span>
+              </div>
+            ) : voiceStatus === 'processing' ? (
+              <div className="flex items-center gap-2 flex-1">
+                <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                <span className="text-sm text-muted-foreground">Processing...</span>
+              </div>
+            ) : (
+              <span className="text-sm text-muted-foreground">Tap mic to speak to Aiva</span>
+            )}
+          </div>
+        ) : (
+          // Text Mode Input
+          <Input
+            ref={inputRef}
+            type="text"
+            placeholder="Ask Aiva anything..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onFocus={() => !isOpen && messages.length > 0 && setIsOpen(true)}
+            className="pl-10 pr-24 h-11 text-sm bg-background border-2 border-border/50 hover:border-primary/30 focus:border-primary/50 rounded-xl"
+          />
+        )}
+
+        {/* Action buttons */}
+        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+          {/* Voice Mode Toggle */}
+          {hasVoiceAccess && isVoiceSupported && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={handleVoiceModeToggle}
+                  className={cn(
+                    'h-8 w-8 rounded-lg flex items-center justify-center transition-all',
+                    isVoiceMode
+                      ? 'bg-primary/20 text-primary'
+                      : 'bg-transparent text-muted-foreground hover:text-primary hover:bg-primary/10'
+                  )}
+                >
+                  <Sparkles className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                {isVoiceMode ? 'Switch to text' : 'Switch to voice'}
+              </TooltipContent>
+            </Tooltip>
           )}
-        >
-          {isLoading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+
+          {isVoiceMode ? (
+            // Voice Mode Buttons
+            <>
+              {isSpeaking ? (
+                <button
+                  type="button"
+                  onClick={stopSpeaking}
+                  className="h-8 w-8 rounded-lg flex items-center justify-center bg-red-500 text-white hover:bg-red-600 shadow-sm transition-all"
+                >
+                  <Square className="h-4 w-4" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleVoiceToggle}
+                  disabled={voiceStatus === 'processing' || voiceStatus === 'connecting'}
+                  className={cn(
+                    'h-8 w-8 rounded-lg flex items-center justify-center transition-all shadow-sm',
+                    'disabled:opacity-40 disabled:cursor-not-allowed',
+                    isRecording
+                      ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse'
+                      : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  )}
+                >
+                  {isRecording ? (
+                    <MicOff className="h-4 w-4" />
+                  ) : voiceStatus === 'processing' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Mic className="h-4 w-4" />
+                  )}
+                </button>
+              )}
+            </>
           ) : (
-            <Send className="h-4 w-4" />
+            // Text Mode Send Button
+            <button 
+              type="submit" 
+              disabled={isLoading || !input.trim()} 
+              className={cn(
+                'h-8 w-8 rounded-lg flex items-center justify-center transition-all',
+                'disabled:opacity-40 disabled:cursor-not-allowed',
+                input.trim() && !isLoading 
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm' 
+                  : 'bg-muted text-muted-foreground'
+              )}
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </button>
           )}
-        </button>
+        </div>
       </form>
 
-      {/* Chat Panel - Only shows when there are messages */}
-      {isOpen && messages.length > 0 && (
+      {/* Chat Panel - Only shows when there are messages or in voice mode */}
+      {isOpen && (displayMessages.length > 0 || isVoiceMode) && (
         <>
           {/* Backdrop */}
           <div 
@@ -221,6 +380,12 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
                   </div>
                 </div>
                 <span className="font-medium text-sm">Aiva Assistant</span>
+                {isVoiceMode && (
+                  <span className="px-1.5 py-0.5 text-[10px] font-medium bg-primary/20 text-primary rounded-md flex items-center gap-1">
+                    <Mic className="h-3 w-3" />
+                    Voice
+                  </span>
+                )}
               </div>
               <button
                 type="button"
@@ -238,9 +403,27 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
             >
               <TooltipProvider delayDuration={300}>
                 <div className="space-y-4">
-                  {messages.map((message) => (
+                  {/* Voice mode empty state */}
+                  {isVoiceMode && displayMessages.length === 0 && !isRecording && !isSpeaking && (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <div className="relative h-16 w-16 mb-4">
+                        <div className="absolute inset-0 rounded-full bg-primary/10 animate-pulse" />
+                        <div className="relative h-16 w-16 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+                          <Mic className="h-8 w-8 text-primary/60" />
+                        </div>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Tap the microphone to start talking
+                      </p>
+                      <p className="text-xs text-muted-foreground/70">
+                        Aiva will listen, understand, and respond with voice
+                      </p>
+                    </div>
+                  )}
+                  
+                  {displayMessages.map((message, index) => (
                     <div
-                      key={message.id}
+                      key={'id' in message ? message.id : `voice-${index}`}
                       className={cn(
                         'flex flex-col gap-1',
                         message.role === 'user' ? 'items-end' : 'items-start'
@@ -301,10 +484,10 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
                         )}
                       >
                         <span className="text-[10px] text-muted-foreground">
-                          {formatTime(message.createdAt || new Date())}
+                          {formatTime('timestamp' in message ? message.timestamp : (message.createdAt || new Date()))}
                         </span>
                         
-                        {message.role === 'assistant' && (
+                        {message.role === 'assistant' && 'id' in message && (
                           <div className="flex items-center gap-1">
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -368,8 +551,8 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
                     </div>
                   ))}
                   
-                  {/* Loading indicator */}
-                  {isLoading && (
+                  {/* Loading/Processing indicator */}
+                  {(isLoading || (isVoiceMode && (voiceStatus === 'processing' || isRecording || isSpeaking))) && (
                     <div className="flex gap-2">
                       <div className="flex-shrink-0 relative h-6 w-6">
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-primary/25 blur-sm" />
@@ -385,12 +568,38 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
                       </div>
                       <div className="bg-muted rounded-2xl rounded-bl-md px-3 py-2">
                         <div className="flex items-center gap-2">
-                          <div className="flex gap-1">
-                            <span className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.3s]" />
-                            <span className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.15s]" />
-                            <span className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce" />
-                          </div>
-                          <span className="text-xs text-muted-foreground">Thinking...</span>
+                          {isVoiceMode && isSpeaking ? (
+                            <>
+                              <Volume2 className="h-4 w-4 text-primary animate-pulse" />
+                              <span className="text-xs text-muted-foreground">Speaking...</span>
+                            </>
+                          ) : isVoiceMode && isRecording ? (
+                            <>
+                              <div className="flex items-center gap-0.5">
+                                {[...Array(3)].map((_, i) => (
+                                  <div
+                                    key={i}
+                                    className={cn(
+                                      'w-1 rounded-full bg-primary transition-all duration-75',
+                                      audioLevel > i * 0.3 ? 'h-3' : 'h-1'
+                                    )}
+                                  />
+                                ))}
+                              </div>
+                              <span className="text-xs text-muted-foreground">Listening...</span>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex gap-1">
+                                <span className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.3s]" />
+                                <span className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.15s]" />
+                                <span className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce" />
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {isVoiceMode ? 'Processing...' : 'Thinking...'}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -437,30 +646,79 @@ export function AivaChatInput({ className }: AivaChatInputProps) {
 
             {/* Footer */}
             <div className="flex-shrink-0 border-t border-border/50 p-3 bg-muted/30">
-              <form onSubmit={handleSubmit} className="flex gap-2">
-                <Input
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Type your message..."
-                  className="flex-1 h-9 text-sm rounded-xl border-2 border-border/50 focus:border-primary/50"
-                  disabled={isLoading}
-                />
-                <Button 
-                  type="submit" 
-                  disabled={isLoading || !input.trim()} 
-                  className="h-9 w-9 rounded-xl p-0"
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                </Button>
-              </form>
-              <p className="text-[10px] text-muted-foreground text-center mt-2">
-                Press Enter to send • Esc to close
-              </p>
+              {isVoiceMode ? (
+                // Voice Mode Footer
+                <div className="flex flex-col items-center gap-2">
+                  <div className="flex items-center gap-3">
+                    {isSpeaking ? (
+                      <Button
+                        type="button"
+                        onClick={stopSpeaking}
+                        variant="destructive"
+                        className="h-12 w-12 rounded-full p-0"
+                      >
+                        <Square className="h-5 w-5" />
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        onClick={handleVoiceToggle}
+                        disabled={voiceStatus === 'processing' || voiceStatus === 'connecting'}
+                        className={cn(
+                          'h-12 w-12 rounded-full p-0 transition-all',
+                          isRecording 
+                            ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
+                            : ''
+                        )}
+                      >
+                        {isRecording ? (
+                          <MicOff className="h-5 w-5" />
+                        ) : voiceStatus === 'processing' ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <Mic className="h-5 w-5" />
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground text-center">
+                    {isRecording 
+                      ? 'Tap to stop recording' 
+                      : isSpeaking 
+                        ? 'Tap to stop Aiva' 
+                        : 'Tap microphone to speak'
+                    } • Esc to close
+                  </p>
+                </div>
+              ) : (
+                // Text Mode Footer
+                <>
+                  <form onSubmit={handleSubmit} className="flex gap-2">
+                    <Input
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Type your message..."
+                      className="flex-1 h-9 text-sm rounded-xl border-2 border-border/50 focus:border-primary/50"
+                      disabled={isLoading}
+                    />
+                    <Button 
+                      type="submit" 
+                      disabled={isLoading || !input.trim()} 
+                      className="h-9 w-9 rounded-xl p-0"
+                    >
+                      {isLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </form>
+                  <p className="text-[10px] text-muted-foreground text-center mt-2">
+                    Press Enter to send • Esc to close
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </>
