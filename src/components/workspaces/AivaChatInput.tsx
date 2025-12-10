@@ -254,16 +254,16 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
           </div>
         ) : (
           // Text Mode Input
-          <Input
-            ref={inputRef}
-            type="text"
-            placeholder="Ask Aiva anything..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onFocus={() => !isOpen && messages.length > 0 && setIsOpen(true)}
+        <Input
+          ref={inputRef}
+          type="text"
+          placeholder="Ask Aiva anything..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onFocus={() => !isOpen && messages.length > 0 && setIsOpen(true)}
             className="pl-10 pr-24 h-11 text-sm bg-background border-2 border-border/50 hover:border-primary/30 focus:border-primary/50 rounded-xl"
-          />
+        />
         )}
 
         {/* Action buttons */}
@@ -327,23 +327,23 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
             </>
           ) : (
             // Text Mode Send Button
-            <button 
-              type="submit" 
-              disabled={isLoading || !input.trim()} 
-              className={cn(
+        <button 
+          type="submit" 
+          disabled={isLoading || !input.trim()} 
+          className={cn(
                 'h-8 w-8 rounded-lg flex items-center justify-center transition-all',
                 'disabled:opacity-40 disabled:cursor-not-allowed',
-                input.trim() && !isLoading 
+            input.trim() && !isLoading 
                   ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm' 
                   : 'bg-muted text-muted-foreground'
-              )}
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </button>
+          )}
+        >
+          {isLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
+        </button>
           )}
         </div>
       </form>
@@ -590,11 +590,11 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
                             </>
                           ) : (
                             <>
-                              <div className="flex gap-1">
-                                <span className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.3s]" />
-                                <span className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.15s]" />
-                                <span className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce" />
-                              </div>
+                          <div className="flex gap-1">
+                            <span className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.3s]" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce [animation-delay:-0.15s]" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce" />
+                          </div>
                               <span className="text-xs text-muted-foreground">
                                 {isVoiceMode ? 'Processing...' : 'Thinking...'}
                               </span>
@@ -693,30 +693,30 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
               ) : (
                 // Text Mode Footer
                 <>
-                  <form onSubmit={handleSubmit} className="flex gap-2">
-                    <Input
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder="Type your message..."
-                      className="flex-1 h-9 text-sm rounded-xl border-2 border-border/50 focus:border-primary/50"
-                      disabled={isLoading}
-                    />
-                    <Button 
-                      type="submit" 
-                      disabled={isLoading || !input.trim()} 
-                      className="h-9 w-9 rounded-xl p-0"
-                    >
-                      {isLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Send className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </form>
-                  <p className="text-[10px] text-muted-foreground text-center mt-2">
-                    Press Enter to send • Esc to close
-                  </p>
+              <form onSubmit={handleSubmit} className="flex gap-2">
+                <Input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Type your message..."
+                  className="flex-1 h-9 text-sm rounded-xl border-2 border-border/50 focus:border-primary/50"
+                  disabled={isLoading}
+                />
+                <Button 
+                  type="submit" 
+                  disabled={isLoading || !input.trim()} 
+                  className="h-9 w-9 rounded-xl p-0"
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
+              </form>
+              <p className="text-[10px] text-muted-foreground text-center mt-2">
+                Press Enter to send • Esc to close
+              </p>
                 </>
               )}
             </div>

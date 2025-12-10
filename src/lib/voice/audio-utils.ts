@@ -51,9 +51,10 @@ export function isVoiceRecordingSupported(): boolean {
   }
 
   return !!(
-    navigator.mediaDevices?.getUserMedia &&
-    window.MediaRecorder &&
-    window.AudioContext
+    navigator.mediaDevices &&
+    typeof navigator.mediaDevices.getUserMedia === 'function' &&
+    typeof window.MediaRecorder !== 'undefined' &&
+    typeof window.AudioContext !== 'undefined'
   );
 }
 

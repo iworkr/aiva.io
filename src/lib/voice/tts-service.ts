@@ -3,22 +3,22 @@
  * Uses ElevenLabs API for high-quality voice synthesis
  */
 
-import { ElevenLabs } from '@elevenlabs/elevenlabs-js';
+import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 
 // Lazy-loaded ElevenLabs client to prevent crashes if API key is missing
-let elevenLabsClient: ElevenLabs | null = null;
+let elevenLabsClientInstance: ElevenLabsClient | null = null;
 
-function getElevenLabsClient(): ElevenLabs {
-  if (!elevenLabsClient) {
+function getElevenLabsClient(): ElevenLabsClient {
+  if (!elevenLabsClientInstance) {
     const apiKey = process.env.ELEVENLABS_API_KEY;
     if (!apiKey) {
       throw new Error(
         'ELEVENLABS_API_KEY is not configured. Please add it to your .env.local file to enable voice features.'
       );
     }
-    elevenLabsClient = new ElevenLabs({ apiKey });
+    elevenLabsClientInstance = new ElevenLabsClient({ apiKey });
   }
-  return elevenLabsClient;
+  return elevenLabsClientInstance;
 }
 
 // Default voice ID - Rachel (neutral, professional voice)
@@ -54,20 +54,25 @@ export async function textToSpeech(
   try {
     const response = await client.textToSpeech.convert(voiceId, {
       text,
-      model_id: options.modelId || 'eleven_turbo_v2_5', // Fast, low-latency model
-      voice_settings: {
+      modelId: options.modelId || 'eleven_turbo_v2_5', // Fast, low-latency model
+      voiceSettings: {
         stability: options.stability ?? 0.5,
-        similarity_boost: options.similarityBoost ?? 0.75,
+        similarityBoost: options.similarityBoost ?? 0.75,
         style: options.style ?? 0,
-        use_speaker_boost: options.useSpeakerBoost ?? true,
+        useSpeakerBoost: options.useSpeakerBoost ?? true,
       },
     });
 
     // Convert the response stream to a buffer
     const chunks: Uint8Array[] = [];
-    for await (const chunk of response) {
-      chunks.push(chunk);
+    const reader = response.getReader();
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) chunks.push(value);
     }
+    
     const audioBuffer = Buffer.concat(chunks);
 
     return {
@@ -99,19 +104,23 @@ export async function* streamTextToSpeech(
   const voiceId = options.voiceId || DEFAULT_VOICE_ID;
 
   try {
-    const response = await client.textToSpeech.convertAsStream(voiceId, {
+    // Use the stream method for real-time streaming
+    const response = await client.textToSpeech.stream(voiceId, {
       text,
-      model_id: options.modelId || 'eleven_turbo_v2_5',
-      voice_settings: {
+      modelId: options.modelId || 'eleven_turbo_v2_5',
+      voiceSettings: {
         stability: options.stability ?? 0.5,
-        similarity_boost: options.similarityBoost ?? 0.75,
+        similarityBoost: options.similarityBoost ?? 0.75,
         style: options.style ?? 0,
-        use_speaker_boost: options.useSpeakerBoost ?? true,
+        useSpeakerBoost: options.useSpeakerBoost ?? true,
       },
     });
 
-    for await (const chunk of response) {
-      yield chunk;
+    const reader = response.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) yield value;
     }
   } catch (error) {
     console.error('ElevenLabs streaming TTS error:', error);
@@ -132,11 +141,11 @@ export async function getAvailableVoices() {
   try {
     const voices = await client.voices.getAll();
     return voices.voices?.map((voice) => ({
-      id: voice.voice_id,
+      id: voice.voiceId,
       name: voice.name,
       category: voice.category,
       description: voice.description,
-      previewUrl: voice.preview_url,
+      previewUrl: voice.previewUrl,
       labels: voice.labels,
     })) || [];
   } catch (error) {
