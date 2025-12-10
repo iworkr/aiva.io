@@ -177,11 +177,20 @@ export function AivaChatInput({ className, hasVoiceAccess = true }: AivaChatInpu
   }, [isOpen]);
 
   // Auto-scroll when new messages arrive
+  // Auto-scroll for text mode messages
   useEffect(() => {
     if (messages.length > 0) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
+
+  // Auto-scroll for voice mode - follow conversation in real-time
+  useEffect(() => {
+    if (isVoiceMode && isOpen) {
+      // Scroll on any voice-related update
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [isVoiceMode, isOpen, voiceMessages, liveTranscript, streamingResponse, pendingUserMessage]);
 
   // Handle voice mode toggle
   const handleVoiceModeToggle = useCallback(async () => {

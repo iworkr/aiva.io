@@ -397,6 +397,16 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
                     ...prev,
                     { role: 'assistant', content: fullText, timestamp: new Date() },
                   ]);
+                  
+                  // If audio has already finished or there was no audio, trigger auto-restart now
+                  // Use a small delay to let any remaining audio finish
+                  setTimeout(() => {
+                    if (!isPlayingRef.current && shouldAutoRestartRef.current && autoRestartAfterResponse) {
+                      console.log('[Voice] 🔄 Audio done, triggering auto-restart from done event');
+                      shouldAutoRestartRef.current = false;
+                      setPendingAutoRestart(true);
+                    }
+                  }, 500);
                   break;
 
                 case 'error':
@@ -416,8 +426,15 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
       setStatus('error');
       onError?.(error);
       toast.error(error.message);
+      
+      // Even on error, try to restart listening if enabled
+      if (autoRestartAfterResponse) {
+        setTimeout(() => {
+          setPendingAutoRestart(true);
+        }, 1000);
+      }
     }
-  }, [messages, voiceId, onTranscription, onResponse, onError, playAudioChunks]);
+  }, [messages, voiceId, onTranscription, onResponse, onError, playAudioChunks, autoRestartAfterResponse]);
 
   // Start recording
   const startRecording = useCallback(async () => {
@@ -945,13 +962,24 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
 
   // Auto-restart listening after AI finishes speaking
   useEffect(() => {
+    console.log('[Voice] Auto-restart check:', { 
+      pendingAutoRestart, 
+      isSpeaking, 
+      isRecording, 
+      isListening,
+      shouldRestart: pendingAutoRestart && !isSpeaking && !isRecording && !isListening 
+    });
+    
     if (pendingAutoRestart && !isSpeaking && !isRecording && !isListening) {
+      console.log('[Voice] ✅ Conditions met for auto-restart');
       setPendingAutoRestart(false);
       setPendingUserMessage(''); // Clear pending message
       setCurrentTranscript(''); // Clear transcript
+      setStatus('idle'); // Reset status before restarting
+      
       // Small delay to ensure clean state transition
       const timer = setTimeout(() => {
-        console.log('[Voice] 🎤 Auto-restarting listening mode');
+        console.log('[Voice] 🎤 Auto-restarting listening mode now');
         if (autoDetectVoice) {
           startListening();
         } else {
