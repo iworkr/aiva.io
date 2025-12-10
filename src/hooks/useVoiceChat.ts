@@ -38,6 +38,7 @@ export interface UseVoiceChatOptions {
   autoStopOnSilence?: boolean;
   silenceTimeout?: number; // ms
   voiceThreshold?: number; // 0-1
+  autoRestartAfterResponse?: boolean; // Auto-restart recording after AI finishes speaking
 }
 
 export interface UseVoiceChatReturn {
@@ -65,6 +66,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
     autoStopOnSilence = true,
     silenceTimeout = 1500,
     voiceThreshold = 0.12, // Increased from 0.05 for better speech detection
+    autoRestartAfterResponse = true, // Default to continuous conversation
   } = options;
 
   // State
@@ -75,6 +77,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
   const [audioLevel, setAudioLevel] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [currentTranscript, setCurrentTranscript] = useState<string>(''); // Live transcript
+  const [pendingAutoRestart, setPendingAutoRestart] = useState(false); // Trigger for auto-restart
 
   // Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -88,6 +91,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
   const isPlayingRef = useRef(false);
   const animationFrameRef = useRef<number | null>(null);
   const isRecordingRef = useRef(false); // Ref for immediate recording state access
+  const shouldAutoRestartRef = useRef(false); // Track if we should auto-restart after speaking
 
   // Check browser support
   const isSupported = typeof window !== 'undefined' && isVoiceRecordingSupported();
@@ -167,6 +171,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
 
     isPlayingRef.current = true;
     setIsSpeaking(true);
+    setStatus('speaking');
 
     // Ensure audio context exists
     if (!audioContextRef.current) {
@@ -179,6 +184,11 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
       isPlayingRef.current = false;
       setIsSpeaking(false);
       return;
+    }
+
+    // Resume audio context if suspended (needed for auto-restart)
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume();
     }
 
     while (audioQueueRef.current.length > 0) {
@@ -201,8 +211,16 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
 
     isPlayingRef.current = false;
     setIsSpeaking(false);
-    setStatus('idle');
-  }, []);
+    
+    // Check if we should auto-restart recording
+    if (shouldAutoRestartRef.current && autoRestartAfterResponse) {
+      console.log('[Voice] 🔄 Auto-restarting recording after response');
+      shouldAutoRestartRef.current = false;
+      setPendingAutoRestart(true); // Trigger useEffect to call startRecording
+    } else {
+      setStatus('idle');
+    }
+  }, [autoRestartAfterResponse]);
 
   // Stop speaking
   const stopSpeaking = useCallback(() => {
@@ -219,6 +237,7 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
     console.log('[Voice] Processing audio, size:', audioBlob.size, 'type:', audioBlob.type);
     setStatus('processing');
     setCurrentTranscript(''); // Clear previous transcript
+    shouldAutoRestartRef.current = true; // Mark that we should auto-restart after response
 
     try {
       // Convert blob to base64
@@ -537,6 +556,19 @@ export function useVoiceChat(options: UseVoiceChatOptions = {}): UseVoiceChatRet
   const clearMessages = useCallback(() => {
     setMessages([]);
   }, []);
+
+  // Auto-restart recording after AI finishes speaking
+  useEffect(() => {
+    if (pendingAutoRestart && !isSpeaking && !isRecording) {
+      setPendingAutoRestart(false);
+      // Small delay to ensure clean state transition
+      const timer = setTimeout(() => {
+        console.log('[Voice] 🎤 Starting new recording (auto-restart)');
+        startRecording();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [pendingAutoRestart, isSpeaking, isRecording, startRecording]);
 
   return {
     status,
