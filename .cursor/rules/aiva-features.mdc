@@ -1,0 +1,387 @@
+---
+description: Aiva.io specific features and integration patterns
+globs: **/*.{ts,tsx}
+---
+
+# Aiva.io Feature Development Rules
+
+## Overview
+
+Aiva.io is a unified AI communication assistant built on Nextbase Ultimate. This document outlines patterns and guidelines specific to Aiva.io features.
+
+## Core Aiva.io Concepts
+
+### Unified Communication Platform
+- **Multi-Channel Integration**: Gmail, Outlook, Slack, and other communication channels
+- **Unified Inbox**: Single interface for all messages across channels
+- **AI-Powered Responses**: Intelligent message drafting and responses
+- **Smart Scheduling**: Automated calendar management from messages
+- **Task Extraction**: Automatic task creation from messages
+
+### Workspace Isolation
+All Aiva.io features follow Nextbase Ultimate's workspace isolation:
+- Messages are workspace-scoped
+- Integrations are workspace-scoped
+- AI prompts are workspace-scoped
+- Calendar events are workspace-scoped
+- All data access controlled by RLS policies
+
+## Communication Channel Integrations
+
+### OAuth Integration Pattern
+
+```typescript
+// Server Action for connecting a channel
+export const connectChannelAction = authActionClient
+  .schema(connectChannelSchema)
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    // Verify workspace membership
+    const isMember = await isWorkspaceMember(userId, parsedInput.workspaceId);
+    if (!isMember) throw new Error("Not a workspace member");
+
+    // Use Supabase Auth for OAuth
+    const supabase = await createSupabaseUserServerActionClient();
+    
+    // Store encrypted tokens workspace-scoped
+    const { data, error } = await supabase
+      .from("workspace_channel_integrations")
+      .insert({
+        workspace_id: parsedInput.workspaceId,
+        channel_type: parsedInput.channelType,
+        encrypted_tokens: encryptTokens(parsedInput.tokens),
+        user_id: userId,
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    revalidatePath(`/workspace/${parsedInput.workspaceId}/integrations`);
+    return data;
+  });
+```
+
+### Message Storage Pattern
+
+```typescript
+// Normalized message schema (workspace-scoped)
+interface UnifiedMessage {
+  id: string;
+  workspace_id: string;
+  channel_type: 'gmail' | 'outlook' | 'slack' | 'other';
+  channel_message_id: string;
+  thread_id: string;
+  from: string;
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject?: string;
+  body: string;
+  body_html?: string;
+  received_at: Date;
+  sent_at?: Date;
+  is_read: boolean;
+  is_starred: boolean;
+  labels?: string[];
+  attachments?: Attachment[];
+  metadata: Record<string, unknown>;
+}
+```
+
+### Message Sync Architecture
+
+1. **Webhook Receivers**: Supabase Edge Functions receive webhooks from channels
+2. **Message Normalization**: Convert channel-specific format to unified schema
+3. **Workspace Scoping**: Associate messages with workspace
+4. **RLS Enforcement**: RLS policies ensure workspace isolation
+5. **Real-time Updates**: Supabase Realtime broadcasts to workspace members
+
+## AI Features
+
+### AI Prompt Library Pattern
+
+```typescript
+// Server Action for AI-powered reply
+export const generateReplyAction = authActionClient
+  .schema(generateReplySchema)
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    // Verify workspace membership
+    const isMember = await isWorkspaceMember(userId, parsedInput.workspaceId);
+    if (!isMember) throw new Error("Not a workspace member");
+
+    // Get workspace AI prompts (workspace-scoped)
+    const prompts = await getWorkspaceAIPrompts(parsedInput.workspaceId);
+    
+    // Generate reply using OpenAI
+    const reply = await generateAIReply({
+      message: parsedInput.message,
+      prompts: prompts,
+      workspaceId: parsedInput.workspaceId,
+    });
+
+    // Log AI operation (audit trail)
+    await logAIOperation({
+      workspaceId: parsedInput.workspaceId,
+      userId: userId,
+      operation: 'generate_reply',
+      input: parsedInput.message.id,
+      output: reply.id,
+    });
+
+    return reply;
+  });
+```
+
+### AI Audit Logging
+
+All AI operations must be logged:
+- User who triggered the operation
+- Workspace context
+- Input and output references
+- Timestamp
+- Operation type (reply, schedule, extract_task, etc.)
+
+```typescript
+// AI operation log table (workspace-scoped)
+interface AIOperationLog {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  operation_type: 'generate_reply' | 'extract_task' | 'schedule' | 'summarize';
+  input_message_id?: string;
+  output_id?: string;
+  prompt_used: string;
+  model_used: string;
+  tokens_used: number;
+  created_at: Date;
+}
+```
+
+## Scheduling Integration
+
+### Scheduling Intent Detection
+
+```typescript
+// Detect scheduling intent from message
+export const detectSchedulingIntentAction = authActionClient
+  .schema(detectIntentSchema)
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    // Verify workspace membership
+    const isMember = await isWorkspaceMember(userId, parsedInput.workspaceId);
+    if (!isMember) throw new Error("Not a workspace member");
+
+    // Use AI to detect scheduling intent
+    const intent = await detectSchedulingIntent({
+      message: parsedInput.message,
+      workspaceId: parsedInput.workspaceId,
+    });
+
+    return intent;
+  });
+```
+
+### Calendar Event Management
+
+```typescript
+// Create calendar event from scheduling intent
+export const createCalendarEventAction = authActionClient
+  .schema(createEventSchema)
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    // Verify workspace membership
+    const isMember = await isWorkspaceMember(userId, parsedInput.workspaceId);
+    if (!isMember) throw new Error("Not a workspace member");
+
+    // Create workspace-scoped calendar event
+    const supabase = await createSupabaseUserServerActionClient();
+    const { data, error } = await supabase
+      .from("workspace_calendar_events")
+      .insert({
+        workspace_id: parsedInput.workspaceId,
+        title: parsedInput.title,
+        start_time: parsedInput.startTime,
+        end_time: parsedInput.endTime,
+        attendees: parsedInput.attendees,
+        source_message_id: parsedInput.messageId,
+        user_id: userId,
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    revalidatePath(`/workspace/${parsedInput.workspaceId}/calendar`);
+    return data;
+  });
+```
+
+## Task Extraction
+
+### Task Extraction Pattern
+
+```typescript
+// Extract tasks from message
+export const extractTasksAction = authActionClient
+  .schema(extractTasksSchema)
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    // Verify workspace membership
+    const isMember = await isWorkspaceMember(userId, parsedInput.workspaceId);
+    if (!isMember) throw new Error("Not a workspace member");
+
+    // Use AI to extract tasks
+    const tasks = await extractTasksFromMessage({
+      message: parsedInput.message,
+      workspaceId: parsedInput.workspaceId,
+    });
+
+    // Create workspace-scoped tasks
+    const supabase = await createSupabaseUserServerActionClient();
+    const { data, error } = await supabase
+      .from("workspace_tasks")
+      .insert(
+        tasks.map(task => ({
+          workspace_id: parsedInput.workspaceId,
+          title: task.title,
+          description: task.description,
+          due_date: task.dueDate,
+          priority: task.priority,
+          source_message_id: parsedInput.message.id,
+          user_id: userId,
+        }))
+      )
+      .select();
+
+    if (error) throw new Error(error.message);
+    revalidatePath(`/workspace/${parsedInput.workspaceId}/tasks`);
+    return data;
+  });
+```
+
+## Database Schema Patterns
+
+### Channel Integration Table
+
+```sql
+CREATE TABLE workspace_channel_integrations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  channel_type TEXT NOT NULL, -- 'gmail', 'outlook', 'slack', etc.
+  encrypted_tokens JSONB NOT NULL, -- Encrypted OAuth tokens
+  is_active BOOLEAN DEFAULT true,
+  last_synced_at TIMESTAMP WITH TIME ZONE,
+  user_id UUID NOT NULL REFERENCES user_profiles(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  
+  CONSTRAINT unique_workspace_channel UNIQUE (workspace_id, channel_type)
+);
+
+-- RLS Policy
+ALTER TABLE workspace_channel_integrations ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view integrations for their workspaces"
+  ON workspace_channel_integrations
+  FOR SELECT
+  USING (is_workspace_member(auth.uid(), workspace_id));
+```
+
+### Unified Messages Table
+
+```sql
+CREATE TABLE workspace_messages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  channel_type TEXT NOT NULL,
+  channel_message_id TEXT NOT NULL,
+  thread_id TEXT NOT NULL,
+  from_address TEXT NOT NULL,
+  to_addresses TEXT[] NOT NULL,
+  cc_addresses TEXT[],
+  bcc_addresses TEXT[],
+  subject TEXT,
+  body TEXT NOT NULL,
+  body_html TEXT,
+  received_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  sent_at TIMESTAMP WITH TIME ZONE,
+  is_read BOOLEAN DEFAULT false,
+  is_starred BOOLEAN DEFAULT false,
+  labels TEXT[],
+  attachments JSONB,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  
+  CONSTRAINT unique_channel_message UNIQUE (workspace_id, channel_type, channel_message_id)
+);
+
+-- RLS Policy
+ALTER TABLE workspace_messages ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view messages for their workspaces"
+  ON workspace_messages
+  FOR SELECT
+  USING (is_workspace_member(auth.uid(), workspace_id));
+```
+
+## Best Practices
+
+### 1. Always Workspace-Scope
+- All Aiva.io features must be workspace-scoped
+- Use RLS policies for database-level security
+- Verify workspace membership in Server Actions
+
+### 2. Encrypt Sensitive Data
+- OAuth tokens must be encrypted
+- Use workspace-scoped encryption keys
+- Never store plaintext tokens
+
+### 3. Audit AI Operations
+- Log all AI operations
+- Track token usage per workspace
+- Monitor for compliance
+
+### 4. Normalize Across Channels
+- Use unified message schema
+- Handle channel-specific quirks in normalization layer
+- Maintain channel metadata for reference
+
+### 5. Real-time Updates
+- Use Supabase Realtime for live updates
+- Broadcast to workspace members only
+- Handle connection failures gracefully
+
+### 6. Error Handling
+- Handle channel API rate limits
+- Retry failed operations with exponential backoff
+- Log errors for monitoring
+
+## Integration Checklist
+
+When adding a new communication channel:
+
+- [ ] Create OAuth flow using Supabase Auth
+- [ ] Design normalized message schema
+- [ ] Create workspace-scoped integration table
+- [ ] Implement RLS policies
+- [ ] Create webhook receiver (Edge Function)
+- [ ] Implement message normalization
+- [ ] Add real-time subscriptions
+- [ ] Create Server Actions for channel operations
+- [ ] Add error handling and retry logic
+- [ ] Implement audit logging
+- [ ] Write tests (unit + E2E)
+- [ ] Update documentation
+
+## Security Considerations
+
+1. **Token Storage**: Always encrypt OAuth tokens
+2. **Workspace Isolation**: RLS policies on all tables
+3. **API Rate Limits**: Respect channel API limits
+4. **Audit Logging**: Log all sensitive operations
+5. **Access Control**: Verify workspace membership
+6. **Data Encryption**: Encrypt sensitive message content if needed
+
+## Performance Optimization
+
+1. **Batch Operations**: Batch message syncs
+2. **Caching**: Cache channel metadata
+3. **Pagination**: Paginate large message lists
+4. **Indexing**: Index on workspace_id, channel_type, thread_id
+5. **Async Processing**: Use background jobs for heavy operations

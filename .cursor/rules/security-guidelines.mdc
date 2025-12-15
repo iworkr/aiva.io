@@ -1,0 +1,245 @@
+---
+description: Security guidelines and best practices for Nextbase
+globs: **/*.{ts,tsx,sql}
+---
+
+# Security Guidelines
+
+## Core Security Principles
+
+### Defense in Depth
+- **Multiple layers**: RLS, middleware, application checks
+- **Never trust client**: Always verify server-side
+- **Fail secure**: Deny by default
+- **Least privilege**: Minimum permissions required
+
+## Authentication Security
+
+### Token Management
+- **HttpOnly Cookies**: JWT tokens in HttpOnly cookies
+- **Secure Cookies**: Use secure flag in production
+- **Token Expiration**: Tokens expire after 1 hour (configurable)
+- **Refresh Tokens**: Handle token refresh properly
+
+### Password Security
+- **Minimum Length**: 8 characters minimum
+- **Hashing**: Supabase handles password hashing
+- **Reset Tokens**: Secure token generation and expiration
+- **Rate Limiting**: Consider rate limiting for login attempts
+
+### OAuth Security
+- **Redirect URLs**: Validate redirect URLs
+- **State Parameter**: Use state parameter for CSRF protection
+- **Token Validation**: Validate OAuth tokens
+- **Provider Configuration**: Secure provider credentials
+
+## Authorization Security
+
+### Workspace Access Control
+```typescript
+// Always check membership
+const isMember = await isWorkspaceMember(userId, workspaceId);
+if (!isMember) throw new Error("Unauthorized");
+
+// Check role for operations
+const role = await getLoggedInUserWorkspaceRole(workspaceId);
+if (role !== "admin" && role !== "owner") {
+  throw new Error("Insufficient permissions");
+}
+```
+
+### Role-Based Access Control
+- **Application Roles**: Admin role in `user_roles` table
+- **Workspace Roles**: Owner, Admin, Member, Readonly
+- **Check Before Operations**: Verify permissions before actions
+- **Principle of Least Privilege**: Minimum permissions required
+
+## Database Security
+
+### Row Level Security (RLS)
+- **All Tables**: RLS enabled on all tables
+- **Function-Based Policies**: Use helper functions for checks
+- **Workspace Isolation**: Policies enforce workspace boundaries
+- **User Isolation**: Policies enforce user data isolation
+
+### RLS Policy Patterns
+
+**Workspace Resources**:
+```sql
+CREATE POLICY "Workspace members can access" 
+ON table_name FOR ALL 
+TO authenticated 
+USING (
+  is_workspace_member(auth.uid(), workspace_id)
+);
+```
+
+**User Resources**:
+```sql
+CREATE POLICY "Users can access own data" 
+ON table_name FOR ALL 
+TO authenticated 
+USING (auth.uid() = user_id);
+```
+
+**Admin Resources**:
+```sql
+CREATE POLICY "Admins can access" 
+ON table_name FOR ALL 
+TO authenticated 
+USING (
+  EXISTS (
+    SELECT 1 FROM user_roles 
+    WHERE user_id = auth.uid() AND role = 'admin'
+  )
+);
+```
+
+### SQL Injection Prevention
+- **Parameterized Queries**: Supabase handles this automatically
+- **Never Concatenate**: Never build SQL with string concatenation
+- **Use Supabase Client**: Always use Supabase client methods
+
+## Input Validation
+
+### Server-Side Validation
+```typescript
+// Always validate with Zod
+export const action = authActionClient
+  .schema(z.object({
+    email: z.string().email(),
+    name: z.string().min(1).max(100),
+  }))
+  .action(async ({ parsedInput }) => {
+    // Input is validated and type-safe
+  });
+```
+
+### Validation Rules
+- **Validate All Inputs**: Never trust client input
+- **Use Zod Schemas**: Centralized validation schemas
+- **Type Safety**: TypeScript + Zod for type safety
+- **Sanitize Inputs**: Sanitize user inputs where needed
+
+### Common Validations
+- **Email**: Use Zod email validation
+- **UUIDs**: Validate UUID format
+- **Strings**: Set min/max length
+- **Numbers**: Validate ranges
+- **Enums**: Use Zod enum validation
+
+## API Security
+
+### Server Actions
+- **Type Safety**: Use `next-safe-action` for type safety
+- **Authentication**: Use `authActionClient` for protected actions
+- **Validation**: Always validate inputs
+- **Error Handling**: Don't expose sensitive errors
+
+### API Routes
+- **Webhook Verification**: Verify webhook signatures
+- **Rate Limiting**: Consider rate limiting
+- **CORS**: Configure CORS properly
+- **Headers**: Set security headers
+
+### Webhook Security
+```typescript
+// Stripe webhook verification
+const sig = req.headers.get("stripe-signature");
+const isValid = stripe.webhooks.constructEvent(body, sig, secret);
+if (!isValid) throw new Error("Invalid signature");
+```
+
+## Environment Variables
+
+### Secrets Management
+- **Never Commit**: Never commit secrets to git
+- **Environment Variables**: Use environment variables
+- **Separate Keys**: Different keys for dev/prod
+- **Rotate Regularly**: Rotate secrets regularly
+
+### Variable Naming
+- **Public Variables**: `NEXT_PUBLIC_*` prefix
+- **Private Variables**: No prefix (server-only)
+- **Clear Names**: Use descriptive names
+- **Documentation**: Document required variables
+
+## Data Protection
+
+### Sensitive Data
+- **Encryption**: Encrypt sensitive data at rest
+- **Transmission**: Use HTTPS for all communication
+- **Storage**: Don't store sensitive data unnecessarily
+- **PII**: Handle PII according to regulations
+
+### Data Access
+- **Least Privilege**: Minimum access required
+- **Audit Logs**: Log sensitive operations
+- **Data Retention**: Set data retention policies
+- **Deletion**: Proper data deletion (cascade)
+
+## Error Handling
+
+### Error Messages
+- **User-Friendly**: Show user-friendly messages
+- **No Sensitive Info**: Don't expose sensitive information
+- **Logging**: Log detailed errors server-side
+- **Error Tracking**: Use Sentry for error tracking
+
+### Error Patterns
+```typescript
+// Good: User-friendly error
+throw new Error("Invalid email address");
+
+// Bad: Exposes sensitive info
+throw new Error(`Database error: ${dbError.message}`);
+```
+
+## Best Practices
+
+### Do's ✅
+1. Always validate inputs server-side
+2. Check permissions before operations
+3. Use RLS policies for database security
+4. Verify authentication in middleware
+5. Use HttpOnly cookies for tokens
+6. Sanitize user inputs
+7. Log security events
+8. Keep dependencies updated
+9. Use type-safe operations
+10. Test security measures
+
+### Don'ts ❌
+1. Don't trust client-side checks alone
+2. Don't expose sensitive errors
+3. Don't skip validation
+4. Don't bypass RLS policies
+5. Don't store secrets in code
+6. Don't use `any` types
+7. Don't skip permission checks
+8. Don't expose internal details
+9. Don't ignore security warnings
+10. Don't skip security testing
+
+## Security Checklist
+
+When adding new features:
+- [ ] Input validation with Zod
+- [ ] Authentication check
+- [ ] Authorization check (if needed)
+- [ ] RLS policies enabled
+- [ ] Workspace membership check (if workspace-scoped)
+- [ ] Error handling (no sensitive info)
+- [ ] Type safety
+- [ ] Security testing
+
+## Common Vulnerabilities to Avoid
+
+1. **SQL Injection**: Use Supabase client (handled automatically)
+2. **XSS**: Sanitize user inputs, use React (auto-escapes)
+3. **CSRF**: Next.js handles CSRF protection
+4. **Authentication Bypass**: Always check authentication
+5. **Authorization Bypass**: Always check permissions
+6. **Data Exposure**: Use RLS policies
+7. **Insecure Direct Object Reference**: Check ownership/membership
+8. **Sensitive Data Exposure**: Don't expose sensitive data

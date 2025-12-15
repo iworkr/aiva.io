@@ -1,0 +1,56 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "name": "aiva-io",
+  "version": 2,
+  "buildCommand": "pnpm build",
+  "devCommand": "pnpm dev",
+  "installCommand": "pnpm install",
+  "framework": "nextjs",
+  "regions": ["iad1"],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
+    },
+    {
+      "source": "/_next/static/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    }
+  ],
+  "rewrites": [
+    { "source": "/api/health", "destination": "/api/health" }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/sync?tier=pro",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/sync?tier=basic",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/sync?tier=free",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/sync?tier=enterprise",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/renew-webhooks",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/auto-send",
+      "schedule": "* * * * *"
+    }
+  ]
+}
+

@@ -1,0 +1,395 @@
+---
+description: Workspace and multi-tenancy patterns in Nextbase (Foundation for Aiva.io)
+globs: **/*.{ts,tsx}
+---
+
+# Workspace & Multi-Tenancy Rules
+
+## Core Principles
+
+### Workspace Isolation
+- **All data is workspace-scoped**: Projects, settings, billing, messages, integrations, etc.
+- **RLS enforces isolation**: Database-level security
+- **Always check membership**: Verify before operations
+- **Filter by workspace**: All queries must filter by workspace
+
+### Aiva.io Workspace Scoping
+For Aiva.io features, workspace isolation is critical:
+- **Messages**: All messages are workspace-scoped
+- **Channel Integrations**: OAuth tokens stored per workspace
+- **AI Prompts**: Custom prompts are workspace-scoped
+- **Calendar Events**: Scheduling is workspace-scoped
+- **Tasks**: Task extraction is workspace-scoped
+- **AI Operations**: All AI operations logged per workspace
+
+## Workspace Context
+
+### Getting Workspace Context
+
+```typescript
+// In Server Component
+const workspace = await getWorkspaceById(workspaceId);
+const isMember = await isWorkspaceMember(userId, workspaceId);
+
+// In Server Action
+export const action = authActionClient
+  .schema(schema)
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    const isMember = await isWorkspaceMember(userId, parsedInput.workspaceId);
+    if (!isMember) throw new Error("Not a workspace member");
+    // ... rest of action
+  });
+```
+
+### Workspace Roles
+
+**Roles**:
+- **Owner**: Full control, cannot be removed
+- **Admin**: Administrative access, can manage members
+- **Member**: Standard access, can create/edit content
+- **Readonly**: Read-only access
+
+**Checking Roles**:
+```typescript
+const role = await getLoggedInUserWorkspaceRole(workspaceId);
+const isAdmin = await isWorkspaceAdmin(userId, workspaceId);
+```
+
+## Data Access Patterns
+
+### Workspace-Scoped Queries
+
+**Always filter by workspace**:
+```typescript
+const { data } = await supabase
+  .from("projects")
+  .select("*")
+  .eq("workspace_id", workspaceId); // Always include this
+```
+
+### RLS Policy Pattern
+
+RLS policies automatically filter by workspace:
+```sql
+CREATE POLICY "Workspace members can view projects" 
+ON projects FOR SELECT 
+TO authenticated 
+USING (
+  is_workspace_member(auth.uid(), workspace_id)
+);
+```
+
+### Workspace Helper Functions
+
+Use existing helper functions:
+- `is_workspace_member(user_id, workspace_id)` - Check membership
+- `is_workspace_admin(user_id, workspace_id)` - Check admin/owner
+- `get_workspace_team_member_ids(workspace_id)` - Get member IDs
+
+## Creating Workspace-Scoped Features
+
+### 1. Database Schema
+
+```sql
+CREATE TABLE feature_name (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  -- other fields
+);
+
+-- Always add workspace_id index
+CREATE INDEX idx_feature_name_workspace_id ON feature_name(workspace_id);
+
+-- Enable RLS
+ALTER TABLE feature_name ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy
+CREATE POLICY "Workspace members can access features" 
+ON feature_name FOR ALL 
+TO authenticated 
+USING (
+  is_workspace_member(auth.uid(), workspace_id)
+);
+```
+
+### 2. Server Action
+
+```typescript
+export const createFeatureAction = authActionClient
+  .schema(z.object({
+    workspaceId: z.string().uuid(),
+    name: z.string().min(1),
+  }))
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    // Check membership
+    const isMember = await isWorkspaceMember(userId, parsedInput.workspaceId);
+    if (!isMember) {
+      throw new Error("Not a workspace member");
+    }
+
+    // Create feature
+    const supabase = await createSupabaseUserServerActionClient();
+    const { data, error } = await supabase
+      .from("feature_name")
+      .insert({
+        workspace_id: parsedInput.workspaceId,
+        name: parsedInput.name,
+        user_id: userId,
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    
+    revalidatePath(`/workspace/${parsedInput.workspaceId}`);
+    return data;
+  });
+```
+
+### 3. Component
+
+```typescript
+// Server Component
+export default async function FeaturePage({ params }) {
+  const { workspaceId } = await params;
+  
+  // Verify access
+  const isMember = await isWorkspaceMember(userId, workspaceId);
+  if (!isMember) {
+    redirect("/dashboard");
+  }
+
+  const features = await getFeaturesForWorkspace(workspaceId);
+  return <FeatureList features={features} workspaceId={workspaceId} />;
+}
+```
+
+## Permission Checks
+
+### Before Operations
+
+**Always check permissions**:
+```typescript
+// Check membership
+const isMember = await isWorkspaceMember(userId, workspaceId);
+if (!isMember) throw new Error("Unauthorized");
+
+// Check admin for admin operations
+const isAdmin = await isWorkspaceAdmin(userId, workspaceId);
+if (!isAdmin) throw new Error("Admin access required");
+
+// Check specific role
+const role = await getLoggedInUserWorkspaceRole(workspaceId);
+if (role !== "admin" && role !== "owner") {
+  throw new Error("Insufficient permissions");
+}
+```
+
+### Role-Based Operations
+
+**Owner/Admin Only**:
+- Delete workspace
+- Manage members
+- Update admin settings
+- Cancel subscriptions
+
+**Admin/Member**:
+- Create projects
+- Update workspace settings
+- Invite members (admin only)
+
+**All Members**:
+- View workspace data
+- Create content
+- Update own content
+
+## Workspace Switching
+
+### Default Workspace
+
+Users can set a default workspace:
+```typescript
+await setDefaultWorkspaceAction({ workspaceId });
+```
+
+### Workspace Switcher
+
+Use the workspace switcher component:
+```tsx
+import { WorkspaceSwitcher } from "@/components/sidebar-components/workspace-switcher";
+
+<WorkspaceSwitcher 
+  workspaces={workspaces}
+  currentWorkspaceId={workspaceId}
+/>
+```
+
+## Best Practices
+
+### Do's ✅
+1. Always check workspace membership
+2. Filter queries by workspace_id
+3. Use RLS policies for security
+4. Verify permissions before operations
+5. Use existing helper functions
+6. Revalidate workspace paths after mutations
+
+### Don'ts ❌
+1. Don't skip membership checks
+2. Don't query without workspace filter
+3. Don't bypass RLS policies
+4. Don't trust client-side checks alone
+5. Don't create new helper functions unnecessarily
+6. Don't forget to revalidate paths
+
+## Common Patterns
+
+### Workspace-Scoped List
+
+```typescript
+export async function getFeaturesForWorkspace(workspaceId: string) {
+  const supabase = await createSupabaseUserServerComponentClient();
+  const { data, error } = await supabase
+    .from("features")
+    .select("*")
+    .eq("workspace_id", workspaceId) // Always filter
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+```
+
+### Workspace-Scoped Create
+
+```typescript
+export const createFeatureAction = authActionClient
+  .schema(z.object({
+    workspaceId: z.string().uuid(),
+    // ... other fields
+  }))
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    // Check membership
+    const isMember = await isWorkspaceMember(userId, parsedInput.workspaceId);
+    if (!isMember) throw new Error("Not a workspace member");
+
+    // Create with workspace_id
+    const { data, error } = await supabase
+      .from("features")
+      .insert({
+        workspace_id: parsedInput.workspaceId,
+        // ... other fields
+      });
+
+    if (error) throw new Error(error.message);
+    revalidatePath(`/workspace/${parsedInput.workspaceId}`);
+    return data;
+  });
+```
+
+## Security Considerations
+
+1. **RLS is Primary**: RLS policies are the primary security layer
+2. **Application Checks**: Additional checks in application code
+3. **Never Trust Client**: Always verify server-side
+4. **Workspace Isolation**: Complete data isolation between workspaces
+5. **Cascade Deletes**: Workspace deletion cascades to all related data
+
+## Aiva.io Specific Patterns
+
+### Message Workspace Scoping
+
+```typescript
+// Get messages for workspace
+export async function getMessagesForWorkspace(workspaceId: string) {
+  const supabase = await createSupabaseUserServerComponentClient();
+  const { data, error } = await supabase
+    .from("workspace_messages")
+    .select("*")
+    .eq("workspace_id", workspaceId) // Critical: workspace filter
+    .order("received_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+```
+
+### Channel Integration Workspace Scoping
+
+```typescript
+// Connect channel to workspace
+export const connectChannelAction = authActionClient
+  .schema(z.object({
+    workspaceId: z.string().uuid(),
+    channelType: z.enum(['gmail', 'outlook', 'slack']),
+    tokens: z.record(z.unknown()),
+  }))
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    // Verify workspace membership
+    const isMember = await isWorkspaceMember(userId, parsedInput.workspaceId);
+    if (!isMember) throw new Error("Not a workspace member");
+
+    // Store encrypted tokens workspace-scoped
+    const supabase = await createSupabaseUserServerActionClient();
+    const { data, error } = await supabase
+      .from("workspace_channel_integrations")
+      .insert({
+        workspace_id: parsedInput.workspaceId,
+        channel_type: parsedInput.channelType,
+        encrypted_tokens: encryptTokens(parsedInput.tokens),
+        user_id: userId,
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    revalidatePath(`/workspace/${parsedInput.workspaceId}/integrations`);
+    return data;
+  });
+```
+
+### AI Operations Workspace Scoping
+
+```typescript
+// All AI operations must be workspace-scoped
+export const generateAIReplyAction = authActionClient
+  .schema(z.object({
+    workspaceId: z.string().uuid(),
+    messageId: z.string().uuid(),
+  }))
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    // Verify workspace membership
+    const isMember = await isWorkspaceMember(userId, parsedInput.workspaceId);
+    if (!isMember) throw new Error("Not a workspace member");
+
+    // Get workspace-scoped AI prompts
+    const prompts = await getWorkspaceAIPrompts(parsedInput.workspaceId);
+    
+    // Generate reply (workspace context)
+    const reply = await generateAIReply({
+      messageId: parsedInput.messageId,
+      workspaceId: parsedInput.workspaceId,
+      prompts: prompts,
+    });
+
+    // Log AI operation (workspace-scoped audit trail)
+    await logAIOperation({
+      workspaceId: parsedInput.workspaceId,
+      userId: userId,
+      operation: 'generate_reply',
+      inputMessageId: parsedInput.messageId,
+    });
+
+    return reply;
+  });
+```
+
+### Key Aiva.io Workspace Rules
+
+1. **Messages**: Always filter by `workspace_id`
+2. **Integrations**: OAuth tokens stored per workspace
+3. **AI Prompts**: Custom prompts are workspace-scoped
+4. **Calendar Events**: Scheduling is workspace-scoped
+5. **Tasks**: Task extraction is workspace-scoped
+6. **AI Logs**: All AI operations logged per workspace
+7. **RLS Policies**: All Aiva.io tables must have workspace-based RLS

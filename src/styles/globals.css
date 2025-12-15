@@ -1,0 +1,563 @@
+@import "tailwindcss";
+
+@plugin "@tailwindcss/typography" {
+  classname: wysiwyg;
+}
+
+@plugin "@tailwindcss/forms";
+@import "tw-animate-css";
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  /* Brand: primary #258FFB (blue), accent #33EFFA (cyan) - converted to OKLCH */
+  --primary: oklch(0.62 0.19 250);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.145 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.85 0.15 195);
+  --accent-foreground: oklch(0.145 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.62 0.19 250);
+  /* Charts biased toward primary/accent palette */
+  --chart-1: oklch(0.62 0.19 250);
+  --chart-2: oklch(0.85 0.15 195);
+  --chart-3: oklch(0.52 0.17 250);
+  --chart-4: oklch(0.75 0.14 195);
+  --chart-5: oklch(0.45 0.15 250);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.62 0.19 250);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.95 0.03 250);
+  --sidebar-accent-foreground: oklch(0.145 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.62 0.19 250);
+  /* Skeleton: subtle gray slightly darker than background */
+  --skeleton: oklch(0.94 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.145 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  /* Brand: slightly brighter primary/accent in dark mode - OKLCH format */
+  --primary: oklch(0.68 0.18 250);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.27 0.006 286);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.27 0.006 286);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.88 0.14 195);
+  --accent-foreground: oklch(0.145 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.27 0.006 286);
+  --input: oklch(0.27 0.006 286);
+  --ring: oklch(0.68 0.18 250);
+  --chart-1: oklch(0.68 0.18 250);
+  --chart-2: oklch(0.88 0.14 195);
+  --chart-3: oklch(0.58 0.16 250);
+  --chart-4: oklch(0.78 0.13 195);
+  --chart-5: oklch(0.50 0.14 250);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.68 0.18 250);
+  --sidebar-primary-foreground: oklch(0.145 0 0);
+  --sidebar-accent: oklch(0.25 0.05 250);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.27 0.006 286);
+  --sidebar-ring: oklch(0.68 0.18 250);
+  /* Skeleton: subtle gray slightly lighter than background */
+  --skeleton: oklch(0.22 0 0);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-skeleton: var(--skeleton);
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentColor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  body {
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
+  }
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+}
+
+@import "./tiptap.css";
+@import "./utils.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@layer base {
+  button {
+    cursor: pointer;
+  }
+}
+
+@keyframes animate-marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(calc(-50% - var(--gap)));
+  }
+}
+
+/* Floating assistant tooltip animation */
+@keyframes fade-in-delayed {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  10% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+}
+
+.animate-fade-in-delayed {
+  animation: fade-in-delayed 5s ease-in-out forwards;
+}
+
+.animate-marquee {
+  animation-name: animate-marquee;
+  animation-duration: var(--duration);
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes animate-marquee-vertical {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(calc(-50% - var(--gap)));
+  }
+}
+
+.animate-marquee-vertical {
+  animation-name: animate-marquee-vertical;
+  animation-duration: var(--duration);
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Animated Gradient Border - Shared @property definition */
+@property --angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+/* Animated Gradient Border for Aiva Input */
+.aiva-input-wrapper {
+  --border-width: 2px;
+  --radius: 0.5rem;
+  position: relative;
+  border-radius: var(--radius);
+  isolation: isolate;
+}
+
+.aiva-input-wrapper::before {
+  content: " ";
+  position: absolute;
+  inset: calc(var(--border-width) * -1);
+  z-index: 0;
+  border-radius: inherit;
+  padding: var(--border-width);
+  background: conic-gradient(
+    from var(--angle),
+    hsl(var(--primary)) 0deg,
+    hsl(var(--accent)) 90deg,
+    hsl(var(--primary) / 0.5) 180deg,
+    hsl(var(--accent)) 270deg,
+    hsl(var(--primary)) 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: spin-border 3s linear infinite;
+  opacity: 0.5;
+  transition: opacity 0.3s;
+}
+
+.aiva-input-wrapper:focus-within::before {
+  opacity: 1;
+}
+
+.aiva-input-wrapper input {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+}
+
+@keyframes spin-border {
+  to {
+    --angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aiva-input-wrapper::before {
+    animation: none;
+  }
+}
+
+/* Animated Gradient Border - Conic Gradient Effect for tiles/cards
+   NOTE: Unlike `.aiva-input-wrapper`, elements using `.animated-border`
+   are responsible for their own background color via Tailwind classes
+   like `bg-card` / `bg-background`. This utility ONLY renders the border.
+*/
+.animated-border {
+  position: relative;
+  border-radius: inherit;
+  isolation: isolate;
+}
+
+.animated-border::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  z-index: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--angle),
+    hsl(var(--primary)),
+    hsl(var(--accent)),
+    hsl(var(--primary) / 0.8),
+    hsl(var(--accent)),
+    hsl(var(--primary))
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+  animation: rotate-gradient 4s linear infinite;
+}
+
+.animated-border:hover::before {
+  opacity: 1;
+}
+
+.animated-border-active::before {
+  opacity: 1;
+}
+
+@keyframes rotate-gradient {
+  to {
+    --angle: 360deg;
+  }
+}
+
+/* Dark mode variant with more vibrant colors */
+.dark .animated-border::before {
+  background: conic-gradient(
+    from var(--angle),
+    hsl(var(--primary)),
+    hsl(var(--accent)),
+    hsl(var(--primary) / 0.9),
+    hsl(var(--accent)),
+    hsl(var(--primary))
+  );
+}
+
+.dark .animated-border:hover::before {
+  opacity: 1;
+}
+
+.dark .animated-border-active::before {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animated-border::before {
+    animation: none;
+  }
+}
+
+/* ============================================
+   AI ELEMENT STYLES
+   Soft gradients, glows, and floating effects
+   ============================================ */
+
+/* AI Glow effect */
+.ai-glow {
+  position: relative;
+}
+
+.ai-glow::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    hsl(var(--primary) / 0.3),
+    hsl(var(--accent) / 0.3),
+    hsl(var(--primary) / 0.2)
+  );
+  filter: blur(8px);
+  z-index: -1;
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+
+.ai-glow:hover::before {
+  opacity: 1;
+}
+
+/* Floating card shadow */
+.floating-shadow {
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06),
+    0 0 0 1px rgba(0, 0, 0, 0.02);
+}
+
+.dark .floating-shadow {
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.3),
+    0 2px 4px -1px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* Avatar glow on hover */
+.avatar-glow:hover {
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.2);
+}
+
+/* Chip/badge background with subtle gradient */
+.chip-gradient {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--muted)),
+    hsl(var(--muted) / 0.8)
+  );
+}
+
+/* AI element soft gradient background */
+.ai-gradient-bg {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--primary) / 0.05),
+    hsl(var(--accent) / 0.05)
+  );
+}
+
+.dark .ai-gradient-bg {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--primary) / 0.1),
+    hsl(var(--accent) / 0.1)
+  );
+}
+
+/* Typewriter cursor animation */
+@keyframes typewriter-cursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.typewriter-cursor {
+  animation: typewriter-cursor 0.7s infinite;
+}
+
+/* Confidence meter fill animation */
+@keyframes fill-bar {
+  from { width: 0; }
+  to { width: var(--fill-width); }
+}
+
+.animate-fill-bar {
+  animation: fill-bar 1.5s ease-out forwards;
+}
+
+/* Pulse with glow */
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4);
+  }
+  50% {
+    opacity: 0.8;
+    box-shadow: 0 0 0 8px hsl(var(--primary) / 0);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Staggered fade-in for lists */
+@keyframes stagger-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stagger-fade-in > * {
+  animation: stagger-fade-in 0.3s ease-out forwards;
+  opacity: 0;
+}
+
+.stagger-fade-in > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-fade-in > *:nth-child(2) { animation-delay: 50ms; }
+.stagger-fade-in > *:nth-child(3) { animation-delay: 100ms; }
+.stagger-fade-in > *:nth-child(4) { animation-delay: 150ms; }
+.stagger-fade-in > *:nth-child(5) { animation-delay: 200ms; }
+.stagger-fade-in > *:nth-child(6) { animation-delay: 250ms; }
+.stagger-fade-in > *:nth-child(7) { animation-delay: 300ms; }
+.stagger-fade-in > *:nth-child(8) { animation-delay: 350ms; }
+.stagger-fade-in > *:nth-child(9) { animation-delay: 400ms; }
+.stagger-fade-in > *:nth-child(10) { animation-delay: 450ms; }
+
+/* Typing cursor blink animation for voice streaming */
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.animate-blink {
+  animation: blink 1s infinite;
+}

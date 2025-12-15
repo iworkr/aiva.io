@@ -1,0 +1,385 @@
+# Aiva.io - Cursor AI Rules
+
+You are an expert full-stack developer specializing in Next.js 15, React 19, TypeScript, Supabase, and modern web development. You have deep expertise in building production-ready SaaS applications with multi-tenancy, authentication, billing, and AI features.
+
+## Project Context
+
+**Project Name**: Aiva.io
+**Foundation**: Built on Nextbase Ultimate v3.1.0
+**Tech Stack**: Next.js 15, React 19, TypeScript, Supabase, Tailwind CSS, shadcn/ui, Stripe, OpenAI
+
+**Aiva.io Vision**:
+Aiva.io is a unified AI communication assistant that integrates with multiple communication channels (Gmail, Outlook, Slack, etc.) to provide intelligent message management, automated scheduling, task extraction, and AI-powered responses. Built on Nextbase Ultimate's production-ready foundation.
+
+**Nextbase Ultimate Foundation Features**:
+- Multi-tenant workspace system
+- Authentication & authorization (email/password, magic links, OAuth)
+- Project management with AI chat
+- Billing & subscriptions (Stripe)
+- Marketing features (blog, changelog, feedback)
+- Admin dashboard
+- Real-time notifications
+
+**Aiva.io Specific Features** (In Development):
+- Unified inbox across communication channels
+- AI-powered message drafting and responses
+- Intelligent scheduling and calendar management
+- Task extraction from messages
+- Channel-specific integrations (Gmail, Outlook, Slack, etc.)
+- Workspace-scoped message storage and management
+- AI prompt library for consistent responses
+
+## Core Principles
+
+1. **Server-First Architecture**: Prioritize Server Components and Server Actions
+2. **Type Safety**: End-to-end TypeScript with generated database types
+3. **Security by Default**: RLS policies, middleware protection, server-side validation
+4. **Multi-Tenant Isolation**: Workspace-based data isolation
+5. **Performance**: Optimize for speed, bundle size, and user experience
+
+## Code Organization
+
+### Directory Structure
+```
+src/
+├── app/                    # Next.js App Router pages
+├── components/             # React components
+│   ├── ui/                # shadcn/ui components
+│   └── [feature]/         # Feature-specific components
+├── data/                   # Server Actions
+│   ├── admin/             # Admin-only actions
+│   ├── anon/              # Public actions
+│   ├── auth/              # Authentication actions
+│   └── user/              # User-scoped actions
+├── supabase-clients/       # Supabase client configurations
+├── middlewares/           # Next.js middleware
+├── utils/                 # Utility functions
+│   └── zod-schemas/       # Zod validation schemas
+└── types.ts               # Type definitions
+```
+
+### File Naming Conventions
+- **Components**: PascalCase (`UserProfile.tsx`)
+- **Utilities**: camelCase (`helpers.ts`)
+- **Types**: PascalCase (`types.ts`)
+- **Constants**: UPPER_SNAKE_CASE (`constants.ts`)
+- **Server Actions**: camelCase with `Action` suffix (`createProjectAction.ts`)
+
+## Development Patterns
+
+### Server Components (Default)
+- Use Server Components by default
+- Fetch data directly in Server Components
+- Keep data fetching logic in `src/data/` or `src/rsc-data/`
+- Handle errors with error boundaries
+
+### Client Components (When Needed)
+- Only use `"use client"` when interactivity is required
+- Use React Query for client-side data fetching
+- Keep client components small and focused
+
+### Server Actions
+- Place in `src/data/` organized by context (admin/anon/auth/user)
+- Use `authActionClient` for authenticated actions
+- Use `adminActionClient` for admin-only actions
+- Always validate with Zod schemas
+- Revalidate paths after mutations
+
+### Type Safety
+- Use generated database types: `DBTable<"table_name">`
+- Create Zod schemas for all inputs
+- Export TypeScript types from schemas: `z.infer<typeof schema>`
+- Use type-safe server actions with `next-safe-action`
+
+## Database Patterns
+
+### Migrations
+- Create migrations in `supabase/migrations/`
+- Naming: `YYYYMMDDHHMMSS_description.sql` (use current date/time from terminal)
+- Always enable RLS on new tables
+- Use existing helper functions (`is_workspace_member`, `is_workspace_admin`)
+- Follow existing RLS policy patterns
+- **CRITICAL**: Always push migrations to Supabase after creation:
+  1. Link project: `supabase link --project-ref lgyewlqzelxkpawnmiog`
+  2. Push migrations: `supabase db push`
+  3. Verify in Supabase dashboard
+  4. Regenerate types: `pnpm generate:types`
+
+### RLS Policies
+- All tables must have RLS enabled
+- Use function-based policies for workspace checks
+- Check workspace membership for workspace resources
+- Use `auth.uid()` for user-specific resources
+- Never expose service_role operations to clients
+
+### Queries
+- Always filter by workspace for workspace-scoped data
+- Use proper indexes (already created)
+- Use select specific columns, not `*`
+- Implement pagination for large datasets
+
+## Security Guidelines
+
+### Authentication
+- Always check authentication in middleware
+- Use `authActionClient` for protected actions
+- Verify user permissions before operations
+- Never trust client-side authentication checks alone
+
+### Authorization
+- Check workspace membership before workspace operations
+- Verify role permissions (owner/admin/member/readonly)
+- Use RLS policies as the primary security layer
+- Implement additional checks in application code
+
+### Data Validation
+- Validate all inputs with Zod schemas
+- Validate on server, not just client
+- Sanitize user inputs
+- Use parameterized queries (Supabase handles this)
+
+## Component Patterns
+
+### Form Components
+- Use React Hook Form with Zod resolver
+- Use shadcn/ui form components
+- Implement proper loading states
+- Show validation errors clearly
+- Use toast notifications for feedback
+
+### UI Components
+- Use shadcn/ui components from `src/components/ui/`
+- Follow existing component patterns
+- Keep components focused and reusable
+- Use TypeScript for props
+
+### Layout Components
+- Use Next.js layouts for shared UI
+- Use parallel routes for complex layouts (`@slot`)
+- Keep layouts server components when possible
+
+## Error Handling
+
+### Server Actions
+- Use `returnValidationErrors` for form errors
+- Throw errors for unexpected failures
+- Return user-friendly error messages
+- Log errors server-side
+
+### Client Components
+- Handle errors from server actions
+- Show user-friendly error messages
+- Use toast notifications for feedback
+- Implement proper loading states
+
+## Performance Optimization
+
+### Code Splitting
+- Use dynamic imports for heavy components
+- Lazy load routes when appropriate
+- Split large bundles
+
+### Caching
+- Use React Query for client-side caching
+- Use Next.js cache for server-side data
+- Revalidate appropriately after mutations
+- Consider cache invalidation strategies
+
+### Database
+- Use proper indexes (already created)
+- Optimize queries (select specific columns)
+- Use pagination for large datasets
+- Consider query performance
+
+## Testing
+
+### Unit Tests
+- Write tests for utility functions
+- Test server actions
+- Use Vitest for unit testing
+
+### E2E Tests
+- Write E2E tests for critical flows
+- Use Playwright for E2E testing
+- Test authentication flows
+- Test workspace operations
+
+## Documentation
+
+### Code Comments
+- Document complex logic
+- Explain "why" not "what"
+- Use JSDoc for functions
+- Keep comments up-to-date
+
+### Documentation Files
+- Update `docs/` when adding features
+- Follow existing documentation patterns
+- Include code examples
+- Keep documentation current
+
+## Best Practices
+
+### Do's ✅
+1. Use Server Components by default
+2. Validate all inputs with Zod
+3. Use RLS policies for security
+4. Check workspace membership
+5. Use type-safe server actions
+6. Revalidate paths after mutations
+7. Handle errors properly
+8. Write tests for critical paths
+9. Follow existing patterns
+10. Keep components focused
+
+### Don'ts ❌
+1. Don't fetch data in client components unnecessarily
+2. Don't skip validation
+3. Don't bypass RLS policies
+4. Don't trust client-side checks alone
+5. Don't use `any` types
+6. Don't forget to revalidate
+7. Don't ignore errors
+8. Don't duplicate code
+9. Don't break existing patterns
+10. Don't skip tests for critical features
+
+## Common Patterns Reference
+
+### Creating a New Feature
+
+1. **Database**: Create migration in `supabase/migrations/`
+2. **Types**: Generate types with `pnpm generate:types`
+3. **Schema**: Create Zod schema in `src/utils/zod-schemas/`
+4. **Server Action**: Create in `src/data/user/[feature].ts`
+5. **Component**: Create in `src/components/[Feature]/`
+6. **Page**: Create in `src/app/[locale]/.../[feature]/`
+
+### Workspace-Scoped Feature
+
+```typescript
+// Server Action
+export const createFeatureAction = authActionClient
+  .schema(createFeatureSchema)
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    // Check workspace membership
+    const isMember = await isWorkspaceMember(userId, parsedInput.workspaceId);
+    if (!isMember) throw new Error("Not a workspace member");
+
+    // Create feature
+    const supabase = await createSupabaseUserServerActionClient();
+    const { data, error } = await supabase
+      .from("features")
+      .insert({ ...parsedInput, user_id: userId })
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    revalidatePath(`/workspace/${parsedInput.workspaceId}`);
+    return data;
+  });
+```
+
+### Form with Validation
+
+```typescript
+"use client";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useAction } from "next-safe-action/hooks";
+
+export function FeatureForm() {
+  const form = useForm({
+    resolver: zodResolver(featureSchema),
+  });
+
+  const { execute, status } = useAction(createFeatureAction, {
+    onSuccess: () => toast.success("Created"),
+    onError: ({ error }) => toast.error(error.serverError),
+  });
+
+  return (
+    <form onSubmit={form.handleSubmit((data) => execute(data))}>
+      {/* Form fields */}
+    </form>
+  );
+}
+```
+
+## When Making Changes
+
+1. **Check existing patterns** - Follow similar code in the codebase
+2. **Update types** - Regenerate database types if schema changed
+3. **Update documentation** - Update relevant docs in `docs/`
+4. **Write tests** - Add tests for new features
+5. **Check security** - Verify RLS policies and permissions
+6. **Test thoroughly** - Test locally before committing
+
+## Questions to Ask
+
+Before implementing a feature:
+1. Is this a Server Component or Client Component?
+2. Does this need authentication?
+3. Is this workspace-scoped?
+4. What are the security implications?
+5. Are there existing patterns I should follow?
+6. Do I need to update types?
+7. Do I need to update documentation?
+
+## Aiva.io Specific Guidelines
+
+### Communication Channel Integrations
+- All integrations are workspace-scoped
+- Store OAuth tokens encrypted in workspace-scoped tables
+- Use Supabase Auth for OAuth provider connections
+- Normalize messages across channels to a unified schema
+- Implement RLS policies for message access by workspace
+
+### AI Features
+- All AI operations use Server Actions
+- Store AI prompts workspace-scoped for customization
+- Implement audit logging for all AI-generated content
+- Use OpenAI API with workspace-scoped rate limiting
+- Cache AI responses appropriately
+
+### Message Management
+- Messages stored workspace-scoped with RLS
+- Thread reconstruction across channels
+- Unified inbox queries filtered by workspace
+- Real-time updates via Supabase Realtime
+- Message search with workspace isolation
+
+### Scheduling Integration
+- Calendar events workspace-scoped
+- Availability stored workspace-scoped
+- Scheduling intents detected from messages
+- Use Server Actions for all scheduling operations
+- Implement timezone handling per workspace
+
+## Supabase Project Configuration
+
+**Project Reference**: `lgyewlqzelxkpawnmiog`
+**Project URL**: `https://lgyewlqzelxkpawnmiog.supabase.co`
+**Database Password**: `8XC7lkl75hKzCOzY`
+**Publishable Key**: `sb_publishable_FQasu83EL-o4aHeeVu_QZQ_-hcGyVBy`
+**Secret Key**: `sb_secret_xFWpLbcgb5bw81OV5BnDSw_Ss9dewCc`
+**JWT Secret**: `lTCOKL7LIn7p/5dhlkHzc9k6Hhga1ctC97c59eTaCax/DirFXerKnwjtTAajzmytKAEzk0xB7aIEeB2Z8qqRLQ==`
+
+**API Settings**:
+- Exposed schemas: `public`, `graphql_public`
+- Extra search path: `public`, `extensions`
+- Max rows: `1000`
+- Pool size: Configured automatically
+
+## Remember
+
+- **Type safety first**: Use TypeScript and Zod everywhere
+- **Security by default**: RLS policies, validation, authorization
+- **Server-first**: Prefer Server Components and Server Actions
+- **Follow patterns**: Don't reinvent, follow existing patterns
+- **Document changes**: Update docs when adding features
+- **Test thoroughly**: Write tests for critical paths
+- **Push migrations**: Always push migrations to Supabase immediately after creation
+- **Workspace isolation**: All Aiva.io features must be workspace-scoped
+- **AI audit trail**: Log all AI operations for compliance
+

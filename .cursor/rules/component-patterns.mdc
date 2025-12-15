@@ -1,0 +1,339 @@
+---
+description: Component patterns and best practices for Nextbase
+globs: **/*.{tsx,ts}
+---
+
+# Component Patterns
+
+## Component Types
+
+### Server Components (Default)
+- **Use by default**: No `"use client"` directive
+- **Data fetching**: Fetch data directly
+- **No interactivity**: No hooks, no event handlers
+- **Better performance**: Smaller bundle, faster load
+
+### Client Components (When Needed)
+- **Add `"use client"`**: Only when interactivity required
+- **Minimal scope**: Keep client components small
+- **Props from Server**: Receive data from Server Components
+- **Interactivity only**: Forms, buttons, inputs, etc.
+
+## Component Organization
+
+### Directory Structure
+```
+components/
+├── ui/                    # shadcn/ui components
+├── [Feature]/            # Feature-specific components
+│   ├── FeatureName.tsx  # Main component
+│   └── FeatureParts.tsx # Sub-components
+└── shared/              # Shared components
+```
+
+### Naming Conventions
+- **PascalCase**: Component files (`UserProfile.tsx`)
+- **Descriptive**: Clear, descriptive names
+- **Feature Prefix**: Group by feature when appropriate
+- **Index Files**: Use `index.ts` for exports
+
+## Server Component Patterns
+
+### Data Fetching
+```typescript
+// Server Component
+export default async function Page({ params }) {
+  const { workspaceId } = await params;
+  const data = await fetchData(workspaceId);
+  
+  return <DataDisplay data={data} />;
+}
+```
+
+### Error Handling
+```typescript
+export default async function Page() {
+  try {
+    const data = await fetchData();
+    return <DataDisplay data={data} />;
+  } catch (error) {
+    return <ErrorDisplay error={error} />;
+  }
+}
+```
+
+### Loading States
+```typescript
+// Use Next.js loading.tsx
+// src/app/[locale]/.../page.tsx
+export default async function Page() {
+  const data = await fetchData();
+  return <DataDisplay data={data} />;
+}
+
+// src/app/[locale]/.../loading.tsx
+export default function Loading() {
+  return <Skeleton />;
+}
+```
+
+## Client Component Patterns
+
+### Form Components
+```typescript
+"use client";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useAction } from "next-safe-action/hooks";
+
+export function FormComponent({ initialData }) {
+  const form = useForm({
+    resolver: zodResolver(schema),
+    defaultValues: initialData,
+  });
+
+  const { execute, status } = useAction(action, {
+    onSuccess: () => toast.success("Success"),
+    onError: ({ error }) => toast.error(error.serverError),
+  });
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit((data) => execute(data))}>
+        {/* Form fields */}
+      </form>
+    </Form>
+  );
+}
+```
+
+### Interactive Components
+```typescript
+"use client";
+import { useState } from "react";
+
+export function InteractiveComponent({ data }) {
+  const [state, setState] = useState(data);
+
+  const handleAction = async () => {
+    // Client-side logic
+    setState(newState);
+  };
+
+  return (
+    <div>
+      <button onClick={handleAction}>Action</button>
+    </div>
+  );
+}
+```
+
+## Form Patterns
+
+### React Hook Form + Zod
+```typescript
+"use client";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useAction } from "next-safe-action/hooks";
+
+export function Form() {
+  const form = useForm({
+    resolver: zodResolver(schema),
+  });
+
+  const { execute, status } = useAction(action);
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit((data) => execute(data))}>
+        <FormInput
+          control={form.control}
+          name="fieldName"
+          label="Label"
+        />
+        <Button type="submit" disabled={status === "executing"}>
+          Submit
+        </Button>
+      </form>
+    </Form>
+  );
+}
+```
+
+### Form Components
+Use shadcn/ui form components:
+- `FormInput`: Text inputs
+- `FormTextarea`: Textarea inputs
+- `FormSelect`: Select dropdowns
+- `FormCheckbox`: Checkboxes
+- `FormRadioGroup`: Radio groups
+- `FormDatePicker`: Date pickers
+
+## UI Component Patterns
+
+### Using shadcn/ui Components
+```typescript
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+
+export function Component() {
+  return (
+    <Card>
+      <CardHeader>Title</CardHeader>
+      <CardContent>
+        <Button>Action</Button>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+### Styling Patterns
+- **Tailwind CSS**: Use Tailwind for styling
+- **cn() Utility**: Use `cn()` for conditional classes
+- **Consistent Spacing**: Use consistent spacing scale
+- **Responsive Design**: Mobile-first approach
+
+## Component Composition
+
+### Compound Components
+```typescript
+export function Feature() {
+  return (
+    <FeatureContainer>
+      <FeatureHeader />
+      <FeatureContent />
+      <FeatureFooter />
+    </FeatureContainer>
+  );
+}
+```
+
+### Props Patterns
+```typescript
+// Explicit props
+interface ComponentProps {
+  data: DataType;
+  onAction: () => void;
+  optional?: string;
+}
+
+export function Component({ data, onAction, optional }: ComponentProps) {
+  // Component implementation
+}
+```
+
+## Error Boundaries
+
+### Error Display
+```typescript
+"use client";
+import { ErrorBoundary } from "react-error-boundary";
+
+export function ErrorFallback({ error }) {
+  return (
+    <div>
+      <h2>Something went wrong</h2>
+      <p>{error.message}</p>
+    </div>
+  );
+}
+
+export function ComponentWithErrorBoundary({ children }) {
+  return (
+    <ErrorBoundary FallbackComponent={ErrorFallback}>
+      {children}
+    </ErrorBoundary>
+  );
+}
+```
+
+## Loading States
+
+### Skeleton Components
+```typescript
+import { Skeleton } from "@/components/ui/skeleton";
+
+export function LoadingSkeleton() {
+  return (
+    <div>
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-3/4" />
+    </div>
+  );
+}
+```
+
+### Suspense Boundaries
+```typescript
+import { Suspense } from "react";
+
+export function Page() {
+  return (
+    <Suspense fallback={<LoadingSkeleton />}>
+      <AsyncComponent />
+    </Suspense>
+  );
+}
+```
+
+## Best Practices
+
+### Do's ✅
+1. Use Server Components by default
+2. Keep client components small
+3. Use shadcn/ui components
+4. Follow existing patterns
+5. Use TypeScript for props
+6. Handle loading states
+7. Handle error states
+8. Use proper form validation
+9. Keep components focused
+10. Compose components
+
+### Don'ts ❌
+1. Don't use `"use client"` unnecessarily
+2. Don't fetch data in client components
+3. Don't duplicate components
+4. Don't skip loading states
+5. Don't ignore errors
+6. Don't use inline styles
+7. Don't skip TypeScript types
+8. Don't create overly complex components
+9. Don't mix concerns
+10. Don't skip accessibility
+
+## Accessibility
+
+### ARIA Labels
+```typescript
+<button aria-label="Close dialog">×</button>
+```
+
+### Keyboard Navigation
+- Ensure keyboard accessibility
+- Use semantic HTML
+- Focus management
+- Screen reader support
+
+## Performance
+
+### Code Splitting
+```typescript
+import dynamic from "next/dynamic";
+
+const HeavyComponent = dynamic(() => import("./HeavyComponent"), {
+  loading: () => <Skeleton />,
+});
+```
+
+### Memoization
+```typescript
+import { memo } from "react";
+
+export const ExpensiveComponent = memo(function ExpensiveComponent({ data }) {
+  // Component implementation
+});
+```
