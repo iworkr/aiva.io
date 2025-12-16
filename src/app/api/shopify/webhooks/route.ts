@@ -10,7 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { createSupabaseServiceRoleClient } from '@/supabase-clients/admin/createSupabaseServiceRoleClient';
+import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = JSON.parse(body);
-    const supabase = createSupabaseServiceRoleClient();
+    const supabase = supabaseAdminClient;
 
     // Log webhook for audit trail
     await supabase.from('shopify_webhook_logs').insert({
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
  * Called when a merchant uninstalls your app
  */
 async function handleAppUninstalled(
-  supabase: ReturnType<typeof createSupabaseServiceRoleClient>,
+  supabase: typeof supabaseAdminClient,
   shopDomain: string,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _payload: unknown
@@ -131,7 +131,7 @@ async function handleAppUninstalled(
  * You must respond with the customer's data within 30 days
  */
 async function handleCustomerDataRequest(
-  supabase: ReturnType<typeof createSupabaseServiceRoleClient>,
+  supabase: typeof supabaseAdminClient,
   shopDomain: string,
   payload: {
     shop_id: number;
@@ -172,7 +172,7 @@ async function handleCustomerDataRequest(
  * Called when a shop requests deletion of a customer's data
  */
 async function handleCustomerRedact(
-  supabase: ReturnType<typeof createSupabaseServiceRoleClient>,
+  supabase: typeof supabaseAdminClient,
   shopDomain: string,
   payload: {
     shop_id: number;
@@ -216,7 +216,7 @@ async function handleCustomerRedact(
  * You must delete ALL data associated with this shop
  */
 async function handleShopRedact(
-  supabase: ReturnType<typeof createSupabaseServiceRoleClient>,
+  supabase: typeof supabaseAdminClient,
   shopDomain: string,
   payload: {
     shop_id: number;

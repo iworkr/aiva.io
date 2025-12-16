@@ -12,7 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { createSupabaseServiceRoleClient } from '@/supabase-clients/admin/createSupabaseServiceRoleClient';
+import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -155,7 +155,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Store connection in database
-    const supabase = createSupabaseServiceRoleClient();
+    const supabase = supabaseAdminClient;
     
     // Check if this shop already exists
     const { data: existingShop } = await supabase
