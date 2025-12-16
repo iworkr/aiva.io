@@ -2293,6 +2293,104 @@ export type Database = {
           },
         ]
       }
+      shopify_stores: {
+        Row: {
+          access_token: string
+          country_code: string | null
+          created_at: string | null
+          currency: string | null
+          id: string
+          installed_at: string | null
+          is_active: boolean | null
+          linked_user_id: string | null
+          scopes: string[] | null
+          shop_domain: string
+          shop_email: string | null
+          shop_name: string | null
+          shop_owner: string | null
+          shop_plan: string | null
+          timezone: string | null
+          uninstalled_at: string | null
+          updated_at: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          access_token: string
+          country_code?: string | null
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          installed_at?: string | null
+          is_active?: boolean | null
+          linked_user_id?: string | null
+          scopes?: string[] | null
+          shop_domain: string
+          shop_email?: string | null
+          shop_name?: string | null
+          shop_owner?: string | null
+          shop_plan?: string | null
+          timezone?: string | null
+          uninstalled_at?: string | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          access_token?: string
+          country_code?: string | null
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          installed_at?: string | null
+          is_active?: boolean | null
+          linked_user_id?: string | null
+          scopes?: string[] | null
+          shop_domain?: string
+          shop_email?: string | null
+          shop_name?: string | null
+          shop_owner?: string | null
+          shop_plan?: string | null
+          timezone?: string | null
+          uninstalled_at?: string | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopify_stores_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shopify_webhook_logs: {
+        Row: {
+          created_at: string | null
+          id: string
+          payload: Json | null
+          processed_at: string | null
+          shop_domain: string
+          topic: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          payload?: Json | null
+          processed_at?: string | null
+          shop_domain: string
+          topic: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          payload?: Json | null
+          processed_at?: string | null
+          shop_domain?: string
+          topic?: string
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           assigned_to: string | null
