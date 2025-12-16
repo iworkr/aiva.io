@@ -20,28 +20,10 @@ redirect_urls = [
 [webhooks]
 api_version = "2024-01"
 
-# Mandatory GDPR compliance webhooks
+# App uninstall webhook
 [[webhooks.subscriptions]]
 topics = ["app/uninstalled"]
 uri = "/api/shopify/webhooks"
-
-[[webhooks.subscriptions]]
-topics = ["customers/data_request"]
-uri = "/api/shopify/webhooks"
-
-[[webhooks.subscriptions]]
-topics = ["customers/redact"]
-uri = "/api/shopify/webhooks"
-
-[[webhooks.subscriptions]]
-topics = ["shop/redact"]
-uri = "/api/shopify/webhooks"
-
-[app_proxy]
-# Optional: If you want to embed content in the storefront
-# url = "https://www.tryaiva.io"
-# subpath = "aiva"
-# prefix = "apps"
 
 [pos]
 embedded = false
