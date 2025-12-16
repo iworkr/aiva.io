@@ -60,11 +60,7 @@ CREATE POLICY "Users can view their linked Shopify stores"
     FOR SELECT
     USING (
         linked_user_id = auth.uid()
-        OR workspace_id IN (
-            SELECT workspace_id 
-            FROM public.workspace_users 
-            WHERE user_id = auth.uid()
-        )
+        OR is_workspace_member(auth.uid(), workspace_id)
     );
 
 -- Users can update their linked stores (e.g., link to workspace)
@@ -73,12 +69,7 @@ CREATE POLICY "Users can update their linked Shopify stores"
     FOR UPDATE
     USING (
         linked_user_id = auth.uid()
-        OR workspace_id IN (
-            SELECT workspace_id 
-            FROM public.workspace_users 
-            WHERE user_id = auth.uid()
-            AND role IN ('owner', 'admin')
-        )
+        OR is_workspace_admin(auth.uid(), workspace_id)
     );
 
 -- Create updated_at trigger
