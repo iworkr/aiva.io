@@ -2,8 +2,10 @@
 # This file configures your Shopify app for the App Store
 # Docs: https://shopify.dev/docs/apps/tools/cli/configuration
 
-name = "Aiva - AI Communication Assistant"
+name = "Aiva: AI Inbox Assistant"
 client_id = "729af1a9f3307682602bd761fcc3eefb"
+application_url = "https://www.tryaiva.io/api/shopify/app"
+embedded = true
 
 [access_scopes]
 # Scopes your app needs - keep minimal for faster approval
@@ -12,7 +14,7 @@ scopes = "read_customers,write_customers,read_orders,read_products,read_content"
 [auth]
 redirect_urls = [
   "https://www.tryaiva.io/api/shopify/auth/callback",
-  "http://localhost:3000/api/shopify/auth/callback"  # For local development
+  "http://localhost:3000/api/shopify/auth/callback"
 ]
 
 [webhooks]
@@ -45,9 +47,4 @@ uri = "/api/shopify/webhooks"
 embedded = false
 
 [build]
-# Include any build commands here
-dev_store_url = "your-dev-store.myshopify.com"  # For testing
-
-[app]
-embedded = false  # Set to true if you want app to load inside Shopify Admin
-
+dev_store_url = "aivateststore.myshopify.com"

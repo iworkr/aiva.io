@@ -9,7 +9,23 @@
   "regions": ["iad1"],
   "headers": [
     {
-      "source": "/(.*)",
+      "source": "/api/shopify/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Content-Security-Policy", "value": "frame-ancestors https://*.myshopify.com https://admin.shopify.com;" }
+      ]
+    },
+    {
+      "source": "/:locale/shopify/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Content-Security-Policy", "value": "frame-ancestors https://*.myshopify.com https://admin.shopify.com;" }
+      ]
+    },
+    {
+      "source": "/((?!api/shopify|en/shopify|de/shopify).*)",
       "headers": [
         { "key": "X-Frame-Options", "value": "DENY" },
         { "key": "X-Content-Type-Options", "value": "nosniff" },
@@ -53,4 +69,3 @@
     }
   ]
 }
-
