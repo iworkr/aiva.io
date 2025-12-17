@@ -204,10 +204,12 @@ export async function GET(request: NextRequest) {
       console.log('🟢 Created new Shopify store connection');
     }
 
-    // Clear cookies
-    const response = NextResponse.redirect(
-      new URL('/en/shopify/onboarding?success=installed', request.url)
-    );
+    // Clear cookies and redirect to onboarding with shop info
+    const onboardingUrl = new URL('/en/shopify/onboarding', request.url);
+    onboardingUrl.searchParams.set('success', 'installed');
+    onboardingUrl.searchParams.set('shop', shop);
+    
+    const response = NextResponse.redirect(onboardingUrl.toString());
     response.cookies.delete('shopify_nonce');
     response.cookies.delete('shopify_shop');
 
