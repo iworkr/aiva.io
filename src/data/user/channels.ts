@@ -56,6 +56,8 @@ export const createChannelConnectionAction = authActionClient
 
     if (existing) {
       // Update existing connection instead of creating duplicate
+      // CRITICAL: Reset sync_cursor to null to force a full resync
+      // This ensures we pick up all messages when reconnecting
       const { data, error } = await supabase
         .from('channel_connections')
         .update({
@@ -66,6 +68,8 @@ export const createChannelConnectionAction = authActionClient
           status: 'active',
           provider_account_name: providerAccountName,
           metadata: metadata,
+          sync_cursor: null, // Reset to force full sync on reconnection
+          last_sync_at: null, // Reset last sync time too
           updated_at: new Date().toISOString(),
         })
         .eq('id', existing.id)

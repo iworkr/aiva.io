@@ -29,6 +29,7 @@ export async function syncGmailMessages(
     maxMessages?: number;
     query?: string;
     useAdminClient?: boolean;
+    forceFullSync?: boolean; // Force List API instead of History API
   } = {},
 ) {
   try {
@@ -69,8 +70,22 @@ export async function syncGmailMessages(
     let messageIds: string[] = [];
     let newHistoryId: string | null = null;
 
+    // Check if we should force a full sync
+    // Force full sync if:
+    // 1. forceFullSync option is set
+    // 2. last_sync_at is null (never synced) or very old (> 6 hours)
+    // 3. No sync_cursor exists
+    const lastSyncAt = connection.last_sync_at ? new Date(connection.last_sync_at) : null;
+    const hoursSinceLastSync = lastSyncAt ? (Date.now() - lastSyncAt.getTime()) / (1000 * 60 * 60) : Infinity;
+    const shouldForceFullSync = options.forceFullSync || hoursSinceLastSync > 6;
+    
+    if (shouldForceFullSync && connection.sync_cursor) {
+      console.log(`📥 Forcing full sync (hours since last: ${hoursSinceLastSync.toFixed(1)}, forceFullSync: ${options.forceFullSync})`);
+    }
+
     // Try to use History API for incremental sync (much more efficient)
-    if (connection.sync_cursor && !options.query) {
+    // Skip History API if forcing full sync
+    if (connection.sync_cursor && !options.query && !shouldForceFullSync) {
       console.log("📥 Using Gmail History API for incremental sync...");
       try {
         const history = await getGmailHistory(accessToken, connection.sync_cursor, {

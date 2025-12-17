@@ -2293,23 +2293,321 @@ export type Database = {
           },
         ]
       }
+      shopify_customers: {
+        Row: {
+          accepts_marketing: boolean | null
+          accepts_marketing_updated_at: string | null
+          created_at: string | null
+          created_at_shopify: string | null
+          currency: string | null
+          default_address: Json | null
+          email: string | null
+          first_name: string | null
+          id: string
+          last_name: string | null
+          note: string | null
+          orders_count: number | null
+          phone: string | null
+          shopify_customer_id: number
+          shopify_store_id: string
+          synced_at: string | null
+          tags: string[] | null
+          tax_exempt: boolean | null
+          total_spent: number | null
+          updated_at: string | null
+          updated_at_shopify: string | null
+          verified_email: boolean | null
+          workspace_id: string
+        }
+        Insert: {
+          accepts_marketing?: boolean | null
+          accepts_marketing_updated_at?: string | null
+          created_at?: string | null
+          created_at_shopify?: string | null
+          currency?: string | null
+          default_address?: Json | null
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          note?: string | null
+          orders_count?: number | null
+          phone?: string | null
+          shopify_customer_id: number
+          shopify_store_id: string
+          synced_at?: string | null
+          tags?: string[] | null
+          tax_exempt?: boolean | null
+          total_spent?: number | null
+          updated_at?: string | null
+          updated_at_shopify?: string | null
+          verified_email?: boolean | null
+          workspace_id: string
+        }
+        Update: {
+          accepts_marketing?: boolean | null
+          accepts_marketing_updated_at?: string | null
+          created_at?: string | null
+          created_at_shopify?: string | null
+          currency?: string | null
+          default_address?: Json | null
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          note?: string | null
+          orders_count?: number | null
+          phone?: string | null
+          shopify_customer_id?: number
+          shopify_store_id?: string
+          synced_at?: string | null
+          tags?: string[] | null
+          tax_exempt?: boolean | null
+          total_spent?: number | null
+          updated_at?: string | null
+          updated_at_shopify?: string | null
+          verified_email?: boolean | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopify_customers_shopify_store_id_fkey"
+            columns: ["shopify_store_id"]
+            isOneToOne: false
+            referencedRelation: "shopify_stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopify_customers_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shopify_orders: {
+        Row: {
+          billing_address: Json | null
+          cancelled_at: string | null
+          closed_at: string | null
+          created_at: string | null
+          created_at_shopify: string | null
+          currency: string | null
+          customer_name: string | null
+          discount_codes: Json | null
+          email: string | null
+          financial_status: string | null
+          fulfillment_status: string | null
+          id: string
+          line_items: Json | null
+          name: string | null
+          note: string | null
+          order_number: string | null
+          processed_at: string | null
+          shipping_address: Json | null
+          shopify_order_id: number
+          shopify_store_id: string
+          subtotal_price: number | null
+          synced_at: string | null
+          tags: string | null
+          total_discounts: number | null
+          total_price: number | null
+          total_tax: number | null
+          updated_at: string | null
+          updated_at_shopify: string | null
+          workspace_id: string
+        }
+        Insert: {
+          billing_address?: Json | null
+          cancelled_at?: string | null
+          closed_at?: string | null
+          created_at?: string | null
+          created_at_shopify?: string | null
+          currency?: string | null
+          customer_name?: string | null
+          discount_codes?: Json | null
+          email?: string | null
+          financial_status?: string | null
+          fulfillment_status?: string | null
+          id?: string
+          line_items?: Json | null
+          name?: string | null
+          note?: string | null
+          order_number?: string | null
+          processed_at?: string | null
+          shipping_address?: Json | null
+          shopify_order_id: number
+          shopify_store_id: string
+          subtotal_price?: number | null
+          synced_at?: string | null
+          tags?: string | null
+          total_discounts?: number | null
+          total_price?: number | null
+          total_tax?: number | null
+          updated_at?: string | null
+          updated_at_shopify?: string | null
+          workspace_id: string
+        }
+        Update: {
+          billing_address?: Json | null
+          cancelled_at?: string | null
+          closed_at?: string | null
+          created_at?: string | null
+          created_at_shopify?: string | null
+          currency?: string | null
+          customer_name?: string | null
+          discount_codes?: Json | null
+          email?: string | null
+          financial_status?: string | null
+          fulfillment_status?: string | null
+          id?: string
+          line_items?: Json | null
+          name?: string | null
+          note?: string | null
+          order_number?: string | null
+          processed_at?: string | null
+          shipping_address?: Json | null
+          shopify_order_id?: number
+          shopify_store_id?: string
+          subtotal_price?: number | null
+          synced_at?: string | null
+          tags?: string | null
+          total_discounts?: number | null
+          total_price?: number | null
+          total_tax?: number | null
+          updated_at?: string | null
+          updated_at_shopify?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopify_orders_shopify_store_id_fkey"
+            columns: ["shopify_store_id"]
+            isOneToOne: false
+            referencedRelation: "shopify_stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopify_orders_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shopify_products: {
+        Row: {
+          body_html: string | null
+          created_at: string | null
+          created_at_shopify: string | null
+          handle: string | null
+          id: string
+          images: Json | null
+          options: Json | null
+          product_type: string | null
+          published_at: string | null
+          shopify_product_id: number
+          shopify_store_id: string
+          status: string | null
+          synced_at: string | null
+          tags: string[] | null
+          template_suffix: string | null
+          title: string
+          updated_at: string | null
+          updated_at_shopify: string | null
+          variants: Json | null
+          vendor: string | null
+          workspace_id: string
+        }
+        Insert: {
+          body_html?: string | null
+          created_at?: string | null
+          created_at_shopify?: string | null
+          handle?: string | null
+          id?: string
+          images?: Json | null
+          options?: Json | null
+          product_type?: string | null
+          published_at?: string | null
+          shopify_product_id: number
+          shopify_store_id: string
+          status?: string | null
+          synced_at?: string | null
+          tags?: string[] | null
+          template_suffix?: string | null
+          title: string
+          updated_at?: string | null
+          updated_at_shopify?: string | null
+          variants?: Json | null
+          vendor?: string | null
+          workspace_id: string
+        }
+        Update: {
+          body_html?: string | null
+          created_at?: string | null
+          created_at_shopify?: string | null
+          handle?: string | null
+          id?: string
+          images?: Json | null
+          options?: Json | null
+          product_type?: string | null
+          published_at?: string | null
+          shopify_product_id?: number
+          shopify_store_id?: string
+          status?: string | null
+          synced_at?: string | null
+          tags?: string[] | null
+          template_suffix?: string | null
+          title?: string
+          updated_at?: string | null
+          updated_at_shopify?: string | null
+          variants?: Json | null
+          vendor?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopify_products_shopify_store_id_fkey"
+            columns: ["shopify_store_id"]
+            isOneToOne: false
+            referencedRelation: "shopify_stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopify_products_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shopify_stores: {
         Row: {
           access_token: string
           country_code: string | null
           created_at: string | null
           currency: string | null
+          customers_sync_cursor: string | null
           id: string
           installed_at: string | null
           is_active: boolean | null
+          last_customers_sync_at: string | null
+          last_orders_sync_at: string | null
+          last_products_sync_at: string | null
           link_method: Database["public"]["Enums"]["shopify_link_method"] | null
           linked_user_id: string | null
+          orders_sync_cursor: string | null
+          products_sync_cursor: string | null
           scopes: string[] | null
           shop_domain: string
           shop_email: string | null
           shop_name: string | null
           shop_owner: string | null
           shop_plan: string | null
+          sync_enabled: boolean | null
           timezone: string | null
           uninstalled_at: string | null
           updated_at: string | null
@@ -2320,19 +2618,26 @@ export type Database = {
           country_code?: string | null
           created_at?: string | null
           currency?: string | null
+          customers_sync_cursor?: string | null
           id?: string
           installed_at?: string | null
           is_active?: boolean | null
+          last_customers_sync_at?: string | null
+          last_orders_sync_at?: string | null
+          last_products_sync_at?: string | null
           link_method?:
             | Database["public"]["Enums"]["shopify_link_method"]
             | null
           linked_user_id?: string | null
+          orders_sync_cursor?: string | null
+          products_sync_cursor?: string | null
           scopes?: string[] | null
           shop_domain: string
           shop_email?: string | null
           shop_name?: string | null
           shop_owner?: string | null
           shop_plan?: string | null
+          sync_enabled?: boolean | null
           timezone?: string | null
           uninstalled_at?: string | null
           updated_at?: string | null
@@ -2343,19 +2648,26 @@ export type Database = {
           country_code?: string | null
           created_at?: string | null
           currency?: string | null
+          customers_sync_cursor?: string | null
           id?: string
           installed_at?: string | null
           is_active?: boolean | null
+          last_customers_sync_at?: string | null
+          last_orders_sync_at?: string | null
+          last_products_sync_at?: string | null
           link_method?:
             | Database["public"]["Enums"]["shopify_link_method"]
             | null
           linked_user_id?: string | null
+          orders_sync_cursor?: string | null
+          products_sync_cursor?: string | null
           scopes?: string[] | null
           shop_domain?: string
           shop_email?: string | null
           shop_name?: string | null
           shop_owner?: string | null
           shop_plan?: string | null
+          sync_enabled?: boolean | null
           timezone?: string | null
           uninstalled_at?: string | null
           updated_at?: string | null
@@ -2364,6 +2676,72 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "shopify_stores_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shopify_sync_logs: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          duration_ms: number | null
+          error_message: string | null
+          errors: Json | null
+          id: string
+          records_created: number | null
+          records_synced: number | null
+          records_updated: number | null
+          shopify_store_id: string
+          started_at: string | null
+          status: string | null
+          sync_type: string
+          workspace_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          error_message?: string | null
+          errors?: Json | null
+          id?: string
+          records_created?: number | null
+          records_synced?: number | null
+          records_updated?: number | null
+          shopify_store_id: string
+          started_at?: string | null
+          status?: string | null
+          sync_type: string
+          workspace_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          error_message?: string | null
+          errors?: Json | null
+          id?: string
+          records_created?: number | null
+          records_synced?: number | null
+          records_updated?: number | null
+          shopify_store_id?: string
+          started_at?: string | null
+          status?: string | null
+          sync_type?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopify_sync_logs_shopify_store_id_fkey"
+            columns: ["shopify_store_id"]
+            isOneToOne: false
+            referencedRelation: "shopify_stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopify_sync_logs_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"

@@ -9,6 +9,7 @@ import { createSupabaseUserServerActionClient } from "@/supabase-clients/user/cr
 import { supabaseAdminClient } from "@/supabase-clients/admin/supabaseAdminClient";
 import { OpenAI } from "openai";
 import { verifySchedulingConfirmation, isSchedulingConfirmation, CalendarVerificationResult } from './calendar-verifier';
+import { getCustomerOrderHistory, formatCustomerHistoryForAI } from '@/lib/shopify/context';
 
 // Lazy-load OpenAI client to avoid crashes on missing API key
 let openaiClient: OpenAI | null = null;
@@ -212,6 +213,7 @@ export async function generateReplyDraft(
     // Prepare conversation context and count previous interactions
     let conversationContext = "";
     let previousInteractionCount = 0;
+    let shopifyCustomerContext = "";
     
     // Count previous interactions with this sender
     const { count: interactionCount } = await supabase
@@ -221,6 +223,25 @@ export async function generateReplyDraft(
       .eq("sender_email", message.sender_email);
     
     previousInteractionCount = interactionCount || 0;
+
+    // Fetch Shopify customer order history if sender email exists
+    if (message.sender_email) {
+      try {
+        const customerHistory = await getCustomerOrderHistory(
+          workspaceId,
+          message.sender_email,
+          { useAdminClient: options.useAdminClient }
+        );
+        
+        if (customerHistory.orderCount > 0) {
+          shopifyCustomerContext = formatCustomerHistoryForAI(customerHistory);
+          console.log("[AI Reply] Found Shopify customer with", customerHistory.orderCount, "orders");
+        }
+      } catch (shopifyError) {
+        console.warn("[AI Reply] Failed to fetch Shopify context:", shopifyError);
+        // Don't block on Shopify errors, just continue without context
+      }
+    }
 
     if (message.provider_thread_id) {
       // Get previous messages in thread
@@ -250,6 +271,7 @@ Body:
 ${message.body}
 
 ${conversationContext ? `\n\nConversation Context:\n${conversationContext}` : ""}
+${shopifyCustomerContext ? `\n\n${shopifyCustomerContext}` : ""}
 ${context ? `\n\nAdditional Context: ${context}` : ""}
 
 REQUIREMENTS:
@@ -323,6 +345,8 @@ CRITICAL: Confidence scores must be realistic and varied:
 - Use 0.70-0.89 for standard business replies with clear context
 - Use 0.50-0.69 for ambiguous situations or sensitive topics
 - Use below 0.50 when unsure about appropriate response
+
+${shopifyCustomerContext ? `SHOPIFY CONTEXT: When the sender is a known Shopify customer, you can reference their order history to provide personalized responses. Mention specific order numbers, products, or purchase dates when relevant to the inquiry.` : ""}
 
 Be honest about uncertainty. Don't default to high confidence.
 IMPORTANT: Always return valid, complete JSON. Keep replies concise.`,

@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { connectionId, workspaceId, maxMessages, query } = body;
+    const { connectionId, workspaceId, maxMessages, query, forceFullSync, resetSyncCursor } = body;
 
     if (!connectionId || !workspaceId) {
       return NextResponse.json(
@@ -61,6 +61,25 @@ export async function POST(request: NextRequest) {
         { error: 'You do not have permission to sync this connection' },
         { status: 403 }
       );
+    }
+
+    // If resetSyncCursor is requested, clear the sync_cursor to force a full resync
+    if (resetSyncCursor) {
+      console.log(`🔄 Resetting sync_cursor for connection ${connectionId} to force full resync`);
+      const { error: updateError } = await supabase
+        .from('channel_connections')
+        .update({ 
+          sync_cursor: null, 
+          last_sync_at: null,
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', connectionId);
+      
+      if (updateError) {
+        console.error('Failed to reset sync_cursor:', updateError);
+      } else {
+        console.log(`✅ Sync cursor reset for ${connectionId}`);
+      }
     }
 
     // Use universal sync orchestrator

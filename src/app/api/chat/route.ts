@@ -3,10 +3,11 @@
  * Handles AI chat queries for workspace context
  */
 
+import { formatShopifyContextForAI, getShopifyContextForWorkspace } from '@/lib/shopify/context';
+import { createSupabaseUserServerComponentClient } from '@/supabase-clients/user/createSupabaseUserServerComponentClient';
 import { openai } from '@ai-sdk/openai';
 import { streamText } from 'ai';
 import { NextRequest } from 'next/server';
-import { createSupabaseUserServerComponentClient } from '@/supabase-clients/user/createSupabaseUserServerComponentClient';
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,8 +41,8 @@ export async function POST(req: NextRequest) {
       .eq('id', workspaceMembers.workspace_id)
       .single();
 
-    // Get recent messages and events for context
-    const [messagesResult, eventsResult] = await Promise.all([
+    // Get recent messages, events, and Shopify context
+    const [messagesResult, eventsResult, shopifyContext] = await Promise.all([
       supabase
         .from('messages')
         .select('id, subject, sender_name, sender_email, body, priority, created_at')
@@ -56,10 +57,15 @@ export async function POST(req: NextRequest) {
         .gte('start_time', new Date().toISOString())
         .order('start_time', { ascending: true })
         .limit(10),
+      // Fetch Shopify context for this workspace (if connected)
+      getShopifyContextForWorkspace(workspaceMembers.workspace_id),
     ]);
 
     const recentMessages = messagesResult.data || [];
     const upcomingEvents = eventsResult.data || [];
+    
+    // Format Shopify context for AI
+    const shopifyContextStr = formatShopifyContextForAI(shopifyContext);
 
     // Parse request
     const { messages } = await req.json();
@@ -81,13 +87,14 @@ export async function POST(req: NextRequest) {
 
     const systemPrompt = `You are Aiva, an AI assistant for ${workspace?.name || 'the workspace'}.
 
-Your role is to help users manage their communication and schedule. You have access to:
+Your role is to help users manage their communication, schedule, and e-commerce operations. You have access to:
 
-Recent Unread Messages:
+## Recent Unread Messages
 ${contextMessages || 'No unread messages'}
 
-Upcoming Events:
+## Upcoming Events
 ${contextEvents || 'No upcoming events'}
+${shopifyContextStr}
 
 You can help with:
 - Answering questions about messages and events
@@ -95,8 +102,11 @@ You can help with:
 - Providing insights about priorities
 - Helping with search queries
 - General assistance with the workspace
+${shopifyContext.hasStore ? `- Shopify store insights (orders, customers, products)
+- E-commerce questions and order status
+- Customer history and purchase patterns` : ''}
 
-Be helpful, concise, and focus on actionable information. When relevant, reference specific messages or events by their subject/title.`;
+Be helpful, concise, and focus on actionable information. When relevant, reference specific messages, events, or Shopify data by their identifiers.`;
 
     const result = streamText({
       model: openai('gpt-4o-mini'),
