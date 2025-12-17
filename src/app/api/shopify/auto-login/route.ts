@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { verifyLinkToken } from '@/lib/shopify/tokens';
 import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
-import { createServerClient } from '@supabase/ssr';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,18 +8,21 @@ export const dynamic = 'force-dynamic';
  * Auto-login endpoint for returning Shopify users
  * 
  * Flow:
- * 1. Verify the link token
+ * 1. Verify the link token (contains shop domain)
  * 2. Look up the linked user from the shopify_stores table
- * 3. Create a session for that user
- * 4. Redirect to dashboard
+ * 3. Generate a magic link for instant login
+ * 4. Redirect directly to the magic link URL (which logs them in)
  */
 export async function GET(request: NextRequest) {
+  const appUrl = process.env.SHOPIFY_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://www.tryaiva.io';
+  
   try {
     const token = request.nextUrl.searchParams.get('token');
     const host = request.nextUrl.searchParams.get('host') || '';
     
     if (!token) {
-      return NextResponse.redirect(new URL('/login?error=missing_token', request.url));
+      console.error('Auto-login: Missing token');
+      return NextResponse.redirect(new URL('/en/login?error=missing_token', appUrl));
     }
     
     // Verify token
@@ -29,24 +30,24 @@ export async function GET(request: NextRequest) {
     try {
       tokenData = verifyLinkToken(token);
     } catch (error) {
-      console.error('Token verification failed:', error);
-      // Token expired or invalid - redirect to link page
-      return NextResponse.redirect(new URL('/login?error=session_expired', request.url));
+      console.error('Auto-login: Token verification failed:', error);
+      return NextResponse.redirect(new URL('/en/login?error=session_expired', appUrl));
     }
     
     const { shop } = tokenData;
+    console.log('Auto-login: Processing for shop:', shop);
     
     // Get the linked user for this shop
     const { data: shopData, error: shopError } = await supabaseAdminClient
       .from('shopify_stores')
-      .select('linked_user_id')
+      .select('linked_user_id, shop_email')
       .eq('shop_domain', shop)
       .eq('is_active', true)
       .single();
     
     if (shopError || !shopData?.linked_user_id) {
-      console.error('Shop not found or not linked:', shopError);
-      return NextResponse.redirect(new URL(`/shopify/link?token=${token}`, request.url));
+      console.error('Auto-login: Shop not found or not linked:', shopError);
+      return NextResponse.redirect(new URL(`/en/shopify/onboarding?shop=${shop}`, appUrl));
     }
     
     // Get the user's email
@@ -55,40 +56,37 @@ export async function GET(request: NextRequest) {
     );
     
     if (userError || !userData?.user?.email) {
-      console.error('User not found:', userError);
-      return NextResponse.redirect(new URL('/login?error=user_not_found', request.url));
+      console.error('Auto-login: User not found:', userError);
+      return NextResponse.redirect(new URL('/en/login?error=user_not_found', appUrl));
     }
     
+    const userEmail = userData.user.email;
+    console.log('Auto-login: Generating magic link for:', userEmail);
+    
     // Generate a magic link for instant login
+    const dashboardUrl = `${appUrl}/en/dashboard?from=shopify&shop=${shop}`;
+    
     const { data: linkData, error: linkError } = await supabaseAdminClient.auth.admin.generateLink({
       type: 'magiclink',
-      email: userData.user.email,
+      email: userEmail,
       options: {
-        redirectTo: `${process.env.SHOPIFY_APP_URL || 'https://www.tryaiva.io'}/dashboard?from=shopify`,
+        redirectTo: dashboardUrl,
       },
     });
     
-    if (linkError || !linkData?.properties?.hashed_token) {
-      console.error('Failed to generate magic link:', linkError);
-      return NextResponse.redirect(new URL('/login?error=auth_failed', request.url));
+    if (linkError || !linkData?.properties?.action_link) {
+      console.error('Auto-login: Failed to generate magic link:', linkError);
+      // Fallback: redirect to login with email prefilled
+      return NextResponse.redirect(new URL(`/en/login?email=${encodeURIComponent(userEmail)}&from=shopify`, appUrl));
     }
     
-    // Extract the token from the magic link and redirect to verify endpoint
-    const magicLinkUrl = new URL(linkData.properties.action_link);
-    const verifyUrl = new URL('/auth/v1/verify', process.env.SHOPIFY_APP_URL || 'https://www.tryaiva.io');
+    console.log('Auto-login: Redirecting to magic link for instant login');
     
-    // Copy over all the params from the magic link
-    magicLinkUrl.searchParams.forEach((value, key) => {
-      verifyUrl.searchParams.set(key, value);
-    });
+    // Redirect directly to the magic link - this logs them in!
+    return NextResponse.redirect(linkData.properties.action_link);
     
-    // Add our redirect
-    verifyUrl.searchParams.set('redirect_to', '/dashboard?from=shopify');
-    
-    return NextResponse.redirect(verifyUrl.toString());
   } catch (error) {
     console.error('Auto-login error:', error);
-    return NextResponse.redirect(new URL('/login?error=auto_login_failed', request.url));
+    return NextResponse.redirect(new URL('/en/login?error=auto_login_failed', appUrl));
   }
 }
-
