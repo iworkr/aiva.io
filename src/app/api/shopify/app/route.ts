@@ -18,17 +18,25 @@ const COLORS = {
   grayLight: '#f1f5f9',
 };
 
-// Inline SVG of the Aiva checkmark logo
+// Inline SVG of the Aiva logo - thick rounded V shape with cyan-blue gradient
 const AIVA_LOGO_SVG = `
 <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">
   <defs>
-    <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#00E5FF"/>
-      <stop offset="50%" style="stop-color:#00B8D4"/>
-      <stop offset="100%" style="stop-color:#2196F3"/>
+    <linearGradient id="aiva-left" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F5FF"/>
+      <stop offset="50%" stop-color="#00E0FF"/>
+      <stop offset="100%" stop-color="#00C8E0"/>
+    </linearGradient>
+    <linearGradient id="aiva-right" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00D0E8"/>
+      <stop offset="50%" stop-color="#1E90FF"/>
+      <stop offset="100%" stop-color="#2080F0"/>
     </linearGradient>
   </defs>
-  <path d="M82 25 C84 23 87 23 89 25 C91 27 91 30 89 32 L48 78 C46 80 43 80 41 78 L11 53 C9 51 9 48 11 46 C13 44 16 44 18 46 L44 68 L82 25 Z" fill="url(#logoGrad)" />
+  <!-- Left arm - shorter, going up-left from center -->
+  <path d="M8 22 C4 18 6 12 12 12 L22 12 C26 12 30 14 32 18 L48 62 L42 72 L14 26 C12 22 10 24 8 22 Z" fill="url(#aiva-left)"/>
+  <!-- Right arm - longer, going up-right from center -->
+  <path d="M42 72 L48 62 L80 10 C82 6 86 4 90 4 C94 4 96 8 94 12 L56 74 C52 80 46 80 42 72 Z" fill="url(#aiva-right)"/>
 </svg>
 `;
 
