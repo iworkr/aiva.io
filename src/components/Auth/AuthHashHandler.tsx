@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createSupabaseUserClient } from '@/supabase-clients/user/createSupabaseUserClient';
+import { supabaseUserClientComponent } from '@/supabase-clients/user/supabaseUserClientComponent';
 
 /**
  * This component handles Supabase auth tokens that come in the URL hash.
@@ -26,7 +26,7 @@ export function AuthHashHandler() {
     if (hash && (hash.includes('access_token') || hash.includes('type=magiclink'))) {
       console.log('🔐 Auth hash detected, processing...');
       
-      const supabase = createSupabaseUserClient();
+      const supabase = supabaseUserClientComponent;
       
       // Supabase client will automatically detect and process the hash tokens
       // We just need to wait for it and then redirect
