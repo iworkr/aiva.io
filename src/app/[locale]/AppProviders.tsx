@@ -1,5 +1,6 @@
 "use client";
 import { PHProvider } from "@/contexts/PostHogProvider";
+import { AuthHashHandler } from "@/components/Auth/AuthHashHandler";
 import {
   QueryClient,
   QueryClientProvider,
@@ -108,6 +109,7 @@ export function AppProviders({
               shallowRouting
             />
             <CustomerToaster />
+            <AuthHashHandler />
             {process.env.NEXT_PUBLIC_POSTHOG_API_KEY && <PostHogPageView />}
           </Suspense>
         </QueryClientProvider>
