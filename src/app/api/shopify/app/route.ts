@@ -92,9 +92,188 @@ export async function GET(request: NextRequest) {
     return renderLinkingPage(shop, host, apiKey, linkUrl.toString());
   }
   
-  // Shop not found - redirect to OAuth
-  const authUrl = `${appUrl}/api/shopify/auth?shop=${shop}`;
-  return NextResponse.redirect(authUrl);
+  // Shop not found - show reinstall message (OAuth can't work in iframe)
+  return renderReinstallPage(shop, host, apiKey, appUrl);
+}
+
+function renderReinstallPage(
+  shop: string,
+  host: string,
+  apiKey: string,
+  appUrl: string
+): NextResponse {
+  const shopDisplayName = shop.replace('.myshopify.com', '');
+  const installUrl = `${appUrl}/api/shopify/auth?shop=${shop}`;
+  
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Aiva - Setup Required</title>
+  <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: ${COLORS.grayLight};
+    }
+    .card {
+      background: ${COLORS.white};
+      border-radius: 20px;
+      box-shadow: 0 8px 32px rgba(15, 23, 42, 0.1);
+      max-width: 420px;
+      width: 92%;
+      overflow: hidden;
+      text-align: center;
+    }
+    .header {
+      background: ${COLORS.navy};
+      padding: 36px 32px;
+      position: relative;
+    }
+    .header::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: ${COLORS.gradient};
+    }
+    .logo-box {
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 20px;
+      background: ${COLORS.white};
+      border-radius: 16px;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .header h1 {
+      color: ${COLORS.white};
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .header p {
+      color: ${COLORS.gray};
+      font-size: 14px;
+    }
+    .content {
+      padding: 32px;
+    }
+    .icon-warning {
+      width: 64px;
+      height: 64px;
+      background: #fef3c7;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 32px;
+    }
+    h2 {
+      color: ${COLORS.navy};
+      font-size: 20px;
+      margin-bottom: 12px;
+    }
+    p {
+      color: ${COLORS.gray};
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 16px 24px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 16px;
+      text-align: center;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: ${COLORS.gradient};
+      color: ${COLORS.white};
+      box-shadow: 0 4px 14px rgba(0, 212, 255, 0.35);
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 212, 255, 0.45);
+    }
+    .note {
+      margin-top: 16px;
+      font-size: 12px;
+      color: ${COLORS.gray};
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="logo-box">${AIVA_LOGO_SVG}</div>
+      <h1>Aiva AI Inbox</h1>
+      <p>Your intelligent communication assistant</p>
+    </div>
+    
+    <div class="content">
+      <div class="icon-warning">⚠️</div>
+      <h2>Setup Required</h2>
+      <p>
+        Your store <strong>${shopDisplayName}</strong> needs to complete the Aiva setup. 
+        Click below to authorize the connection.
+      </p>
+      
+      <button class="btn" id="setupBtn">Complete Setup →</button>
+      <p class="note">Opens authorization in a new tab</p>
+    </div>
+  </div>
+  
+  <script>
+    (function() {
+      var installUrl = '${installUrl}';
+      var btn = document.getElementById('setupBtn');
+      
+      btn.addEventListener('click', function() {
+        try {
+          var AppBridge = window['app-bridge'];
+          if (AppBridge && AppBridge.createApp) {
+            var app = AppBridge.createApp({
+              apiKey: '${apiKey}',
+              host: '${host}',
+            });
+            var Redirect = AppBridge.actions.Redirect;
+            if (Redirect) {
+              var redirect = Redirect.create(app);
+              redirect.dispatch(Redirect.Action.REMOTE, installUrl);
+              return;
+            }
+          }
+        } catch (e) {
+          console.log('App Bridge error:', e);
+        }
+        window.open(installUrl, '_blank');
+      });
+    })();
+  </script>
+</body>
+</html>`;
+  
+  return new NextResponse(html, {
+    headers: {
+      'Content-Type': 'text/html',
+      'Content-Security-Policy': "frame-ancestors https://*.myshopify.com https://admin.shopify.com;",
+    },
+  });
 }
 
 function renderDashboardPage(
