@@ -4,10 +4,10 @@
  * This endpoint handles the "Continue with Shopify" flow:
  * 1. Creates a new Aiva account using the Shopify store owner's email
  * 2. Links the Shopify store to the new account
- * 3. Sends a magic link for passwordless login
+ * 3. Returns a magic link URL for INSTANT login (no email needed!)
  * 
- * If an account already exists with that email, it just sends a magic link
- * and links the store to that existing account.
+ * Since the user is already authenticated with Shopify (which verified their email),
+ * we can safely auto-login them by generating a magic link and redirecting to it.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -107,7 +107,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate magic link for login
+    // Generate magic link for INSTANT login (no email needed!)
+    // Since Shopify has already verified the user's identity, we can auto-login
     const appUrl = process.env.SHOPIFY_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://www.tryaiva.io';
     const redirectUrl = `${appUrl}/en/dashboard?from=shopify&shop=${shopDomain}&linked=true`;
 
@@ -119,65 +120,28 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (magicLinkError) {
+    if (magicLinkError || !magicLinkData?.properties?.action_link) {
       console.error('Failed to generate magic link:', magicLinkError);
-      // Don't fail the whole request, the account is created/linked
-      // User can still log in manually
-    }
-
-    // Send the magic link email
-    if (magicLinkData?.properties?.action_link) {
-      // The admin.generateLink doesn't send an email, we need to use signInWithOtp
-      // But we can't do that server-side. We'll use a different approach.
-      // Actually, let's use the email service if configured, or fall back to manual
-      
-      // For now, let's use Supabase's built-in email by triggering signInWithOtp
-      // through the admin client
-      const { error: otpError } = await supabaseAdminClient.auth.admin.generateLink({
-        type: 'magiclink', 
-        email,
-        options: {
-          redirectTo: redirectUrl,
-        }
+      // Fallback: redirect to login page with context
+      return NextResponse.json({
+        success: true,
+        accountExists,
+        userId,
+        redirectUrl: `/en/login?from=shopify&shop=${shopDomain}&email=${encodeURIComponent(email)}`,
+        message: 'Account linked! Please log in to continue.',
       });
-      
-      if (otpError) {
-        console.log('Note: Magic link generation returned:', otpError);
-      }
     }
 
-    // Trigger actual email send using the regular auth flow
-    // This uses Supabase's email templates
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    
-    const emailResponse = await fetch(`${supabaseUrl}/auth/v1/otp`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': supabaseAnonKey,
-      },
-      body: JSON.stringify({
-        email,
-        options: {
-          emailRedirectTo: redirectUrl,
-        }
-      }),
-    });
-
-    if (!emailResponse.ok) {
-      const emailError = await emailResponse.text();
-      console.error('Failed to send OTP email:', emailError);
-      // Still return success - account is created/linked
-    }
-
+    // Return the magic link URL - client will redirect to this for instant login!
     return NextResponse.json({
       success: true,
       accountExists,
       userId,
+      // This is the magic link that logs them in immediately
+      loginUrl: magicLinkData.properties.action_link,
       message: accountExists 
-        ? 'Login link sent to your email' 
-        : 'Account created! Check your email to complete setup',
+        ? 'Welcome back! Logging you in...' 
+        : 'Account created! Logging you in...',
     });
 
   } catch (error) {
@@ -188,4 +152,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

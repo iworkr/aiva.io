@@ -69,18 +69,20 @@ export default function ShopifyLinkPage() {
     verifyToken();
   }, [token]);
 
-  // Handle "Continue with Shopify" - creates/links account using Shopify email
+  // Handle "Continue with Shopify" - creates/links account and auto-logs in
   async function handleContinueWithShopify() {
-    if (!token || !shopData) return;
+    if (!shopData) return;
 
     setLinking(true);
     try {
-      const response = await fetch("/api/shopify/link", {
+      // Use the create-account endpoint which returns an instant login URL
+      const response = await fetch("/api/shopify/create-account", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          token,
-          linkMethod: "shopify",
+          shopDomain: shopData.shop,
+          email: shopData.email,
+          name: shopData.ownerName || shopData.shopName,
         }),
       });
 
@@ -90,12 +92,21 @@ export default function ShopifyLinkPage() {
         throw new Error(data.error || "Failed to link account");
       }
 
-      toast.success("Account linked successfully!");
+      toast.success(data.message || "Account linked successfully!");
+
+      // Redirect to the magic link for instant login
+      if (data.loginUrl) {
+        setTimeout(() => {
+          window.location.href = data.loginUrl;
+        }, 500);
+        return;
+      }
+
+      // Fallback
       router.push("/dashboard?from=shopify");
     } catch (err) {
       console.error("Shopify link error:", err);
       toast.error(err instanceof Error ? err.message : "Failed to link account");
-    } finally {
       setLinking(false);
     }
   }

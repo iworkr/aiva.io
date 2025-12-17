@@ -3,9 +3,24 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Check, Loader2, Mail, MessageSquare, ShoppingBag, Sparkles, Store, User } from 'lucide-react';
+import { ArrowRight, Check, Loader2, Mail, MessageSquare, ShoppingBag, Sparkles, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+
+// Shopify "S" bag icon
+function ShopifyIcon({ className }: { className?: string }) {
+  return (
+    <svg 
+      className={className} 
+      viewBox="0 0 24 24" 
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M15.34 3.55c-.06-.34-.32-.53-.54-.57-.21-.04-4.6-.33-4.6-.33s-3.06-3.03-3.4-3.37c-.34-.34-.99-.23-.99-.23L4.2 0s-.5.14-.76.26c-.83.37-1.4 1.06-1.62 2.02L0 15.89s-.04.37.16.57c.2.2.55.21.55.21l4.38 1.1s.25.07.42-.02c.17-.09.28-.32.28-.32l.84-3.36s4.76 1.17 5.59 1.37c.83.2 1.57-.19 1.78-.9.2-.7 2.18-8.89 2.34-9.99z"/>
+      <path d="M10.5 7.87l-.83 2.55s-.77-.36-1.7-.3c-1.37.1-1.38.95-1.37 1.17.07 1.23 3.32 1.5 3.5 4.4.14 2.28-1.21 3.85-3.16 3.97-2.34.15-3.63-1.23-3.63-1.23l.5-2.12s1.27.96 2.29.9c.67-.04.91-.59.88-1.01-.1-1.61-2.74-1.51-2.9-4.17-.13-2.24 1.33-4.51 4.58-4.71 1.25-.08 1.84.24 1.84.24z" fill="white"/>
+    </svg>
+  );
+}
 
 interface OnboardingContentProps {
   shopDomain: string | null;
@@ -29,7 +44,7 @@ export function OnboardingContent({
   const [accountCreated, setAccountCreated] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
 
-  // Handle "Continue with Shopify" - creates account with Shopify email
+  // Handle "Continue with Shopify" - creates account and auto-logs in
   const handleContinueWithShopify = async () => {
     if (!shopDomain || !shopEmail) {
       toast.error('Missing shop information. Please reinstall the app.');
@@ -55,24 +70,29 @@ export function OnboardingContent({
         throw new Error(data.error || 'Failed to create account');
       }
 
-      if (data.accountExists) {
-        // Account already exists - send magic link
-        setMagicLinkSent(true);
-        toast.success('Check your email!', {
-          description: `A login link has been sent to ${shopEmail}`,
-        });
-      } else {
-        // New account created
-        setAccountCreated(true);
-        setMagicLinkSent(true);
-        toast.success('Account created!', {
-          description: `Check ${shopEmail} to complete setup`,
-        });
+      // Show success message
+      toast.success(data.message || 'Success!');
+
+      // If we got a loginUrl (magic link), redirect to it for instant login!
+      if (data.loginUrl) {
+        // Small delay to show the toast
+        setTimeout(() => {
+          window.location.href = data.loginUrl;
+        }, 500);
+        return;
       }
+
+      // Fallback: redirect to provided URL or login page
+      if (data.redirectUrl) {
+        router.push(data.redirectUrl);
+        return;
+      }
+
+      // Last resort: show magic link sent message
+      setMagicLinkSent(true);
     } catch (error) {
       console.error('Error creating account:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to create account');
-    } finally {
       setIsCreatingAccount(false);
     }
   };
@@ -222,7 +242,7 @@ export function OnboardingContent({
             </div>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Store className="h-5 w-5" />
+                <ShopifyIcon className="h-5 w-5 text-[#95BF47]" />
                 Continue with Shopify
               </CardTitle>
               <CardDescription>
@@ -265,8 +285,8 @@ export function OnboardingContent({
                   </>
                 ) : (
                   <>
+                    <ShopifyIcon className="mr-2 h-5 w-5" />
                     Continue with Shopify
-                    <ArrowRight className="ml-2 h-4 w-4" />
                   </>
                 )}
               </Button>
