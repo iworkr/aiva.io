@@ -4,14 +4,15 @@
  * This endpoint handles the "Continue with Shopify" flow:
  * 1. Creates a new Aiva account using the Shopify store owner's email
  * 2. Links the Shopify store to the new account
- * 3. Returns a magic link URL for INSTANT login (no email needed!)
+ * 3. Returns a URL to /api/shopify/session for server-side login (no hash tokens!)
  * 
  * Since the user is already authenticated with Shopify (which verified their email),
- * we can safely auto-login them by generating a magic link and redirecting to it.
+ * we can safely auto-login them by creating a server-side session.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
+import { generateLinkToken } from '@/lib/shopify/tokens';
 
 export const dynamic = 'force-dynamic';
 
@@ -107,22 +108,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate magic link for INSTANT login (no email needed!)
-    // Since Shopify has already verified the user's identity, we can auto-login
+    // Generate a secure token for server-side session creation
+    // This avoids the unreliable hash token approach
     const appUrl = process.env.SHOPIFY_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://www.tryaiva.io';
-    const redirectUrl = `${appUrl}/en/dashboard?from=shopify&shop=${shopDomain}&linked=true`;
+    
+    // Get the shop's access token to generate a link token
+    const { data: shopWithToken } = await supabaseAdminClient
+      .from('shopify_stores')
+      .select('access_token')
+      .eq('shop_domain', shopDomain)
+      .single();
 
-    const { data: magicLinkData, error: magicLinkError } = await supabaseAdminClient.auth.admin.generateLink({
-      type: 'magiclink',
-      email,
-      options: {
-        redirectTo: redirectUrl,
-      },
-    });
-
-    if (magicLinkError || !magicLinkData?.properties?.action_link) {
-      console.error('Failed to generate magic link:', magicLinkError);
-      // Fallback: redirect to login page with context
+    if (!shopWithToken?.access_token) {
+      console.error('Shop access token not found');
       return NextResponse.json({
         success: true,
         accountExists,
@@ -132,13 +130,22 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Return the magic link URL - client will redirect to this for instant login!
+    // Generate link token for secure session creation
+    const token = generateLinkToken(shopDomain, shopWithToken.access_token);
+    
+    // Build URL to server-side session endpoint (same as auto-login uses)
+    const sessionUrl = new URL('/api/shopify/session', appUrl);
+    sessionUrl.searchParams.set('shop', shopDomain);
+    sessionUrl.searchParams.set('token', token);
+    sessionUrl.searchParams.set('redirectTo', '/en/dashboard?from=shopify&linked=true');
+
+    // Return the session URL - client will redirect to this for instant login!
     return NextResponse.json({
       success: true,
       accountExists,
       userId,
-      // This is the magic link that logs them in immediately
-      loginUrl: magicLinkData.properties.action_link,
+      // This URL creates a server-side session (no hash tokens!)
+      loginUrl: sessionUrl.toString(),
       message: accountExists 
         ? 'Welcome back! Logging you in...' 
         : 'Account created! Logging you in...',
