@@ -2,6 +2,7 @@ import { SidebarAdminPanelNav } from "@/components/sidebar-admin-panel-nav";
 import { SidebarFooterUserNav } from "@/components/sidebar-footer-user-nav";
 import { SidebarWorkspaceNav } from "@/components/sidebar-workspace-nav";
 import { SidebarLogo } from "@/components/sidebar-logo";
+import Link from "next/link";
 import {
   Sidebar,
   SidebarContent,
@@ -42,15 +43,13 @@ export async function ProjectSidebar(props: { params: Promise<unknown> }) {
           <ProjectSidebarGroup project={fullProject} workspace={workspace} />
           <SidebarWorkspaceNav workspace={workspace} withLinkLabelPrefix />
           <SidebarAdminPanelNav />
-          {/* Shopify Integration - External Link */}
+          {/* Shopify Integration - Links to settings */}
           <SidebarGroup>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <a
-                    href="https://shopify.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <Link
+                    href="/settings?tab=account"
                     className="flex items-center gap-2"
                   >
                     <img
@@ -59,7 +58,7 @@ export async function ProjectSidebar(props: { params: Promise<unknown> }) {
                       className="h-[15px] w-[15px]"
                     />
                     <span>Shopify Integration</span>
-                  </a>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

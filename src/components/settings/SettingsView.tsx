@@ -71,6 +71,7 @@ import {
   getAutoSendFilters,
 } from '@/data/user/settings';
 import { useRouter } from '@/i18n/routing';
+import { useSearchParams } from 'next/navigation';
 import { ReactNode } from 'react';
 import { useProSubscription } from '@/components/ProFeatureGate';
 import { ShopifyConnection } from './ShopifyConnection';
@@ -751,10 +752,16 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
     router.push('/update-password');
   };
 
+  // URL-based tab switching
+  const searchParams = useSearchParams();
+  const urlTab = searchParams.get('tab');
+  const validTabs = ['ai', 'notifications', 'account', 'billing'];
+  const defaultTab = urlTab && validTabs.includes(urlTab) ? urlTab : 'ai';
+
   return (
     <div className="p-6">
       <div className="mx-auto max-w-5xl">
-        <Tabs defaultValue="ai" className="space-y-6">
+        <Tabs defaultValue={defaultTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="ai">
               <Sparkles className="mr-2 h-4 w-4" />
