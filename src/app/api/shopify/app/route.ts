@@ -18,25 +18,21 @@ const COLORS = {
   grayLight: '#f1f5f9',
 };
 
-// Inline SVG of the Aiva logo - thick rounded V shape with cyan-blue gradient
+// Official Aiva logo SVG - the V checkmark with cyan-blue gradient
 const AIVA_LOGO_SVG = `
-<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="300 350 1200 1100" style="width:100%;height:100%">
   <defs>
-    <linearGradient id="aiva-left" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#00F5FF"/>
-      <stop offset="50%" stop-color="#00E0FF"/>
-      <stop offset="100%" stop-color="#00C8E0"/>
+    <linearGradient id="aiva-grad-1" x1="374.8" y1="1044.7" x2="1178.3" y2="1044.7" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#33effa"/>
+      <stop offset="1" stop-color="#258ffb"/>
     </linearGradient>
-    <linearGradient id="aiva-right" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#00D0E8"/>
-      <stop offset="50%" stop-color="#1E90FF"/>
-      <stop offset="100%" stop-color="#2080F0"/>
+    <linearGradient id="aiva-grad-2" x1="1265.6" y1="450.9" x2="937.2" y2="1081.9" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#33effa"/>
+      <stop offset="1" stop-color="#258ffb"/>
     </linearGradient>
   </defs>
-  <!-- Left arm - shorter, going up-left from center -->
-  <path d="M8 22 C4 18 6 12 12 12 L22 12 C26 12 30 14 32 18 L48 62 L42 72 L14 26 C12 22 10 24 8 22 Z" fill="url(#aiva-left)"/>
-  <!-- Right arm - longer, going up-right from center -->
-  <path d="M42 72 L48 62 L80 10 C82 6 86 4 90 4 C94 4 96 8 94 12 L56 74 C52 80 46 80 42 72 Z" fill="url(#aiva-right)"/>
+  <path fill="url(#aiva-grad-1)" d="M1178.27,985.28l-162.51,352.82a53.71,53.71,0,0,1-48.78,31.24H681.76a53.71,53.71,0,0,1-48.78-31.24L379.19,787.12c-14.45-31.37,8.47-67.15,43-67.15H667.45a47.35,47.35,0,0,1,43,27.53l113.92,247.32C900.72,1139.51,1109.83,1133.87,1178.27,985.28Z"/>
+  <path fill="url(#aiva-grad-2)" d="M1408.48,485.49,1213.99,907.73l-35.72,77.55c-68.44,148.59-277.55,154.23-353.9,9.55l252.86-548.95a47.34,47.34,0,0,1,43-27.53h245.25C1400.01,418.34,1422.93,454.12,1408.48,485.49Z"/>
 </svg>
 `;
 
