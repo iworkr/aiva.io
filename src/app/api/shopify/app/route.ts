@@ -18,14 +18,28 @@ const COLORS = {
   grayLight: '#f1f5f9',
 };
 
+// Inline SVG of the Aiva checkmark logo
+const AIVA_LOGO_SVG = `
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">
+  <defs>
+    <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00E5FF"/>
+      <stop offset="50%" style="stop-color:#00B8D4"/>
+      <stop offset="100%" style="stop-color:#2196F3"/>
+    </linearGradient>
+  </defs>
+  <path d="M82 25 C84 23 87 23 89 25 C91 27 91 30 89 32 L48 78 C46 80 43 80 41 78 L11 53 C9 51 9 48 11 46 C13 44 16 44 18 46 L44 68 L82 25 Z" fill="url(#logoGrad)" />
+</svg>
+`;
+
 /**
  * This is the main app URL that Shopify loads in an iframe
  * when merchants click on the app in their admin.
  * 
  * Flow:
  * 1. Check if shop is already linked to an Aiva user
- * 2. If linked: redirect to auto-login endpoint
- * 3. If not linked: redirect to linking page with secure token
+ * 2. If linked: show dashboard page
+ * 3. If not linked: show linking page
  */
 export async function GET(request: NextRequest) {
   const shop = request.nextUrl.searchParams.get('shop');
@@ -39,7 +53,6 @@ export async function GET(request: NextRequest) {
       return new NextResponse('Missing shop parameter', { status: 400 });
     }
     
-    // Redirect to auth flow if no shop in params
     const authUrl = `${process.env.SHOPIFY_APP_URL}/api/shopify/auth?shop=${shopFromCookie}`;
     return NextResponse.redirect(authUrl);
   }
@@ -59,7 +72,7 @@ export async function GET(request: NextRequest) {
     console.error('Error fetching shop data:', error);
   }
   
-  // If shop is linked to a user, show the dashboard opener
+  // If shop is linked to a user, show dashboard opener
   if (shopData?.linked_user_id && shopData?.access_token) {
     const token = generateLinkToken(shop, shopData.access_token);
     const autoLoginUrl = new URL('/api/shopify/auto-login', appUrl);
@@ -69,7 +82,7 @@ export async function GET(request: NextRequest) {
     return renderDashboardPage(shop, host, apiKey, autoLoginUrl.toString());
   }
   
-  // If shop exists but not linked, generate token for linking
+  // If shop exists but not linked, show linking page
   if (shopData?.access_token) {
     const token = generateLinkToken(shop, shopData.access_token);
     const linkUrl = new URL('/en/shopify/link', appUrl);
@@ -79,14 +92,11 @@ export async function GET(request: NextRequest) {
     return renderLinkingPage(shop, host, apiKey, linkUrl.toString());
   }
   
-  // Shop not found in database - redirect to OAuth flow
+  // Shop not found - redirect to OAuth
   const authUrl = `${appUrl}/api/shopify/auth?shop=${shop}`;
   return NextResponse.redirect(authUrl);
 }
 
-/**
- * Render the main dashboard page for linked stores
- */
 function renderDashboardPage(
   shop: string,
   host: string,
@@ -94,10 +104,8 @@ function renderDashboardPage(
   dashboardUrl: string
 ): NextResponse {
   const shopDisplayName = shop.replace('.myshopify.com', '');
-  const logoUrl = 'https://www.tryaiva.io/aiva-logo/2x/Asset%2082@2x-100.jpg';
   
-  const html = `
-<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -137,25 +145,22 @@ function renderDashboardPage(
       height: 4px;
       background: ${COLORS.gradient};
     }
-    .logo-container {
+    .logo-box {
       width: 72px;
       height: 72px;
       margin: 0 auto 20px;
+      background: ${COLORS.white};
+      border-radius: 16px;
+      padding: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
-    }
-    .logo-container img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
     }
     .header h1 {
       color: ${COLORS.white};
       font-size: 24px;
       font-weight: 700;
       margin-bottom: 6px;
-      letter-spacing: -0.5px;
     }
     .header p {
       color: ${COLORS.gray};
@@ -243,7 +248,6 @@ function renderDashboardPage(
       border: none;
       cursor: pointer;
       transition: all 0.2s ease;
-      text-decoration: none;
       background: ${COLORS.gradient};
       color: ${COLORS.white};
       box-shadow: 0 4px 14px rgba(0, 212, 255, 0.35);
@@ -251,9 +255,6 @@ function renderDashboardPage(
     .btn:hover {
       transform: translateY(-2px);
       box-shadow: 0 6px 20px rgba(0, 212, 255, 0.45);
-    }
-    .btn:active {
-      transform: translateY(0);
     }
     .note {
       text-align: center;
@@ -266,9 +267,7 @@ function renderDashboardPage(
 <body>
   <div class="card">
     <div class="header">
-      <div class="logo-container">
-        <img src="${logoUrl}" alt="Aiva" />
-      </div>
+      <div class="logo-box">${AIVA_LOGO_SVG}</div>
       <h1>Aiva AI Inbox</h1>
       <p>Your intelligent communication assistant</p>
     </div>
@@ -308,31 +307,27 @@ function renderDashboardPage(
         </div>
       </div>
       
-      <button class="btn" id="openDashboard">
-        Open Aiva Dashboard →
-      </button>
-      
+      <button class="btn" id="openDashboard">Open Aiva Dashboard →</button>
       <p class="note">Opens in a new tab for the full experience</p>
     </div>
   </div>
   
   <script>
     (function() {
-      const dashboardUrl = '${dashboardUrl}';
-      const btn = document.getElementById('openDashboard');
+      var dashboardUrl = '${dashboardUrl}';
+      var btn = document.getElementById('openDashboard');
       
       btn.addEventListener('click', function() {
         try {
-          const AppBridge = window['app-bridge'];
+          var AppBridge = window['app-bridge'];
           if (AppBridge && AppBridge.createApp) {
-            const app = AppBridge.createApp({
+            var app = AppBridge.createApp({
               apiKey: '${apiKey}',
               host: '${host}',
             });
-            
-            const Redirect = AppBridge.actions.Redirect;
+            var Redirect = AppBridge.actions.Redirect;
             if (Redirect) {
-              const redirect = Redirect.create(app);
+              var redirect = Redirect.create(app);
               redirect.dispatch(Redirect.Action.REMOTE, dashboardUrl);
               return;
             }
@@ -340,14 +335,12 @@ function renderDashboardPage(
         } catch (e) {
           console.log('App Bridge error:', e);
         }
-        
         window.open(dashboardUrl, '_blank');
       });
     })();
   </script>
 </body>
-</html>
-  `;
+</html>`;
   
   return new NextResponse(html, {
     headers: {
@@ -357,9 +350,6 @@ function renderDashboardPage(
   });
 }
 
-/**
- * Render the linking page for new stores
- */
 function renderLinkingPage(
   shop: string,
   host: string,
@@ -367,10 +357,8 @@ function renderLinkingPage(
   linkUrl: string
 ): NextResponse {
   const shopDisplayName = shop.replace('.myshopify.com', '');
-  const logoUrl = 'https://www.tryaiva.io/aiva-logo/2x/Asset%2082@2x-100.jpg';
   
-  const html = `
-<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -410,25 +398,22 @@ function renderLinkingPage(
       height: 4px;
       background: ${COLORS.gradient};
     }
-    .logo-container {
+    .logo-box {
       width: 72px;
       height: 72px;
       margin: 0 auto 20px;
+      background: ${COLORS.white};
+      border-radius: 16px;
+      padding: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
-    }
-    .logo-container img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
     }
     .header h1 {
       color: ${COLORS.white};
       font-size: 24px;
       font-weight: 700;
       margin-bottom: 6px;
-      letter-spacing: -0.5px;
     }
     .header p {
       color: ${COLORS.gray};
@@ -452,9 +437,7 @@ function renderLinkingPage(
       width: 18px;
       height: 18px;
       margin-right: 8px;
-    }
-    .shop-badge svg path {
-      fill: url(#cyanGradient);
+      fill: ${COLORS.cyan};
     }
     .intro {
       color: ${COLORS.gray};
@@ -473,7 +456,6 @@ function renderLinkingPage(
       border: none;
       cursor: pointer;
       transition: all 0.2s ease;
-      text-decoration: none;
       background: ${COLORS.gradient};
       color: ${COLORS.white};
       box-shadow: 0 4px 14px rgba(0, 212, 255, 0.35);
@@ -481,9 +463,6 @@ function renderLinkingPage(
     .btn:hover {
       transform: translateY(-2px);
       box-shadow: 0 6px 20px rgba(0, 212, 255, 0.45);
-    }
-    .btn:active {
-      transform: translateY(0);
     }
     .note {
       text-align: center;
@@ -494,21 +473,9 @@ function renderLinkingPage(
   </style>
 </head>
 <body>
-  <!-- SVG gradient definition for icons -->
-  <svg width="0" height="0" style="position:absolute">
-    <defs>
-      <linearGradient id="cyanGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" style="stop-color:#00d4ff"/>
-        <stop offset="100%" style="stop-color:#3b82f6"/>
-      </linearGradient>
-    </defs>
-  </svg>
-
   <div class="card">
     <div class="header">
-      <div class="logo-container">
-        <img src="${logoUrl}" alt="Aiva" />
-      </div>
+      <div class="logo-box">${AIVA_LOGO_SVG}</div>
       <h1>Connect Your Account</h1>
       <p>Link ${shopDisplayName} to Aiva</p>
     </div>
@@ -524,31 +491,27 @@ function renderLinkingPage(
         This enables AI-powered replies with full context from your orders, customers, and products.
       </p>
       
-      <button class="btn" id="openLink">
-        Continue Setup →
-      </button>
-      
+      <button class="btn" id="openLink">Continue Setup →</button>
       <p class="note">Opens in a new tab to complete setup</p>
     </div>
   </div>
   
   <script>
     (function() {
-      const linkUrl = '${linkUrl}';
-      const btn = document.getElementById('openLink');
+      var linkUrl = '${linkUrl}';
+      var btn = document.getElementById('openLink');
       
       btn.addEventListener('click', function() {
         try {
-          const AppBridge = window['app-bridge'];
+          var AppBridge = window['app-bridge'];
           if (AppBridge && AppBridge.createApp) {
-            const app = AppBridge.createApp({
+            var app = AppBridge.createApp({
               apiKey: '${apiKey}',
               host: '${host}',
             });
-            
-            const Redirect = AppBridge.actions.Redirect;
+            var Redirect = AppBridge.actions.Redirect;
             if (Redirect) {
-              const redirect = Redirect.create(app);
+              var redirect = Redirect.create(app);
               redirect.dispatch(Redirect.Action.REMOTE, linkUrl);
               return;
             }
@@ -556,14 +519,12 @@ function renderLinkingPage(
         } catch (e) {
           console.log('App Bridge error:', e);
         }
-        
         window.open(linkUrl, '_blank');
       });
     })();
   </script>
 </body>
-</html>
-  `;
+</html>`;
   
   return new NextResponse(html, {
     headers: {
