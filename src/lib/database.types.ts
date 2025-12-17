@@ -2302,6 +2302,7 @@ export type Database = {
           id: string
           installed_at: string | null
           is_active: boolean | null
+          link_method: Database["public"]["Enums"]["shopify_link_method"] | null
           linked_user_id: string | null
           scopes: string[] | null
           shop_domain: string
@@ -2322,6 +2323,9 @@ export type Database = {
           id?: string
           installed_at?: string | null
           is_active?: boolean | null
+          link_method?:
+            | Database["public"]["Enums"]["shopify_link_method"]
+            | null
           linked_user_id?: string | null
           scopes?: string[] | null
           shop_domain: string
@@ -2342,6 +2346,9 @@ export type Database = {
           id?: string
           installed_at?: string | null
           is_active?: boolean | null
+          link_method?:
+            | Database["public"]["Enums"]["shopify_link_method"]
+            | null
           linked_user_id?: string | null
           scopes?: string[] | null
           shop_domain?: string
@@ -3360,6 +3367,7 @@ export type Database = {
       pricing_type: "one_time" | "recurring"
       project_status: "draft" | "pending_approval" | "approved" | "completed"
       project_team_member_role: "admin" | "member" | "readonly"
+      shopify_link_method: "shopify" | "existing_account"
       subscription_status:
         | "trialing"
         | "active"
@@ -3613,6 +3621,7 @@ export const Constants = {
       pricing_type: ["one_time", "recurring"],
       project_status: ["draft", "pending_approval", "approved", "completed"],
       project_team_member_role: ["admin", "member", "readonly"],
+      shopify_link_method: ["shopify", "existing_account"],
       subscription_status: [
         "trialing",
         "active",

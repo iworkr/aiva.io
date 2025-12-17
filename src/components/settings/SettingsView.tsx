@@ -73,6 +73,7 @@ import {
 import { useRouter } from '@/i18n/routing';
 import { ReactNode } from 'react';
 import { useProSubscription } from '@/components/ProFeatureGate';
+import { ShopifyConnection } from './ShopifyConnection';
 
 interface SettingsViewProps {
   workspaceId: string;
@@ -1707,6 +1708,9 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
 
           {/* Account Settings */}
           <TabsContent value="account" className="space-y-6">
+            {/* Shopify Connection */}
+            <ShopifyConnection userId={userId} />
+
             <Card>
               <CardHeader className="pb-4">
                 <CardTitle className="text-xl font-bold">Profile Information</CardTitle>
