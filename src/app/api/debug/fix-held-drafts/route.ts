@@ -89,8 +89,8 @@ export async function POST(request: NextRequest) {
       workspaceId,
       totalFound: messagesWithHeldDrafts?.length || 0,
       fixed: fixed.length,
-      errors: errors.length,
       fixedMessages: fixed,
+      errorCount: errors.length,
       errors: errors,
     });
   } catch (error) {
