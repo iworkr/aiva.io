@@ -175,25 +175,50 @@ export const generateAIContextAction = authActionClient
 
     // Get Shopify store info - try direct query first (more reliable in server actions)
     try {
-      // First, check if ANY store exists for this workspace (even if not active)
-      const { data: allStores, error: allStoresError } = await supabase
+      // Check stores linked to workspace_id first
+      const { data: workspaceStores, error: workspaceError } = await supabase
         .from('shopify_stores')
-        .select('shop_name, shop_domain, currency, is_active, workspace_id')
+        .select('shop_name, shop_domain, currency, is_active, workspace_id, linked_user_id')
         .eq('workspace_id', workspaceId)
         .limit(5);
       
-      console.log('[Generate Context] All Shopify stores for workspace:', {
+      // Also check stores linked to the user (in case workspace_id isn't set)
+      const { data: userStores, error: userError } = await supabase
+        .from('shopify_stores')
+        .select('shop_name, shop_domain, currency, is_active, workspace_id, linked_user_id')
+        .eq('linked_user_id', userId)
+        .limit(5);
+      
+      // Combine and deduplicate stores
+      const allStores = [
+        ...(workspaceStores || []),
+        ...(userStores || []).filter(us => 
+          !workspaceStores?.some(ws => ws.shop_domain === us.shop_domain)
+        ),
+      ];
+      
+      console.log('[Generate Context] Shopify stores found:', {
         workspaceId,
-        count: allStores?.length || 0,
-        stores: allStores?.map(s => ({ name: s.shop_name, domain: s.shop_domain, active: s.is_active })),
-        error: allStoresError?.message,
+        userId,
+        workspaceStoresCount: workspaceStores?.length || 0,
+        userStoresCount: userStores?.length || 0,
+        totalStores: allStores.length,
+        stores: allStores.map(s => ({ 
+          name: s.shop_name, 
+          domain: s.shop_domain, 
+          active: s.is_active,
+          hasWorkspaceId: !!s.workspace_id,
+          hasLinkedUserId: !!s.linked_user_id,
+        })),
+        workspaceError: workspaceError?.message,
+        userError: userError?.message,
       });
       
       // Try to get active store first
-      let store = allStores?.find(s => s.is_active === true);
+      let store = allStores.find(s => s.is_active === true);
       
       // If no active store, use the first one (store might be linked but not marked active)
-      if (!store && allStores && allStores.length > 0) {
+      if (!store && allStores.length > 0) {
         store = allStores[0];
         console.log('[Generate Context] No active store found, using first store:', store.shop_domain);
       }
