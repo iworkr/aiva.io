@@ -171,18 +171,69 @@ export const generateAIContextAction = authActionClient
       contextParts.push(`You are an AI email assistant for ${workspace.name || 'this workspace'}.`);
     }
 
-    // Get Shopify store info
-    const { getShopifyContextForWorkspace, formatShopifyContextForAI } = await import('@/lib/shopify/context');
+    // Get Shopify store info - try direct query first (more reliable in server actions)
     try {
-      const shopifyContext = await getShopifyContextForWorkspace(workspaceId);
-      if (shopifyContext.hasStore && shopifyContext.store) {
-        const shopifyContextText = formatShopifyContextForAI(shopifyContext);
-        if (shopifyContextText) {
-          contextParts.push(shopifyContextText);
+      const { data: store, error: storeError } = await supabase
+        .from('shopify_stores')
+        .select('shop_name, shop_domain, currency, is_active')
+        .eq('workspace_id', workspaceId)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+      
+      if (store && !storeError) {
+        const shopifyParts: string[] = [];
+        shopifyParts.push(`\n## Shopify Store`);
+        shopifyParts.push(`Store: ${store.shop_name || store.shop_domain}`);
+        shopifyParts.push(`Currency: ${store.currency || 'USD'}`);
+        
+        // Get store statistics
+        const { count: totalOrders } = await supabase
+          .from('shopify_orders')
+          .select('*', { count: 'exact', head: true })
+          .eq('workspace_id', workspaceId);
+        
+        const { count: totalCustomers } = await supabase
+          .from('shopify_customers')
+          .select('*', { count: 'exact', head: true })
+          .eq('workspace_id', workspaceId);
+        
+        const { count: totalProducts } = await supabase
+          .from('shopify_products')
+          .select('*', { count: 'exact', head: true })
+          .eq('workspace_id', workspaceId)
+          .eq('status', 'active');
+        
+        if (totalOrders || totalCustomers || totalProducts) {
+          shopifyParts.push(`\n### Store Statistics`);
+          if (totalOrders) shopifyParts.push(`- Total Orders: ${totalOrders}`);
+          if (totalCustomers) shopifyParts.push(`- Total Customers: ${totalCustomers}`);
+          if (totalProducts) shopifyParts.push(`- Active Products: ${totalProducts}`);
         }
+        
+        // Get popular products
+        const { data: products } = await supabase
+          .from('shopify_products')
+          .select('title, price')
+          .eq('workspace_id', workspaceId)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(5);
+        
+        if (products && products.length > 0) {
+          shopifyParts.push(`\n### Products Available`);
+          for (const product of products) {
+            const price = product.price ? ` - $${parseFloat(String(product.price))}` : '';
+            shopifyParts.push(`- ${product.title}${price}`);
+          }
+        }
+        
+        contextParts.push(shopifyParts.join('\n'));
+      } else {
+        console.log('[Generate Context] No active Shopify store found for workspace:', workspaceId);
       }
     } catch (error) {
-      console.warn('Failed to fetch Shopify context:', error);
+      console.error('[Generate Context] Failed to fetch Shopify store:', error);
     }
 
     // Get channel connections to understand what channels are used
