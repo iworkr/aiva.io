@@ -197,8 +197,13 @@ export const generateAIContextAction = authActionClient
       contextParts.push(`You handle messages from: ${providers.join(', ')}.`);
       
       if (connections.some(c => c.provider === 'gmail')) {
-        const gmailAccounts = connections.filter(c => c.provider === 'gmail').map(c => c.provider_account_name || c.provider_account_id);
-        contextParts.push(`Gmail accounts: ${gmailAccounts.join(', ')}.`);
+        const gmailAccounts = connections
+          .filter(c => c.provider === 'gmail')
+          .map(c => c.provider_account_name)
+          .filter(Boolean);
+        if (gmailAccounts.length > 0) {
+          contextParts.push(`Gmail accounts: ${gmailAccounts.join(', ')}.`);
+        }
       }
     }
 
