@@ -53,9 +53,10 @@ interface MessageDetailViewProps {
   messageId: string;
   workspaceId: string;
   userId: string;
+  draftId?: string;
 }
 
-export function MessageDetailView({ messageId, workspaceId, userId }: MessageDetailViewProps) {
+export function MessageDetailView({ messageId, workspaceId, userId, draftId }: MessageDetailViewProps) {
   const router = useRouter();
   const [message, setMessage] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -340,6 +341,7 @@ export function MessageDetailView({ messageId, workspaceId, userId }: MessageDet
           senderEmail={message.sender_email}
           provider={provider}
           providerMessageId={message.provider_message_id}
+          draftId={draftId}
           onSent={() => {
             // Refresh the thread after sending
             router.refresh();

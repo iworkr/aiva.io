@@ -50,8 +50,19 @@ export default async function InboxPage({
     redirect('/onboarding');
   }
 
-  // Await searchParams before using (Next.js 15 requirement)
+  // Await params and searchParams before using (Next.js 15 requirement)
+  const { locale } = await params;
   const resolvedSearchParams = await searchParams;
+
+  // If message query param is present, redirect to message detail page
+  const messageParam = resolvedSearchParams.message as string | undefined;
+  if (messageParam) {
+    const draftParam = resolvedSearchParams.draft as string | undefined;
+    const redirectUrl = draftParam 
+      ? `/${locale}/inbox/${messageParam}?draft=${draftParam}`
+      : `/${locale}/inbox/${messageParam}`;
+    redirect(redirectUrl);
+  }
 
   // Valid priority and category values
   const validPriorities = ['high', 'medium', 'low', 'noise'] as const;

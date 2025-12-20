@@ -12,10 +12,14 @@ import { Suspense } from 'react';
 
 export default async function MessageDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; messageId: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const { messageId } = await params;
+  const resolvedSearchParams = await searchParams;
+  const draftId = resolvedSearchParams.draft as string | undefined;
   const { data: { user } } = await getUser();
   if (!user) {
     redirect('/login');
@@ -49,6 +53,7 @@ export default async function MessageDetailPage({
         messageId={messageId}
         workspaceId={workspace.id}
         userId={user.id}
+        draftId={draftId}
       />
     </Suspense>
   );

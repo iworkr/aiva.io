@@ -26,9 +26,10 @@ import {
 } from '@/components/ui/tooltip';
 import { generateReplyDraftAction, sendReplyAction } from '@/data/user/messages';
 import { cn } from '@/lib/utils';
+import { supabaseUserClientComponent } from '@/supabase-clients/user/supabaseUserClientComponent';
 import { Loader2, RefreshCw, Send, Sparkles, X } from 'lucide-react';
 import { useAction } from 'next-safe-action/hooks';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 interface InlineReplyComposerProps {
@@ -38,6 +39,7 @@ interface InlineReplyComposerProps {
   senderEmail: string;
   provider: 'gmail' | 'outlook' | 'slack' | 'teams';
   providerMessageId?: string;
+  draftId?: string;
   onSent?: () => void;
 }
 
@@ -48,6 +50,7 @@ export function InlineReplyComposer({
   senderEmail,
   provider,
   providerMessageId,
+  draftId,
   onSent,
 }: InlineReplyComposerProps) {
   const [replyText, setReplyText] = useState('');
@@ -55,6 +58,7 @@ export function InlineReplyComposer({
   const [isSending, setIsSending] = useState(false);
   const [confidenceScore, setConfidenceScore] = useState<number | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [isLoadingDraft, setIsLoadingDraft] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Send reply action
@@ -96,6 +100,43 @@ export function InlineReplyComposer({
       setIsGenerating(false);
     },
   });
+
+  // Load draft if draftId is provided
+  useEffect(() => {
+    if (!draftId || !workspaceId) return;
+
+    const loadDraft = async () => {
+      setIsLoadingDraft(true);
+      try {
+        const supabase = supabaseUserClientComponent;
+        const { data: draft, error } = await supabase
+          .from('message_drafts')
+          .select('body, confidence_score, hold_for_review, review_reason')
+          .eq('id', draftId)
+          .eq('workspace_id', workspaceId)
+          .eq('message_id', messageId)
+          .single();
+
+        if (error) {
+          console.error('Failed to load draft:', error);
+          toast.error("Couldn't load the draft. You can still write a reply.");
+        } else if (draft && draft.body) {
+          setReplyText(draft.body);
+          setConfidenceScore(draft.confidence_score || null);
+          toast.success("Draft loaded! Ready to send or edit.");
+          // Focus the textarea after a short delay
+          setTimeout(() => textareaRef.current?.focus(), 100);
+        }
+      } catch (err) {
+        console.error('Error loading draft:', err);
+        toast.error("Couldn't load the draft. You can still write a reply.");
+      } finally {
+        setIsLoadingDraft(false);
+      }
+    };
+
+    loadDraft();
+  }, [draftId, messageId, workspaceId]);
 
   const handleGenerateAI = useCallback(() => {
     if (!messageId || !workspaceId) return;
@@ -239,11 +280,13 @@ export function InlineReplyComposer({
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
             placeholder={
-              isGenerating
+              isLoadingDraft
+                ? 'Loading draft...'
+                : isGenerating
                 ? 'Drafting a reply for you...'
                 : `Write your reply to ${senderEmail}...`
             }
-            disabled={isGenerating}
+            disabled={isGenerating || isLoadingDraft}
             className={cn(
               'min-h-[80px] resize-none pr-20',
               isGenerating && 'opacity-50'
@@ -251,11 +294,13 @@ export function InlineReplyComposer({
           />
 
           {/* Loading overlay */}
-          {isGenerating && (
+          {(isGenerating || isLoadingDraft) && (
             <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-md">
               <div className="flex items-center gap-2">
                 <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                <span className="text-sm text-muted-foreground">Thinking of the perfect reply...</span>
+                <span className="text-sm text-muted-foreground">
+                  {isLoadingDraft ? 'Loading draft...' : 'Thinking of the perfect reply...'}
+                </span>
               </div>
             </div>
           )}
@@ -264,7 +309,7 @@ export function InlineReplyComposer({
           <Button
             size="sm"
             onClick={handleSendClick}
-            disabled={isSending || isGenerating || !replyText.trim()}
+            disabled={isSending || isGenerating || isLoadingDraft || !replyText.trim()}
             className="absolute bottom-2 right-2 gap-1.5"
           >
             {isSending ? (
