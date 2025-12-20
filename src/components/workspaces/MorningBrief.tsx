@@ -273,6 +273,24 @@ export async function MorningBrief() {
     return true;
   });
 
+  // Server-side debug logging
+  console.log('[MorningBrief] Server-side render:', {
+    workspaceId,
+    userId,
+    attentionItemsCount: attentionItems?.length || 0,
+    briefingItemsCount: briefingItems.length,
+    deduplicatedItemsCount: deduplicatedItems.length,
+    hasThursdayEmail: deduplicatedItems.some(item => 
+      item.title?.includes('Thursday') || item.id === '367735ec-3639-4d13-b867-48e701d7da58'
+    ),
+    items: deduplicatedItems.map(item => ({
+      id: item.id,
+      messageId: item.messageId,
+      title: item.title,
+      type: item.type,
+    })),
+  });
+
   return (
     <div className="space-y-5">
       {/* Greeting and Summary */}

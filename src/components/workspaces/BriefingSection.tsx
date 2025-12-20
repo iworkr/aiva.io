@@ -137,8 +137,18 @@ export function BriefingSection({ items, workspaceId, userId }: BriefingSectionP
     userId,
   });
 
+  // Always render something for debugging, even if no items
   if (items.length === 0) {
-    return null;
+    return (
+      <div id="briefing" className="space-y-1">
+        <div className="flex items-center justify-between px-3 mb-1">
+          <h2 className="text-sm font-medium text-muted-foreground">What needs your attention</h2>
+        </div>
+        <div className="px-3 py-2 text-xs text-muted-foreground">
+          No items requiring attention. [DEBUG: BriefingSection rendered with 0 items]
+        </div>
+      </div>
+    );
   }
 
   const getIcon = (type: string) => {
