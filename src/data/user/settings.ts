@@ -158,6 +158,8 @@ export const generateAIContextAction = authActionClient
     if (!isMember) throw new Error('Not a workspace member');
 
     const supabase = await createSupabaseUserServerActionClient();
+    
+    console.log('[Generate Context] Starting context generation:', { workspaceId, userId });
     const contextParts: string[] = [];
 
     // Get workspace info
@@ -173,15 +175,30 @@ export const generateAIContextAction = authActionClient
 
     // Get Shopify store info - try direct query first (more reliable in server actions)
     try {
-      const { data: store, error: storeError } = await supabase
+      // First, check if ANY store exists for this workspace (even if not active)
+      const { data: allStores, error: allStoresError } = await supabase
         .from('shopify_stores')
-        .select('shop_name, shop_domain, currency, is_active')
+        .select('shop_name, shop_domain, currency, is_active, workspace_id')
         .eq('workspace_id', workspaceId)
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
+        .limit(5);
       
-      if (store && !storeError) {
+      console.log('[Generate Context] All Shopify stores for workspace:', {
+        workspaceId,
+        count: allStores?.length || 0,
+        stores: allStores?.map(s => ({ name: s.shop_name, domain: s.shop_domain, active: s.is_active })),
+        error: allStoresError?.message,
+      });
+      
+      // Try to get active store first
+      let store = allStores?.find(s => s.is_active === true);
+      
+      // If no active store, use the first one (store might be linked but not marked active)
+      if (!store && allStores && allStores.length > 0) {
+        store = allStores[0];
+        console.log('[Generate Context] No active store found, using first store:', store.shop_domain);
+      }
+      
+      if (store) {
         const shopifyParts: string[] = [];
         shopifyParts.push(`\n## Shopify Store`);
         shopifyParts.push(`Store: ${store.shop_name || store.shop_domain}`);
@@ -244,11 +261,24 @@ export const generateAIContextAction = authActionClient
         }
         
         contextParts.push(shopifyParts.join('\n'));
+        console.log('[Generate Context] Successfully added Shopify context:', {
+          storeName: store.shop_name || store.shop_domain,
+          hasStats: !!(totalOrders || totalCustomers || totalProducts),
+          productCount: products?.length || 0,
+        });
       } else {
-        console.log('[Generate Context] No active Shopify store found for workspace:', workspaceId);
+        console.log('[Generate Context] No Shopify store found for workspace:', {
+          workspaceId,
+          allStoresCount: allStores?.length || 0,
+          error: allStoresError?.message,
+        });
       }
     } catch (error) {
-      console.error('[Generate Context] Failed to fetch Shopify store:', error);
+      console.error('[Generate Context] Failed to fetch Shopify store:', {
+        error: error instanceof Error ? error.message : String(error),
+        workspaceId,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
     }
 
     // Get channel connections to understand what channels are used
