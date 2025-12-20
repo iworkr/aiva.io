@@ -17,6 +17,7 @@ import { createSupabaseUserServerComponentClient } from '@/supabase-clients/user
 import { BriefingSection } from './BriefingSection';
 import { AivaChatInput } from './AivaChatInput';
 import { TodaysBriefingButton } from './TodaysBriefingButton';
+import { getNeedsAttentionItems, type AttentionItem } from '@/data/user/dashboard-stats';
 
 function getGreeting(timezone?: string) {
   // Use Intl to get the hour in the user's timezone, with UTC fallback
@@ -126,24 +127,16 @@ export async function MorningBrief() {
     ? userProfile.full_name.split(' ')[0]
     : getUserDisplayName(user);
 
-  // Fetch crucial data
+  // Fetch crucial data - Use getNeedsAttentionItems for messages requiring human review
   const [
-    { data: urgentMessages },
+    attentionItems,
     { count: unreadCount },
     { count: allCount },
     { data: upcomingEvents },
     { count: todayEventsCount },
   ] = await Promise.all([
-    // Urgent/high priority messages
-    supabase
-      .from('messages')
-      .select('id, subject, body, priority, created_at, is_read, channel_connection:channel_connections(provider)')
-      .eq('workspace_id', workspaceId)
-      .in('priority', ['high'])
-      .eq('is_read', false)
-      .order('priority', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(5),
+    // Messages that need human attention (requires_human_review = true)
+    getNeedsAttentionItems(workspaceId, userId, 20),
     
     // Unread messages count
     supabase
@@ -181,13 +174,9 @@ export async function MorningBrief() {
   const newMessages = unreadCount || 0;
   const activeConversations = allCount || 0;
 
-  // Build briefing items (using Set to track unique IDs and prevent duplicates)
+  // Build briefing items from attention items (messages requiring human review)
   const briefingItems: BriefingItem[] = [];
   const seenIds = new Set<string>(); // Track unique IDs to prevent duplicates
-
-  // Utility: strip basic HTML tags from message bodies for cleaner snippets
-  const stripHtml = (input: string | null | undefined) =>
-    input ? input.replace(/<[^>]+>/g, '').trim() : '';
 
   // Utility: detect and mask sensitive content (OTPs, passwords, etc.)
   const maskSensitiveContent = (text: string): string => {
@@ -205,26 +194,34 @@ export async function MorningBrief() {
     return maskedText;
   };
 
-  // Add urgent messages (with deduplication)
-  if (urgentMessages) {
-    urgentMessages.forEach((msg: any) => {
+  // Convert AttentionItem[] to BriefingItem[]
+  if (attentionItems && attentionItems.length > 0) {
+    attentionItems.forEach((item: AttentionItem) => {
       // Skip if we've already seen this message ID
-      const uniqueKey = `message-${msg.id}`;
+      const uniqueKey = `message-${item.messageId}`;
       if (seenIds.has(uniqueKey)) return;
       seenIds.add(uniqueKey);
       
-      const cleanBody = stripHtml(msg.body)?.substring(0, 140) || '';
-      const safeDescription = maskSensitiveContent(cleanBody);
+      // Determine priority based on review reason and confidence
+      let priority: 'urgent' | 'high' | 'medium' | 'low' = 'high';
+      if (item.reviewReason === 'calendar_mismatch' || item.reviewReason === 'sensitive_topic') {
+        priority = 'urgent';
+      } else if (item.confidenceScore !== undefined && item.confidenceScore < 0.6) {
+        priority = 'urgent';
+      } else if (item.priority === 'urgent' || item.priority === 'high') {
+        priority = item.priority as 'urgent' | 'high';
+      }
       
       briefingItems.push({
-        id: msg.id,
+        id: item.messageId,
         type: 'message',
-        title: maskSensitiveContent(msg.subject || 'No subject'),
-        description: safeDescription,
-        priority: msg.priority === 'urgent' ? 'urgent' : 'high',
-        timestamp: msg.created_at ? new Date(msg.created_at) : undefined,
-        href: `/inbox/${msg.id}`,
-        metadata: msg.channel_connection?.provider || 'Email',
+        title: maskSensitiveContent(item.subject || 'No subject'),
+        description: item.snippet || item.draftBody?.substring(0, 140) || '',
+        priority,
+        timestamp: item.timestamp ? new Date(item.timestamp) : undefined,
+        href: `/inbox?message=${item.messageId}${item.draftId ? `&draft=${item.draftId}` : ''}`,
+        metadata: item.provider || 'Email',
+        messageId: item.messageId, // Store messageId for dismissal
       });
     });
   }
@@ -314,7 +311,11 @@ export async function MorningBrief() {
       {/* Briefing Items */}
       {deduplicatedItems.length > 0 && (
         <div id="briefing">
-          <BriefingSection items={deduplicatedItems} />
+          <BriefingSection 
+            items={deduplicatedItems} 
+            workspaceId={workspaceId}
+            userId={userId}
+          />
         </div>
       )}
 

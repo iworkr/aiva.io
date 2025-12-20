@@ -34,6 +34,10 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
+import { rejectReviewItemAction, bulkDismissReviewItemsAction } from '@/data/user/review-queue';
+import { useAction } from 'next-safe-action/hooks';
+import { Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface BriefingItem {
   id: string;
@@ -44,22 +48,94 @@ interface BriefingItem {
   timestamp?: Date;
   href: string;
   metadata?: string;
+  messageId?: string; // For messages, store the messageId for dismissal
 }
 
 interface BriefingSectionProps {
   items: BriefingItem[];
+  workspaceId?: string;
+  userId?: string;
 }
 
-export function BriefingSection({ items }: BriefingSectionProps) {
+export function BriefingSection({ items, workspaceId, userId }: BriefingSectionProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [quickReplyText, setQuickReplyText] = useState('');
   const [isGeneratingReply, setIsGeneratingReply] = useState(false);
   const [isSendingReply, setIsSendingReply] = useState(false);
   const [completedItems, setCompletedItems] = useState<Set<string>>(new Set());
+  const router = useRouter();
   
   const topItems = items.slice(0, 3);
   const remainingItems = items.slice(3);
+
+  // Dismiss actions
+  const { execute: dismissItem, status: dismissStatus } = useAction(rejectReviewItemAction, {
+    onSuccess: () => {
+      toast.success('Item dismissed');
+      router.refresh();
+    },
+    onError: ({ error }) => {
+      toast.error(error.serverError || 'Failed to dismiss item');
+    },
+  });
+
+  const { execute: bulkDismiss, status: bulkDismissStatus } = useAction(bulkDismissReviewItemsAction, {
+    onSuccess: ({ data }) => {
+      toast.success(`Dismissed ${data?.dismissedCount || 0} items`);
+      router.refresh();
+    },
+    onError: ({ error }) => {
+      toast.error(error.serverError || 'Failed to dismiss items');
+    },
+  });
+
+  const handleDismissItem = (item: BriefingItem, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (item.type === 'message' && item.messageId && workspaceId) {
+      dismissItem({
+        workspaceId,
+        messageId: item.messageId,
+        action: 'rejected',
+      });
+    } else {
+      // For non-message items, just mark as completed locally
+      setCompletedItems(prev => new Set(prev).add(item.id));
+      toast.success('Item dismissed');
+    }
+  };
+
+  const handleClearAll = () => {
+    if (items.length === 0) return;
+    const messageItems = items.filter(item => item.type === 'message' && item.messageId);
+    if (messageItems.length > 0 && workspaceId) {
+      const messageIds = messageItems.map(item => item.messageId!);
+      bulkDismiss({
+        workspaceId,
+        messageIds,
+        action: 'rejected',
+      });
+    } else {
+      // If no message items, just mark all as completed locally
+      const allIds = new Set(items.map(item => item.id));
+      setCompletedItems(allIds);
+      toast.success('All items dismissed');
+    }
+  };
+
+  // Debug logging
+  console.log('[BriefingSection] Rendering with items:', {
+    count: items.length,
+    items: items.map(i => ({
+      id: i.id,
+      messageId: i.messageId,
+      title: i.title,
+      type: i.type,
+    })),
+    workspaceId,
+    userId,
+  });
 
   if (items.length === 0) {
     return null;
@@ -212,6 +288,25 @@ export function BriefingSection({ items }: BriefingSectionProps) {
           
           {/* Quick Actions */}
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {/* Dismiss button for all item types */}
+            {(workspaceId || item.type !== 'message') && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                      onClick={(e) => handleDismissItem(item, e)}
+                      disabled={dismissStatus === 'executing'}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Dismiss</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
             {item.type === 'message' && (
               <TooltipProvider>
                 <Tooltip>
@@ -394,25 +489,39 @@ export function BriefingSection({ items }: BriefingSectionProps) {
     <div id="briefing" className="space-y-1">
       <div className="flex items-center justify-between px-3 mb-1">
         <h2 className="text-sm font-medium text-muted-foreground">What needs your attention</h2>
-        {items.length > 3 && (
-          <button
-            type="button"
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-          >
-            {isExpanded ? (
-              <>
-                <ChevronUp className="h-3 w-3" />
-                Less
-              </>
-            ) : (
-              <>
-                <ChevronDown className="h-3 w-3" />
-                +{remainingItems.length} more
-              </>
-            )}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {items.length > 0 && workspaceId && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearAll}
+              disabled={bulkDismissStatus === 'executing'}
+              className="text-xs text-muted-foreground hover:text-destructive h-7 px-2"
+            >
+              <Trash2 className="h-3 w-3 mr-1" />
+              Clear All
+            </Button>
+          )}
+          {items.length > 3 && (
+            <button
+              type="button"
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+            >
+              {isExpanded ? (
+                <>
+                  <ChevronUp className="h-3 w-3" />
+                  Less
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-3 w-3" />
+                  +{remainingItems.length} more
+                </>
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Items list */}
