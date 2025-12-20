@@ -562,20 +562,30 @@ IMPORTANT: Always return valid, complete JSON. Keep replies concise.`;
       };
     }
 
-    const { error: messageUpdateError } = await supabase
+    const { error: messageUpdateError, data: updatedMessage } = await supabase
       .from("messages")
       .update(messageUpdate)
-      .eq("id", messageId);
+      .eq("id", messageId)
+      .select('requires_human_review, review_reason')
+      .single();
 
     if (messageUpdateError) {
       console.error('[AI Reply] Failed to update message with draft info:', messageUpdateError);
+      // Even if update fails, the draft is still held for review, so it will be caught by the held drafts query
     } else {
       console.log('[AI Reply] Message updated successfully:', {
         messageId,
         hasDraft: true,
         requiresHumanReview: shouldHoldForReview,
         reviewReason: shouldHoldForReview ? (finalReviewReason || 'draft_held_for_review') : undefined,
+        actualRequiresHumanReview: updatedMessage?.requires_human_review,
+        actualReviewReason: updatedMessage?.review_reason,
       });
+      
+      // Verify the update actually worked
+      if (shouldHoldForReview && !updatedMessage?.requires_human_review) {
+        console.warn('[AI Reply] WARNING: Message update did not set requires_human_review=true as expected. Draft is still held for review.');
+      }
     }
 
     // Log draft result for debugging

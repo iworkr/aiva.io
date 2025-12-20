@@ -232,48 +232,59 @@ export async function getNeedsAttentionItems(
   }
 
   // Also get messages with held drafts that might not have requires_human_review set yet
-  // (for backward compatibility with older drafts)
-  const { data: heldDrafts } = await supabase
-    .from('message_drafts')
+  // (for backward compatibility with older drafts or if message update failed)
+  // This is the primary way we find messages that need review when drafts are held
+  // Query messages that have held drafts - more reliable than querying drafts and joining
+  const { data: messagesWithHeldDrafts, error: heldDraftsError } = await supabase
+    .from('messages')
     .select(`
       id,
-      body,
-      confidence_score,
-      review_reason,
-      calendar_context,
-      ai_uncertainty_notes,
-      message:messages!inner(
+      subject,
+      sender_email,
+      sender_name,
+      snippet,
+      timestamp,
+      priority,
+      category,
+      requires_human_review,
+      reviewed_at,
+      handled_by_aiva,
+      channel_connection:channel_connections(provider),
+      message_drafts!inner(
         id,
-        subject,
-        sender_email,
-        sender_name,
-        snippet,
-        timestamp,
-        priority,
-        category,
-        requires_human_review,
-        reviewed_at,
-        handled_by_aiva,
-        channel_connection:channel_connections(provider)
+        body,
+        confidence_score,
+        review_reason,
+        calendar_context,
+        ai_uncertainty_notes,
+        hold_for_review
       )
     `)
     .eq('workspace_id', workspaceId)
-    .eq('hold_for_review', true)
-    .is('message.reviewed_at', null)
-    .eq('message.handled_by_aiva', false)
-    .order('created_at', { ascending: false })
-    .limit(limit);
+    .eq('message_drafts.hold_for_review', true)
+    .is('reviewed_at', null)
+    .eq('handled_by_aiva', false)
+    .order('timestamp', { ascending: false })
+    .limit(limit * 2); // Get more to ensure we don't miss any
+
+  if (heldDraftsError) {
+    console.error('[Dashboard] Error fetching messages with held drafts:', heldDraftsError);
+  }
 
   const addedMessageIds = new Set(items.map(i => i.messageId));
-  for (const draft of heldDrafts || []) {
-    const msg = draft.message as any;
-    if (!msg || addedMessageIds.has(msg.id)) continue;
+  for (const msg of messagesWithHeldDrafts || []) {
+    if (addedMessageIds.has(msg.id)) continue;
+    
+    // Get the held draft (should be the first one since we filtered for hold_for_review=true)
+    const heldDraft = (msg.message_drafts as any[])?.find((d: any) => d.hold_for_review === true) || (msg.message_drafts as any[])?.[0];
+    
+    if (!heldDraft) continue; // Should not happen, but safety check
     
     items.push({
-      id: draft.id,
+      id: heldDraft.id,
       type: 'review',
       messageId: msg.id,
-      draftId: draft.id,
+      draftId: heldDraft.id,
       subject: msg.subject || '(no subject)',
       senderEmail: msg.sender_email,
       senderName: msg.sender_name || undefined,
@@ -281,13 +292,13 @@ export async function getNeedsAttentionItems(
       timestamp: msg.timestamp,
       priority: msg.priority || undefined,
       category: msg.category || undefined,
-      reviewReason: draft.review_reason || 'draft_held_for_review',
+      reviewReason: heldDraft.review_reason || 'draft_held_for_review',
       provider: (msg.channel_connection as any)?.provider,
       // Draft information
-      draftBody: draft.body,
-      confidenceScore: draft.confidence_score ?? undefined,
-      calendarContext: draft.calendar_context ?? undefined,
-      aiUncertaintyNotes: draft.ai_uncertainty_notes ?? undefined,
+      draftBody: heldDraft.body,
+      confidenceScore: heldDraft.confidence_score ?? undefined,
+      calendarContext: heldDraft.calendar_context ?? undefined,
+      aiUncertaintyNotes: heldDraft.ai_uncertainty_notes ?? undefined,
       hasDraft: true,
     });
   }
