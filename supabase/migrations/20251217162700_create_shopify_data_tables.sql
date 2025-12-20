@@ -402,3 +402,5 @@ COMMENT ON TABLE public.shopify_sync_logs IS 'Audit log of Shopify sync operatio
 -- ALTER TABLE public.shopify_stores DROP COLUMN IF EXISTS customers_sync_cursor;
 -- ALTER TABLE public.shopify_stores DROP COLUMN IF EXISTS products_sync_cursor;
 
+
+

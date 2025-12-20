@@ -64,3 +64,5 @@ export default async function ShopifyLinkCompletePage({ searchParams }: PageProp
   redirect(`/en/dashboard?from=shopify&shop=${shopDomain}&linked=true`);
 }
 
+
+

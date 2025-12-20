@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'workspaceId is required' }, { status: 400 });
     }
 
+    // First, try to find the exact message
     let query = supabase
       .from('messages')
       .select(`
@@ -44,17 +45,21 @@ export async function GET(request: NextRequest) {
         requires_human_review,
         labels,
         created_at,
-        channel_connection:channel_connections(provider, provider_account_name)
+        handled_by_aiva,
+        channel_connection:channel_connections(provider, provider_account_name, provider_account_id)
       `)
       .eq('workspace_id', workspaceId)
       .order('timestamp', { ascending: false })
-      .limit(50);
+      .limit(100);
 
+    // Use more flexible matching
     if (subject) {
-      query = query.ilike('subject', `%${subject}%`);
+      // Try exact match first, then partial
+      query = query.or(`subject.eq.${subject},subject.ilike.%${subject}%`);
     }
     if (sender) {
-      query = query.ilike('sender_email', `%${sender}%`);
+      // Try exact email match first
+      query = query.or(`sender_email.eq.${sender},sender_email.ilike.%${sender}%`);
     }
 
     const { data: messages, error } = await query;
@@ -83,12 +88,17 @@ export async function GET(request: NextRequest) {
       queueItems = queueData || [];
     }
 
-    // Get workspace settings
-    const { data: settings } = await supabase
+    // Get workspace settings (will be fetched again below with more fields)
+
+    // Get workspace smart filter settings
+    const { data: workspaceSettings } = await supabase
       .from('workspace_settings')
-      .select('auto_send_enabled, auto_send_confidence_threshold')
+      .select('excluded_categories, excluded_senders, auto_send_enabled, auto_send_confidence_threshold')
       .eq('workspace_id', workspaceId)
       .single();
+
+    const excludedCategories = (workspaceSettings?.excluded_categories as string[]) || [];
+    const excludedSenders = (workspaceSettings?.excluded_senders as string[]) || [];
 
     // Analyze each message
     const analyzed = messages?.map(msg => {
@@ -96,46 +106,99 @@ export async function GET(request: NextRequest) {
       const queueItem = queueItems.find(q => q.message_id === msg.id);
 
       const reasons: string[] = [];
+      const checks: Record<string, boolean> = {};
 
-      // Check if it would be eligible for draft generation
-      if (!msg.actionability || msg.actionability === 'none') {
-        reasons.push(`Actionability is '${msg.actionability || 'null'}' (needs: question, request, fyi, scheduling_intent, or task)`);
+      // Check 1: Actionability
+      const validActionability = ['question', 'request', 'fyi', 'scheduling_intent', 'task'];
+      const hasValidActionability = msg.actionability && validActionability.includes(msg.actionability);
+      checks.actionability = hasValidActionability;
+      if (!hasValidActionability) {
+        reasons.push(`Actionability is '${msg.actionability || 'null'}' (needs: ${validActionability.join(', ')})`);
       }
 
+      // Check 2: Already has draft
+      checks.hasDraft = !msg.has_draft_reply;
       if (msg.has_draft_reply) {
         reasons.push('Already has a draft');
       }
 
+      // Check 3: Human review flag
+      checks.notFlaggedForReview = !msg.requires_human_review;
       if (msg.requires_human_review) {
         reasons.push('Flagged for human review');
       }
 
+      // Check 4: Time window (last 24 hours)
+      const messageAge = Date.now() - new Date(msg.timestamp).getTime();
+      const isRecent = messageAge < 24 * 60 * 60 * 1000;
+      checks.isRecent = isRecent;
+      if (!isRecent) {
+        const hoursAgo = Math.round(messageAge / (60 * 60 * 1000));
+        reasons.push(`Message is ${hoursAgo} hours old (needs to be < 24 hours)`);
+      }
+
+      // Check 5: Excluded categories
+      const isExcludedCategory = excludedCategories.includes(msg.category || '');
+      checks.notExcludedCategory = !isExcludedCategory;
+      if (isExcludedCategory) {
+        reasons.push(`Category '${msg.category}' is excluded`);
+      }
+
+      // Check 6: Excluded senders
+      const senderEmail = (msg.sender_email || '').toLowerCase();
+      const isExcludedSender = excludedSenders.some(excluded => 
+        senderEmail.includes(excluded.toLowerCase()) || excluded.toLowerCase().includes(senderEmail)
+      );
+      checks.notExcludedSender = !isExcludedSender;
+      if (isExcludedSender) {
+        reasons.push(`Sender '${msg.sender_email}' is excluded`);
+      }
+
+      // Check 7: SENT label (should not reply to sent messages)
+      const labels = (msg.labels as string[]) || [];
+      const hasSentLabel = labels.some(l => l.toUpperCase() === 'SENT');
+      checks.notSentMessage = !hasSentLabel;
+      if (hasSentLabel) {
+        reasons.push('Message has SENT label (outgoing message)');
+      }
+
+      // Check 8: Draft confidence threshold
       if (messageDrafts.length > 0) {
         const latestDraft = messageDrafts[0];
-        const meetsThreshold = (latestDraft.confidence_score || 0) >= (settings?.auto_send_confidence_threshold || 0.7);
+        const meetsThreshold = (latestDraft.confidence_score || 0) >= (workspaceSettings?.auto_send_confidence_threshold || 0.7);
+        checks.meetsConfidenceThreshold = meetsThreshold;
         if (!meetsThreshold) {
-          reasons.push(`Draft confidence (${latestDraft.confidence_score}) below threshold (${settings?.auto_send_confidence_threshold || 0.7})`);
+          reasons.push(`Draft confidence (${latestDraft.confidence_score}) below threshold (${workspaceSettings?.auto_send_confidence_threshold || 0.7})`);
         }
         if (!queueItem) {
           reasons.push('Draft exists but not queued for auto-send');
         }
       } else {
-        reasons.push('No draft generated yet');
+        checks.hasDraft = false;
+        if (hasValidActionability && !msg.has_draft_reply && !msg.requires_human_review && isRecent && !isExcludedCategory && !isExcludedSender && !hasSentLabel) {
+          reasons.push('No draft generated yet (should be eligible for draft generation)');
+        }
       }
+
+      const wouldGetReply = Object.values(checks).every(v => v === true) && messageDrafts.length > 0 && queueItem;
 
       return {
         ...msg,
         drafts: messageDrafts,
         queueItem,
         reasons,
-        wouldGetReply: reasons.length === 0,
+        checks,
+        wouldGetReply,
+        messageAgeHours: Math.round(messageAge / (60 * 60 * 1000)),
       };
     });
 
     return NextResponse.json({
       workspaceId,
-      autoSendEnabled: settings?.auto_send_enabled || false,
-      confidenceThreshold: settings?.auto_send_confidence_threshold || 0.7,
+      autoSendEnabled: workspaceSettings?.auto_send_enabled || false,
+      confidenceThreshold: workspaceSettings?.auto_send_confidence_threshold || 0.7,
+      excludedCategories,
+      excludedSenders,
       messages: analyzed,
       total: messages?.length || 0,
     });

@@ -23,3 +23,5 @@ COMMENT ON COLUMN public.shopify_stores.link_method IS 'How the Aiva account was
 -- ALTER TABLE public.shopify_stores DROP COLUMN IF EXISTS link_method;
 -- DROP TYPE IF EXISTS public.shopify_link_method;
 
+
+

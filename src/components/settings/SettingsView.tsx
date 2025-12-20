@@ -1125,7 +1125,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                         <Separator />
 
                         {/* Kill Switch */}
-                        {autoSendPaused ? (
+                        {autoSendPaused && (
                           <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
@@ -1154,7 +1154,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                               </Button>
                             </div>
                           </div>
-                        ) : null}
+                        )}
 
                         <Separator />
 
