@@ -1154,27 +1154,6 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                               </Button>
                             </div>
                           </div>
-                        ) : (
-                          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                            <div className="flex items-center gap-3">
-                              <Pause className="h-4 w-4 text-muted-foreground" />
-                              <p className="text-sm text-muted-foreground">
-                                Emergency stop: Pause all auto-replies instantly
-                              </p>
-                            </div>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={handlePauseAutoSend}
-                              disabled={pauseStatus === 'executing'}
-                            >
-                              {pauseStatus === 'executing' ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                'Pause All'
-                              )}
-                            </Button>
-                          </div>
                         )}
 
                         <Separator />
@@ -1344,47 +1323,6 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Inbox Type */}
-                  <div className="space-y-3">
-                    <div className="space-y-0.5">
-                      <Label>Inbox Type</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Determines default reply tone and filtering behavior
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-3 gap-3">
-                      <Button
-                        variant={inboxType === 'work' ? 'default' : 'outline'}
-                        className="flex flex-col items-center gap-1 h-auto py-3"
-                        onClick={() => handleInboxTypeChange('work')}
-                      >
-                        <Briefcase className="h-5 w-5" />
-                        <span className="text-sm">Work</span>
-                        <span className="text-xs text-muted-foreground">Formal, professional</span>
-                      </Button>
-                      <Button
-                        variant={inboxType === 'personal' ? 'default' : 'outline'}
-                        className="flex flex-col items-center gap-1 h-auto py-3"
-                        onClick={() => handleInboxTypeChange('personal')}
-                      >
-                        <Home className="h-5 w-5" />
-                        <span className="text-sm">Personal</span>
-                        <span className="text-xs text-muted-foreground">Casual, friendly</span>
-                      </Button>
-                      <Button
-                        variant={inboxType === 'mixed' ? 'default' : 'outline'}
-                        className="flex flex-col items-center gap-1 h-auto py-3"
-                        onClick={() => handleInboxTypeChange('mixed')}
-                      >
-                        <Shuffle className="h-5 w-5" />
-                        <span className="text-sm">Mixed</span>
-                        <span className="text-xs text-muted-foreground">Context-aware</span>
-                      </Button>
-                    </div>
-                  </div>
-
-                  <Separator />
-
                   {/* Excluded Categories */}
                   <div className="space-y-3">
                     <div className="space-y-0.5">
