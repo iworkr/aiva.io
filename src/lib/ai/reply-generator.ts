@@ -562,15 +562,45 @@ IMPORTANT: Always return valid, complete JSON. Keep replies concise.`;
       };
     }
 
-    const { error: messageUpdateError, data: updatedMessage } = await supabase
-      .from("messages")
-      .update(messageUpdate)
-      .eq("id", messageId)
-      .select('requires_human_review, review_reason')
-      .single();
+    // CRITICAL: Always update requires_human_review when draft is held
+    // Retry logic to ensure the update succeeds
+    let messageUpdateError: any = null;
+    let updatedMessage: any = null;
+    let retries = 0;
+    const maxRetries = 3;
+
+    while (retries < maxRetries) {
+      const { error, data } = await supabase
+        .from("messages")
+        .update(messageUpdate)
+        .eq("id", messageId)
+        .select('requires_human_review, review_reason, reviewed_at, handled_by_aiva')
+        .single();
+
+      messageUpdateError = error;
+      updatedMessage = data;
+
+      if (!error && data) {
+        // Verify the update actually worked
+        if (shouldHoldForReview && !data.requires_human_review) {
+          console.warn(`[AI Reply] WARNING: Message update did not set requires_human_review=true (attempt ${retries + 1}/${maxRetries}). Retrying...`);
+          retries++;
+          // Wait 100ms before retry
+          await new Promise(resolve => setTimeout(resolve, 100));
+          continue;
+        }
+        break; // Success
+      } else if (error && retries < maxRetries - 1) {
+        console.warn(`[AI Reply] Message update failed (attempt ${retries + 1}/${maxRetries}), retrying...`, error);
+        retries++;
+        await new Promise(resolve => setTimeout(resolve, 100));
+        continue;
+      }
+      break; // Give up after max retries
+    }
 
     if (messageUpdateError) {
-      console.error('[AI Reply] Failed to update message with draft info:', messageUpdateError);
+      console.error('[AI Reply] Failed to update message with draft info after retries:', messageUpdateError);
       // Even if update fails, the draft is still held for review, so it will be caught by the held drafts query
     } else {
       console.log('[AI Reply] Message updated successfully:', {
@@ -580,11 +610,13 @@ IMPORTANT: Always return valid, complete JSON. Keep replies concise.`;
         reviewReason: shouldHoldForReview ? (finalReviewReason || 'draft_held_for_review') : undefined,
         actualRequiresHumanReview: updatedMessage?.requires_human_review,
         actualReviewReason: updatedMessage?.review_reason,
+        reviewedAt: updatedMessage?.reviewed_at,
+        handledByAiva: updatedMessage?.handled_by_aiva,
       });
       
-      // Verify the update actually worked
+      // Final verification
       if (shouldHoldForReview && !updatedMessage?.requires_human_review) {
-        console.warn('[AI Reply] WARNING: Message update did not set requires_human_review=true as expected. Draft is still held for review.');
+        console.error('[AI Reply] CRITICAL: Message update failed to set requires_human_review=true after all retries. This message may not appear in the review queue.');
       }
     }
 
