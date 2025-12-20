@@ -369,26 +369,9 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
           // Store timestamp before sync to fetch only new messages
           const syncStartTime = lastSyncTimestampRef.current;
 
-          // Fetch only new messages created after the sync started
-          // Use a small delay to ensure all messages are committed to DB
-          setTimeout(() => {
-            const { orderBy, orderDirection } = getSortParams(sortBy);
-            fetchNewMessages({
-              workspaceId,
-              channelConnectionId: selectedChannel || undefined,
-              priority: priorityFilter as MessagePriority | undefined,
-              category: categoryFilter as MessageCategory | undefined,
-              isRead: statusFilter === 'unread' ? false : undefined,
-              isStarred: statusFilter === 'starred' ? true : undefined,
-              since: syncStartTime,
-              limit: 100,
-              orderBy,
-              orderDirection,
-            });
-          }, 500);
-
-          // Update sync timestamp for next sync
-          lastSyncTimestampRef.current = new Date().toISOString();
+          // Don't fetch messages here - let the onSyncComplete callback handle it
+          // This prevents double-fetching and ensures we use the correct timestamp
+          console.log(`✅ Sync completed: ${data.totalNewMessages} new messages`);
         }
       },
       onError: ({ error }) => {
