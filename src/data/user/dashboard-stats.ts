@@ -202,15 +202,11 @@ export async function getNeedsAttentionItems(
   }
 
   for (const msg of reviewItems || []) {
-    // Filter to only include messages with held drafts
+    // Include all messages that require human review
+    // Draft information will be enriched by the held drafts query below
+    // This ensures messages appear even if RLS blocks the joined drafts
     const drafts = (msg.message_drafts as any[]) || [];
     const heldDraft = drafts.find((d: any) => d.hold_for_review === true);
-    
-    if (!heldDraft && drafts.length === 0) {
-      // Skip if no held draft (might have other drafts)
-      continue;
-    }
-    
     const draft = heldDraft || drafts[0];
     const reviewContext = msg.review_context as any;
     
@@ -228,7 +224,7 @@ export async function getNeedsAttentionItems(
       category: msg.category || undefined,
       reviewReason: draft?.review_reason || msg.review_reason || 'needs_review',
       provider: (msg.channel_connection as any)?.provider,
-      // Draft information
+      // Draft information (may be empty if RLS blocks drafts, will be enriched below)
       draftBody: draft?.body,
       confidenceScore: draft?.confidence_score || reviewContext?.confidenceScore,
       calendarContext: draft?.calendar_context || reviewContext?.calendarContext,
@@ -281,12 +277,28 @@ export async function getNeedsAttentionItems(
     const msg = (draft.message as any);
     if (!msg) continue;
     
-    // Skip if already added or if message is reviewed/handled
-    if (addedMessageIds.has(msg.id)) continue;
+    // Skip if message is reviewed/handled
     if (msg.reviewed_at) continue;
     if (msg.handled_by_aiva) continue;
     if (msg.workspace_id !== workspaceId) continue; // Safety check
     
+    // If message was already added from first query, enrich it with draft info
+    if (addedMessageIds.has(msg.id)) {
+      const existingItem = items.find(i => i.messageId === msg.id);
+      if (existingItem && !existingItem.draftBody) {
+        // Enrich with draft information if not already present
+        existingItem.draftId = draft.id;
+        existingItem.draftBody = draft.body;
+        existingItem.confidenceScore = draft.confidence_score ?? existingItem.confidenceScore;
+        existingItem.calendarContext = draft.calendar_context ?? existingItem.calendarContext;
+        existingItem.aiUncertaintyNotes = draft.ai_uncertainty_notes ?? existingItem.aiUncertaintyNotes;
+        existingItem.reviewReason = draft.review_reason || existingItem.reviewReason;
+        existingItem.hasDraft = true;
+      }
+      continue;
+    }
+    
+    // Otherwise, add as new item
     items.push({
       id: draft.id,
       type: 'review',
