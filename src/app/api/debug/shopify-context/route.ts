@@ -5,14 +5,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseUserRouteHandlerClient } from '@/supabase-clients/user/createSupabaseUserRouteHandlerClient';
-import { getUser } from '@/rsc-data/user/getUser';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    const { data: { user } } = await getUser();
-    if (!user) {
+    const supabase = await createSupabaseUserRouteHandlerClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
@@ -20,8 +21,6 @@ export async function GET(request: NextRequest) {
     if (!workspaceId) {
       return NextResponse.json({ error: 'workspaceId required' }, { status: 400 });
     }
-
-    const supabase = await createSupabaseUserRouteHandlerClient();
     
     const debug: any = {
       userId: user.id,
