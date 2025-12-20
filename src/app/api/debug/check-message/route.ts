@@ -26,7 +26,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'workspaceId is required' }, { status: 400 });
     }
 
-    // First, try to find the exact message
+    // First, get ALL recent messages from this sender (last 7 days) to see what we have
+    // This helps diagnose if the email was synced at all
+    const { data: allRecentFromSender, error: recentError } = await supabase
+      .from('messages')
+      .select(`
+        id,
+        subject,
+        sender_email,
+        sender_name,
+        timestamp,
+        created_at,
+        channel_connection:channel_connections(provider, provider_account_name)
+      `)
+      .eq('workspace_id', workspaceId)
+      .ilike('sender_email', sender || '%')
+      .gte('timestamp', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+      .order('timestamp', { ascending: false })
+      .limit(50);
+
+    // Now try to find the exact message
     let query = supabase
       .from('messages')
       .select(`
@@ -52,14 +71,14 @@ export async function GET(request: NextRequest) {
       .order('timestamp', { ascending: false })
       .limit(100);
 
-    // Use more flexible matching
-    if (subject) {
-      // Try exact match first, then partial
-      query = query.or(`subject.eq.${subject},subject.ilike.%${subject}%`);
-    }
-    if (sender) {
-      // Try exact email match first
-      query = query.or(`sender_email.eq.${sender},sender_email.ilike.%${sender}%`);
+    // Use more flexible matching - search for subject OR sender
+    if (subject && sender) {
+      // Search for messages matching either subject or sender
+      query = query.or(`subject.ilike.%${subject}%,sender_email.ilike.%${sender}%`);
+    } else if (subject) {
+      query = query.ilike('subject', `%${subject}%`);
+    } else if (sender) {
+      query = query.ilike('sender_email', `%${sender}%`);
     }
 
     const { data: messages, error } = await query;
@@ -201,6 +220,13 @@ export async function GET(request: NextRequest) {
       excludedSenders,
       messages: analyzed,
       total: messages?.length || 0,
+      // Include all recent messages from sender for debugging
+      recentMessagesFromSender: allRecentFromSender || [],
+      searchCriteria: {
+        subject: subject || 'not provided',
+        sender: sender || 'not provided',
+        searchedAt: new Date().toISOString(),
+      },
     });
   } catch (error) {
     console.error('Debug check message error:', error);
