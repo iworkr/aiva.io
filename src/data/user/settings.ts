@@ -229,22 +229,49 @@ export const generateAIContextAction = authActionClient
         shopifyParts.push(`Store: ${store.shop_name || store.shop_domain}`);
         shopifyParts.push(`Currency: ${store.currency || 'USD'}`);
         
-        // Get store statistics
-        const { count: totalOrders } = await supabase
+        // Get store ID to query synced data (workspace_id might not be set)
+        const { data: storeData } = await supabase
+          .from('shopify_stores')
+          .select('id')
+          .eq('shop_domain', store.shop_domain)
+          .single();
+        
+        const storeId = storeData?.id;
+        
+        // Query by both workspace_id AND shopify_store_id to catch all synced data
+        let ordersQuery = supabase
           .from('shopify_orders')
-          .select('*', { count: 'exact', head: true })
-          .eq('workspace_id', workspaceId);
+          .select('*', { count: 'exact', head: true });
+        if (workspaceId) {
+          ordersQuery = ordersQuery.eq('workspace_id', workspaceId);
+        }
+        if (storeId) {
+          ordersQuery = ordersQuery.eq('shopify_store_id', storeId);
+        }
+        const { count: totalOrders } = await ordersQuery;
         
-        const { count: totalCustomers } = await supabase
+        let customersQuery = supabase
           .from('shopify_customers')
-          .select('*', { count: 'exact', head: true })
-          .eq('workspace_id', workspaceId);
+          .select('*', { count: 'exact', head: true });
+        if (workspaceId) {
+          customersQuery = customersQuery.eq('workspace_id', workspaceId);
+        }
+        if (storeId) {
+          customersQuery = customersQuery.eq('shopify_store_id', storeId);
+        }
+        const { count: totalCustomers } = await customersQuery;
         
-        const { count: totalProducts } = await supabase
+        let productsQuery = supabase
           .from('shopify_products')
           .select('*', { count: 'exact', head: true })
-          .eq('workspace_id', workspaceId)
           .eq('status', 'active');
+        if (workspaceId) {
+          productsQuery = productsQuery.eq('workspace_id', workspaceId);
+        }
+        if (storeId) {
+          productsQuery = productsQuery.eq('shopify_store_id', storeId);
+        }
+        const { count: totalProducts } = await productsQuery;
         
         if (totalOrders || totalCustomers || totalProducts) {
           shopifyParts.push(`\n### Store Statistics`);
@@ -253,19 +280,33 @@ export const generateAIContextAction = authActionClient
           if (totalProducts) shopifyParts.push(`- Active Products: ${totalProducts}`);
         }
         
-        // Get popular products
-        const { data: products } = await supabase
+        // Get products with full details
+        let productsDataQuery = supabase
           .from('shopify_products')
-          .select('title, variants')
-          .eq('workspace_id', workspaceId)
-          .eq('status', 'active')
+          .select('title, vendor, product_type, body_html, variants, tags')
+          .eq('status', 'active');
+        if (workspaceId) {
+          productsDataQuery = productsDataQuery.eq('workspace_id', workspaceId);
+        }
+        if (storeId) {
+          productsDataQuery = productsDataQuery.eq('shopify_store_id', storeId);
+        }
+        const { data: products } = await productsDataQuery
           .order('created_at', { ascending: false })
-          .limit(5);
+          .limit(10);
         
         if (products && products.length > 0) {
           shopifyParts.push(`\n### Products Available`);
+          
+          // Group by product type or vendor to show what the store sells
+          const productTypes = new Set<string>();
+          const vendors = new Set<string>();
+          
           for (const product of products) {
-            // Extract price from variants (first variant or min price)
+            if (product.product_type) productTypes.add(product.product_type);
+            if (product.vendor) vendors.add(product.vendor);
+            
+            // Extract price from variants
             let priceText = '';
             if (product.variants && Array.isArray(product.variants) && product.variants.length > 0) {
               const prices = (product.variants as any[])
@@ -281,7 +322,21 @@ export const generateAIContextAction = authActionClient
                 }
               }
             }
-            shopifyParts.push(`- ${product.title}${priceText}`);
+            
+            let productDesc = `- ${product.title}${priceText}`;
+            if (product.vendor) productDesc += ` (by ${product.vendor})`;
+            shopifyParts.push(productDesc);
+          }
+          
+          // Add summary of what the store sells
+          if (productTypes.size > 0 || vendors.size > 0) {
+            shopifyParts.push(`\n### What This Store Sells`);
+            if (productTypes.size > 0) {
+              shopifyParts.push(`Product Types: ${Array.from(productTypes).join(', ')}`);
+            }
+            if (vendors.size > 0) {
+              shopifyParts.push(`Vendors/Brands: ${Array.from(vendors).join(', ')}`);
+            }
           }
         }
         
