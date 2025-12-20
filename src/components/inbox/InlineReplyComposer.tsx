@@ -67,6 +67,7 @@ export function InlineReplyComposer({
       toast.success("Your message is on its way! ✈️");
       setReplyText('');
       setConfidenceScore(null);
+      setIsSending(false); // Reset sending state
       onSent?.();
     },
     onError: ({ error }) => {
@@ -162,14 +163,30 @@ export function InlineReplyComposer({
     setShowConfirmDialog(false);
     setIsSending(true);
 
+    const bodyToSend = replyText.trim();
+    if (!bodyToSend) {
+      toast.error("Your reply is empty. Please add some text before sending.");
+      setIsSending(false);
+      return;
+    }
+
+    console.log('[InlineReplyComposer] Sending reply:', {
+      messageId,
+      workspaceId,
+      bodyLength: bodyToSend.length,
+      bodyPreview: bodyToSend.substring(0, 100),
+      draftId,
+    });
+
     sendReply({
       messageId,
       workspaceId,
-      body: replyText.trim(),
+      body: bodyToSend,
       subject: messageSubject.startsWith('Re:') ? messageSubject : `Re: ${messageSubject}`,
       to: [senderEmail],
       provider,
       providerMessageId,
+      draftId, // Pass draftId so calendar event can be created
     });
   };
 

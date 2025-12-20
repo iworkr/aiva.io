@@ -1017,11 +1017,23 @@ export const sendReplyAction = authActionClient
       to: z.array(z.string().email()),
       provider: z.enum(['gmail', 'outlook', 'slack', 'teams']),
       providerMessageId: z.string().optional(),
+      draftId: z.string().uuid().optional(),
     })
   )
   .action(async ({ parsedInput, ctx: { userId } }) => {
-    const { messageId, workspaceId, body, subject, to, provider, providerMessageId } =
+    const { messageId, workspaceId, body, subject, to, provider, providerMessageId, draftId } =
       parsedInput;
+
+    console.log('[sendReplyAction] Starting:', {
+      messageId,
+      workspaceId,
+      bodyLength: body.length,
+      bodyPreview: body.substring(0, 100),
+      subject,
+      to,
+      provider,
+      draftId,
+    });
 
     // Verify workspace membership
     const isMember = await isWorkspaceMember(userId, workspaceId);
@@ -1059,15 +1071,26 @@ export const sendReplyAction = authActionClient
       throw new Error('Channel connection not found or provider mismatch');
     }
 
+    // Validate body is not empty
+    if (!body || !body.trim()) {
+      throw new Error('Email body cannot be empty');
+    }
+
     // Send reply based on provider
     try {
       if (provider === 'gmail') {
         const { sendGmailMessage, getGmailAccessToken } = await import('@/lib/gmail/client');
         const accessToken = await getGmailAccessToken(connection.id);
+        console.log('[sendReplyAction] Sending Gmail message:', {
+          to,
+          subject,
+          bodyLength: body.length,
+          inReplyTo: providerMessageId || message.provider_message_id,
+        });
         await sendGmailMessage(accessToken, {
           to,
           subject,
-          body,
+          body: body.trim(), // Ensure body is trimmed
           inReplyTo: providerMessageId || message.provider_message_id,
           references: message.provider_thread_id
             ? [message.provider_thread_id]
@@ -1076,25 +1099,81 @@ export const sendReplyAction = authActionClient
       } else if (provider === 'outlook') {
         const { sendOutlookMessage, getOutlookAccessToken } = await import('@/lib/outlook/client');
         const accessToken = await getOutlookAccessToken(connection.id);
+        console.log('[sendReplyAction] Sending Outlook message:', {
+          to,
+          subject,
+          bodyLength: body.length,
+          inReplyTo: providerMessageId || message.provider_message_id,
+        });
         await sendOutlookMessage(accessToken, {
           to,
           subject,
-          body,
+          body: body.trim(), // Ensure body is trimmed
           inReplyTo: providerMessageId || message.provider_message_id,
         });
       } else {
         throw new Error(`Reply not supported for ${provider}`);
       }
 
+      // Mark message as reviewed and handled
+      console.log('[sendReplyAction] Marking message as reviewed');
+      await supabase
+        .from('messages')
+        .update({
+          requires_human_review: false,
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: userId,
+          handled_by_aiva: true,
+        })
+        .eq('id', messageId)
+        .eq('workspace_id', workspaceId);
+
+      // Update draft if provided
+      if (draftId) {
+        console.log('[sendReplyAction] Updating draft status');
+        await supabase
+          .from('message_drafts')
+          .update({
+            edited_by_user: true,
+            auto_sent: false, // Manual send, not auto-sent
+            auto_sent_at: null,
+          })
+          .eq('id', draftId)
+          .eq('workspace_id', workspaceId);
+
+        // Create calendar event if date/time information is available
+        try {
+          console.log('[sendReplyAction] Attempting to create calendar event');
+          const { createCalendarEventFromSentEmail } = await import('@/lib/ai/scheduling');
+          const eventResult = await createCalendarEventFromSentEmail(
+            messageId,
+            draftId,
+            workspaceId,
+            userId
+          );
+          
+          if (eventResult.success) {
+            console.log('[sendReplyAction] Calendar event created:', eventResult.eventId);
+          } else {
+            console.log('[sendReplyAction] Calendar event not created:', eventResult.message);
+          }
+        } catch (eventError) {
+          console.error('[sendReplyAction] Error creating calendar event:', eventError);
+          // Don't fail the send if calendar event creation fails
+        }
+      }
+
       revalidatePath(`/inbox`);
       revalidatePath(`/inbox/${messageId}`);
+      revalidatePath(`/`); // Revalidate homepage to remove from attention items
 
+      console.log('[sendReplyAction] Reply sent successfully');
       return {
         success: true,
         message: 'Reply sent successfully',
       };
     } catch (error) {
-      console.error('Send reply error:', error);
+      console.error('[sendReplyAction] Send reply error:', error);
       throw new Error(
         error instanceof Error ? error.message : 'Failed to send reply'
       );

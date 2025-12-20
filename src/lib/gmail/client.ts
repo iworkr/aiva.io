@@ -349,8 +349,21 @@ export async function sendGmailMessage(
     references?: string[];
   }
 ): Promise<{ id: string }> {
+  // Validate body is not empty
+  if (!options.body || !options.body.trim()) {
+    throw new Error('Email body cannot be empty');
+  }
+
+  console.log('[sendGmailMessage] Preparing message:', {
+    to: options.to,
+    subject: options.subject,
+    bodyLength: options.body.length,
+    bodyPreview: options.body.substring(0, 100),
+  });
+
   // Build RFC 2822 formatted message
-  const messageParts = [
+  // Note: We need to ensure the body is included, even if it's just whitespace
+  const headers = [
     `To: ${options.to.join(', ')}`,
     options.cc ? `Cc: ${options.cc.join(', ')}` : '',
     options.bcc ? `Bcc: ${options.bcc.join(', ')}` : '',
@@ -358,13 +371,19 @@ export async function sendGmailMessage(
     'Content-Type: text/plain; charset=utf-8',
     options.inReplyTo ? `In-Reply-To: ${options.inReplyTo}` : '',
     options.references ? `References: ${options.references.join(' ')}` : '',
-    '',
-    options.body,
-  ]
-    .filter(Boolean)
-    .join('\r\n');
+  ].filter(Boolean);
 
-  const encodedMessage = Buffer.from(messageParts)
+  // Join headers and body with proper RFC 2822 formatting
+  const messageParts = [
+    ...headers,
+    '', // Empty line separates headers from body
+    options.body.trim(), // Ensure body is trimmed but not empty
+  ].join('\r\n');
+
+  console.log('[sendGmailMessage] Message parts length:', messageParts.length);
+  console.log('[sendGmailMessage] Body included:', messageParts.includes(options.body.trim()));
+
+  const encodedMessage = Buffer.from(messageParts, 'utf-8')
     .toString('base64')
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
@@ -385,10 +404,18 @@ export async function sendGmailMessage(
   );
 
   if (!response.ok) {
-    throw new Error(`Failed to send Gmail message: ${response.statusText}`);
+    const errorText = await response.text().catch(() => 'Unknown error');
+    console.error('[sendGmailMessage] Gmail API error:', {
+      status: response.status,
+      statusText: response.statusText,
+      error: errorText,
+    });
+    throw new Error(`Failed to send Gmail message: ${response.status} ${response.statusText}`);
   }
 
-  return await response.json();
+  const result = await response.json();
+  console.log('[sendGmailMessage] Message sent successfully:', result.id);
+  return result;
 }
 
 /**
