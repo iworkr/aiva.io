@@ -64,35 +64,46 @@ export function BriefingSection({ items, workspaceId, userId }: BriefingSectionP
   const [isGeneratingReply, setIsGeneratingReply] = useState(false);
   const [isSendingReply, setIsSendingReply] = useState(false);
   const [completedItems, setCompletedItems] = useState<Set<string>>(new Set());
+  const [dismissedItems, setDismissedItems] = useState<Set<string>>(new Set()); // Optimistic dismissals
   const router = useRouter();
   
-  const topItems = items.slice(0, 3);
-  const remainingItems = items.slice(3);
+  // Filter out dismissed items for instant UI update
+  const visibleItems = items.filter(item => !dismissedItems.has(item.id));
+  const topItems = visibleItems.slice(0, 3);
+  const remainingItems = visibleItems.slice(3);
 
-  // Dismiss actions
+  // Dismiss actions with optimistic updates
   const { execute: dismissItem, status: dismissStatus } = useAction(rejectReviewItemAction, {
     onSuccess: () => {
-      toast.success('Item dismissed');
+      // Server confirmed - refresh to get latest state
       router.refresh();
     },
     onError: ({ error }) => {
+      // Revert optimistic update on error
       toast.error(error.serverError || 'Failed to dismiss item');
+      // Note: We don't revert dismissedItems here because router.refresh() will reload the data
     },
   });
 
   const { execute: bulkDismiss, status: bulkDismissStatus } = useAction(bulkDismissReviewItemsAction, {
     onSuccess: ({ data }) => {
       toast.success(`Dismissed ${data?.dismissedCount || 0} items`);
+      // Server confirmed - refresh to get latest state
       router.refresh();
     },
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to dismiss items');
+      // Note: We don't revert dismissedItems here because router.refresh() will reload the data
     },
   });
 
   const handleDismissItem = (item: BriefingItem, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    // Optimistic update - remove from UI immediately
+    setDismissedItems(prev => new Set(prev).add(item.id));
+    
     if (item.type === 'message' && item.messageId && workspaceId) {
       dismissItem({
         workspaceId,
@@ -107,8 +118,13 @@ export function BriefingSection({ items, workspaceId, userId }: BriefingSectionP
   };
 
   const handleClearAll = () => {
-    if (items.length === 0) return;
-    const messageItems = items.filter(item => item.type === 'message' && item.messageId);
+    if (visibleItems.length === 0) return;
+    const messageItems = visibleItems.filter(item => item.type === 'message' && item.messageId);
+    
+    // Optimistic update - remove all from UI immediately
+    const allIds = new Set(visibleItems.map(item => item.id));
+    setDismissedItems(prev => new Set([...prev, ...allIds]));
+    
     if (messageItems.length > 0 && workspaceId) {
       const messageIds = messageItems.map(item => item.messageId!);
       bulkDismiss({
@@ -118,7 +134,6 @@ export function BriefingSection({ items, workspaceId, userId }: BriefingSectionP
       });
     } else {
       // If no message items, just mark all as completed locally
-      const allIds = new Set(items.map(item => item.id));
       setCompletedItems(allIds);
       toast.success('All items dismissed');
     }
@@ -127,7 +142,9 @@ export function BriefingSection({ items, workspaceId, userId }: BriefingSectionP
   // Debug logging
   console.log('[BriefingSection] Rendering with items:', {
     count: items.length,
-    items: items.map(i => ({
+    visibleCount: visibleItems.length,
+    dismissedCount: dismissedItems.size,
+    items: visibleItems.map(i => ({
       id: i.id,
       messageId: i.messageId,
       title: i.title,
@@ -138,7 +155,7 @@ export function BriefingSection({ items, workspaceId, userId }: BriefingSectionP
   });
 
   // Always render something for debugging, even if no items
-  if (items.length === 0) {
+  if (visibleItems.length === 0) {
     return (
       <div id="briefing" className="space-y-1">
         <div className="flex items-center justify-between px-3 mb-1">
@@ -500,7 +517,7 @@ export function BriefingSection({ items, workspaceId, userId }: BriefingSectionP
       <div className="flex items-center justify-between px-3 mb-1">
         <h2 className="text-sm font-medium text-muted-foreground">What needs your attention</h2>
         <div className="flex items-center gap-2">
-          {items.length > 0 && workspaceId && (
+          {visibleItems.length > 0 && workspaceId && (
             <Button
               variant="ghost"
               size="sm"
@@ -512,7 +529,7 @@ export function BriefingSection({ items, workspaceId, userId }: BriefingSectionP
               Clear All
             </Button>
           )}
-          {items.length > 3 && (
+          {visibleItems.length > 3 && (
             <button
               type="button"
               onClick={() => setIsExpanded(!isExpanded)}

@@ -62,6 +62,7 @@ export function MessageDetailView({ messageId, workspaceId, userId, draftId }: M
   const [loading, setLoading] = useState(true);
   const [isStarred, setIsStarred] = useState(false);
   const [creatingEvent, setCreatingEvent] = useState(false);
+  const [threadRefreshTrigger, setThreadRefreshTrigger] = useState(0);
 
   // Fetch message
   useEffect(() => {
@@ -328,6 +329,7 @@ export function MessageDetailView({ messageId, workspaceId, userId, draftId }: M
             threadId={message.provider_thread_id}
             workspaceId={workspaceId}
             userEmail={userEmail}
+            refreshTrigger={threadRefreshTrigger}
           />
         </div>
       </div>
@@ -343,7 +345,11 @@ export function MessageDetailView({ messageId, workspaceId, userId, draftId }: M
           providerMessageId={message.provider_message_id}
           draftId={draftId}
           onSent={() => {
-            // Refresh the thread after sending
+            // Refresh the thread after sending - wait a moment for message to be saved
+            setTimeout(() => {
+              setThreadRefreshTrigger(prev => prev + 1);
+            }, 500); // Small delay to ensure message is saved to DB
+            // Also refresh the page data
             router.refresh();
           }}
         />

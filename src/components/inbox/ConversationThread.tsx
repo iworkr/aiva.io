@@ -16,6 +16,7 @@ interface ConversationThreadProps {
   threadId: string | null;
   workspaceId: string;
   userEmail?: string;
+  refreshTrigger?: number; // Increment this to trigger a refetch
 }
 
 interface Message {
@@ -41,61 +42,62 @@ export function ConversationThread({
   threadId,
   workspaceId,
   userEmail,
+  refreshTrigger,
 }: ConversationThreadProps) {
   const [threadMessages, setThreadMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Fetch thread messages
-  useEffect(() => {
-    const fetchThread = async () => {
-      setLoading(true);
-      setError(null);
+  const fetchThread = async () => {
+    setLoading(true);
+    setError(null);
 
-      try {
-        const supabase = supabaseUserClientComponent;
+    try {
+      const supabase = supabaseUserClientComponent;
 
-        if (threadId) {
-          // Fetch all messages in the thread
-          const { data, error: fetchError } = await supabase
-            .from('messages')
-            .select('*')
-            .eq('workspace_id', workspaceId)
-            .eq('provider_thread_id', threadId)
-            .order('timestamp', { ascending: true });
+      if (threadId) {
+        // Fetch all messages in the thread
+        const { data, error: fetchError } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('workspace_id', workspaceId)
+          .eq('provider_thread_id', threadId)
+          .order('timestamp', { ascending: true });
 
-          if (fetchError) {
-            console.error('Failed to fetch thread:', fetchError);
-            setError('Failed to load conversation');
-          } else {
-            setThreadMessages(data || []);
-          }
+        if (fetchError) {
+          console.error('Failed to fetch thread:', fetchError);
+          setError('Failed to load conversation');
         } else {
-          // No thread ID - just show current message
-          const { data, error: fetchError } = await supabase
-            .from('messages')
-            .select('*')
-            .eq('id', currentMessageId)
-            .eq('workspace_id', workspaceId)
-            .single();
-
-          if (fetchError) {
-            console.error('Failed to fetch message:', fetchError);
-            setError('Failed to load message');
-          } else if (data) {
-            setThreadMessages([data]);
-          }
+          setThreadMessages(data || []);
         }
-      } catch (err) {
-        console.error('Error fetching thread:', err);
-        setError('An error occurred');
-      } finally {
-        setLoading(false);
-      }
-    };
+      } else {
+        // No thread ID - just show current message
+        const { data, error: fetchError } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('id', currentMessageId)
+          .eq('workspace_id', workspaceId)
+          .single();
 
+        if (fetchError) {
+          console.error('Failed to fetch message:', fetchError);
+          setError('Failed to load message');
+        } else if (data) {
+          setThreadMessages([data]);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching thread:', err);
+      setError('An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchThread();
-  }, [currentMessageId, threadId, workspaceId]);
+  }, [currentMessageId, threadId, workspaceId, refreshTrigger]);
 
   // Sort messages - oldest first for natural conversation flow
   const sortedMessages = useMemo(() => {
