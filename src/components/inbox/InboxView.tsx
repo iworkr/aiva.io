@@ -372,14 +372,18 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
           // Fetch only new messages created after the sync started
           // Use a small delay to ensure all messages are committed to DB
           setTimeout(() => {
+            const { orderBy, orderDirection } = getSortParams(sortBy);
             fetchNewMessages({
               workspaceId,
               channelConnectionId: selectedChannel || undefined,
               priority: priorityFilter as MessagePriority | undefined,
               category: categoryFilter as MessageCategory | undefined,
               isRead: statusFilter === 'unread' ? false : undefined,
-              afterTimestamp: syncStartTime,
+              isStarred: statusFilter === 'starred' ? true : undefined,
+              since: syncStartTime,
               limit: 100,
+              orderBy,
+              orderDirection,
             });
           }, 500);
 
@@ -606,7 +610,7 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
 
         {/* Message List */}
         <div className="flex-1 overflow-hidden">
-          {loading ? (
+          {loading && messages.length === 0 ? (
             <InboxSkeleton />
           ) : hasChannels === false ? (
             // No channels connected - Show connect prompt
@@ -749,28 +753,22 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
         onClose={() => setSyncProgressDialogOpen(false)}
         workspaceId={workspaceId}
         onSyncComplete={() => {
-          // Refresh messages after sync completes
-          try {
-            localStorage.removeItem(cacheKey);
-          } catch (error) {
-            console.error('Failed to clear cache:', error);
-          }
-          fetchingRef.current = false;
-          lastFetchRef.current = 0;
-          setCurrentOffset(0);
-          const { orderBy, orderDirection } = getSortParams(sortBy);
-          fetchMessages({
-            workspaceId,
-            channelConnectionId: selectedChannel || undefined,
-            priority: priorityFilter as MessagePriority | undefined,
-            category: categoryFilter as MessageCategory | undefined,
-            isRead: statusFilter === 'unread' ? false : undefined,
-            isStarred: statusFilter === 'starred' ? true : undefined,
-            limit: MESSAGES_PER_PAGE,
-            offset: 0,
-            orderBy,
-            orderDirection,
-          });
+          // Fetch only new messages and append them - don't refresh the whole list
+          // This prevents the white screen and keeps existing messages visible
+          const syncStartTime = lastSyncTimestampRef.current;
+          
+          // Small delay to ensure all messages are committed to DB
+          setTimeout(() => {
+            fetchNewMessages({
+              workspaceId,
+              channelConnectionId: selectedChannel || undefined,
+              priority: priorityFilter as MessagePriority | undefined,
+              category: categoryFilter as MessageCategory | undefined,
+              isRead: statusFilter === 'unread' ? false : undefined,
+              afterTimestamp: syncStartTime,
+              limit: 100,
+            });
+          }, 500);
         }}
       />
     </div>
