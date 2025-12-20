@@ -214,7 +214,7 @@ export const generateAIContextAction = authActionClient
         // Get popular products
         const { data: products } = await supabase
           .from('shopify_products')
-          .select('title, price')
+          .select('title, variants')
           .eq('workspace_id', workspaceId)
           .eq('status', 'active')
           .order('created_at', { ascending: false })
@@ -223,8 +223,23 @@ export const generateAIContextAction = authActionClient
         if (products && products.length > 0) {
           shopifyParts.push(`\n### Products Available`);
           for (const product of products) {
-            const price = product.price ? ` - $${parseFloat(String(product.price))}` : '';
-            shopifyParts.push(`- ${product.title}${price}`);
+            // Extract price from variants (first variant or min price)
+            let priceText = '';
+            if (product.variants && Array.isArray(product.variants) && product.variants.length > 0) {
+              const prices = (product.variants as any[])
+                .map((v: any) => parseFloat(v.price || '0'))
+                .filter((p: number) => p > 0);
+              if (prices.length > 0) {
+                const minPrice = Math.min(...prices);
+                const maxPrice = Math.max(...prices);
+                if (minPrice === maxPrice) {
+                  priceText = ` - $${minPrice.toFixed(2)}`;
+                } else {
+                  priceText = ` - $${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}`;
+                }
+              }
+            }
+            shopifyParts.push(`- ${product.title}${priceText}`);
           }
         }
         
