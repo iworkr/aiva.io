@@ -69,6 +69,7 @@ import {
   getUserProfile,
   getAutoSendSettings,
   getAutoSendFilters,
+  generateAIContextAction,
 } from '@/data/user/settings';
 import { useRouter } from '@/i18n/routing';
 import { useSearchParams } from 'next/navigation';
@@ -145,6 +146,9 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   const [autoTasks, setAutoTasks] = useState(false);
   const [autoEvents, setAutoEvents] = useState(false);
   const [defaultTone, setDefaultTone] = useState('professional');
+  const [aiContext, setAiContext] = useState('');
+  const [aiRules, setAiRules] = useState('');
+  const [isGeneratingContext, setIsGeneratingContext] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
   const [displayName, setDisplayName] = useState(user?.user_metadata?.full_name || '');
@@ -214,6 +218,8 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
             autoExtractTasks?: boolean;
             autoCreateEvents?: boolean;
             defaultReplyTone?: string;
+            context?: string;
+            rules?: string;
           };
           notifications?: {
             email?: boolean;
@@ -230,6 +236,8 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
           setAutoTasks(settings.ai.autoExtractTasks ?? false);
           setAutoEvents(settings.ai.autoCreateEvents ?? false);
           setDefaultTone(settings.ai.defaultReplyTone || 'professional');
+          setAiContext(settings.ai.context || '');
+          setAiRules(settings.ai.rules || '');
         }
 
         // Set notification settings
@@ -307,6 +315,8 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
           autoExtractTasks?: boolean;
           autoCreateEvents?: boolean;
           defaultReplyTone?: string;
+          context?: string;
+          rules?: string;
         };
         notifications?: {
           email?: boolean;
@@ -322,6 +332,8 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
         setAutoTasks(settings.ai.autoExtractTasks ?? false);
         setAutoEvents(settings.ai.autoCreateEvents ?? false);
         setDefaultTone(settings.ai.defaultReplyTone || 'professional');
+        setAiContext(settings.ai.context || '');
+        setAiRules(settings.ai.rules || '');
       }
 
       if (settings?.notifications) {
@@ -397,7 +409,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   // AI Settings - auto-save with debounce
   const { execute: saveAISettings, status: aiStatus } = useAction(updateAISettingsAction, {
     onSuccess: () => {
-      toast.success('Setting updated', { duration: 2000 });
+      // Don't show toast for every auto-save to avoid spam
     },
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to save setting');
@@ -486,7 +498,9 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
     autoClassify?: boolean; 
     autoTasks?: boolean; 
     autoEvents?: boolean; 
-    defaultTone?: string 
+    defaultTone?: string;
+    aiContext?: string;
+    aiRules?: string;
   }) => {
     if (!hasInitializedRef.current) return;
     
@@ -501,6 +515,8 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
         autoExtractTasks: updates.autoTasks ?? autoTasks,
         autoCreateEvents: updates.autoEvents ?? autoEvents,
         defaultReplyTone: (updates.defaultTone ?? defaultTone) as any,
+        aiContext: updates.aiContext !== undefined ? updates.aiContext : aiContext,
+        aiRules: updates.aiRules !== undefined ? updates.aiRules : aiRules,
       });
     }, 500);
   }, [workspaceId, autoClassify, autoTasks, autoEvents, defaultTone, saveAISettings]);
@@ -566,6 +582,35 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   const handleDefaultToneChange = (value: string) => {
     setDefaultTone(value);
     triggerAIAutoSave({ defaultTone: value });
+  };
+
+  const handleAiContextChange = (value: string) => {
+    setAiContext(value);
+    triggerAIAutoSave({ aiContext: value });
+  };
+
+  const handleAiRulesChange = (value: string) => {
+    setAiRules(value);
+    triggerAIAutoSave({ aiRules: value });
+  };
+
+  // Generate AI context action
+  const { execute: generateContext, status: generateContextStatus } = useAction(generateAIContextAction, {
+    onSuccess: ({ data }) => {
+      if (data?.context) {
+        setAiContext(data.context);
+        toast.success('Context generated successfully');
+      }
+    },
+    onError: ({ error }) => {
+      toast.error(error.serverError || 'Failed to generate context');
+    },
+  });
+
+  const handleGenerateContext = () => {
+    generateContext({ workspaceId });
+    setIsGeneratingContext(true);
+    setTimeout(() => setIsGeneratingContext(false), 2000);
   };
 
   const handleEmailNotificationsChange = (value: boolean) => {
@@ -931,6 +976,73 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                     The default tone used when generating AI replies
                   </p>
                 </div>
+
+                <Separator />
+
+                {/* AI Context */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="ai-context">AI Context</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Describe your business, role, and what the AI should know about you. This helps the AI understand your context before replying.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleGenerateContext}
+                      disabled={!hasPro || loadingPro || isGeneratingContext || generateContextStatus === 'executing'}
+                    >
+                      {generateContextStatus === 'executing' || isGeneratingContext ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Auto-Generate
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <Textarea
+                    id="ai-context"
+                    value={aiContext}
+                    onChange={(e) => handleAiContextChange(e.target.value)}
+                    placeholder="Example: I run an e-commerce store selling handmade jewelry. I handle customer inquiries, order questions, and product information. The AI should be friendly and helpful, referencing our products when relevant..."
+                    className="min-h-[120px] font-mono text-sm"
+                    disabled={!hasPro || loadingPro}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {aiContext ? `${aiContext.length} characters` : 'Leave empty to auto-generate from your workspace data (Shopify, emails, etc.)'}
+                  </p>
+                </div>
+
+                <Separator />
+
+                {/* AI Rules */}
+                <div className="space-y-2">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="ai-rules">AI Rules</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Set strict rules the AI must follow when replying. Examples: language style, which emails to reply to, topics to avoid, etc.
+                    </p>
+                  </div>
+                  <Textarea
+                    id="ai-rules"
+                    value={aiRules}
+                    onChange={(e) => handleAiRulesChange(e.target.value)}
+                    placeholder="Example: Always use professional language. Never reply to emails from competitors. Always mention our 30-day return policy when relevant. Use emojis sparingly..."
+                    className="min-h-[120px] font-mono text-sm"
+                    disabled={!hasPro || loadingPro}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {aiRules ? `${aiRules.length} characters` : 'Optional: Add rules to guide AI behavior'}
+                  </p>
+                </div>
+
                 {!hasPro && (
                   <div className="rounded-lg border border-muted bg-muted/30 p-4">
                     <p className="text-sm text-muted-foreground">
@@ -940,7 +1052,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                       <li>• AI-powered reply drafts</li>
                       <li>• Multiple tone variations</li>
                       <li>• Auto-send with confidence thresholds</li>
-                      <li>• Custom AI prompts</li>
+                      <li>• Custom AI context and rules</li>
                     </ul>
                   </div>
                 )}

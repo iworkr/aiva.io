@@ -23,6 +23,8 @@ const updateAISettingsSchema = z.object({
   autoExtractTasks: z.boolean().optional(),
   autoCreateEvents: z.boolean().optional(),
   defaultReplyTone: z.enum(['formal', 'professional', 'friendly', 'casual']).optional(),
+  aiContext: z.string().optional(), // Context description for AI behavior
+  aiRules: z.string().optional(), // Rules the AI must follow
 });
 
 const updateNotificationSettingsSchema = z.object({
@@ -113,6 +115,8 @@ export const updateAISettingsAction = authActionClient
         autoExtractTasks: settings.autoExtractTasks,
         autoCreateEvents: settings.autoCreateEvents,
         defaultReplyTone: settings.defaultReplyTone,
+        context: settings.aiContext,
+        rules: settings.aiRules,
       },
     };
 
@@ -134,6 +138,122 @@ export const updateAISettingsAction = authActionClient
 
     revalidatePath(`/settings`);
     return { success: true };
+  });
+
+// ============================================================================
+// AUTO-GENERATE AI CONTEXT
+// ============================================================================
+
+/**
+ * Auto-generate AI context from workspace data (Shopify, emails, etc.)
+ */
+export const generateAIContextAction = authActionClient
+  .schema(z.object({
+    workspaceId: z.string().uuid(),
+  }))
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    const { workspaceId } = parsedInput;
+
+    const isMember = await isWorkspaceMember(userId, workspaceId);
+    if (!isMember) throw new Error('Not a workspace member');
+
+    const supabase = await createSupabaseUserServerActionClient();
+    const contextParts: string[] = [];
+
+    // Get workspace info
+    const { data: workspace } = await supabase
+      .from('workspaces')
+      .select('name')
+      .eq('id', workspaceId)
+      .single();
+
+    if (workspace) {
+      contextParts.push(`You are an AI email assistant for ${workspace.name || 'this workspace'}.`);
+    }
+
+    // Get Shopify store info
+    const { getShopifyContextForWorkspace, formatShopifyContextForAI } = await import('@/lib/shopify/context');
+    try {
+      const shopifyContext = await getShopifyContextForWorkspace(workspaceId);
+      if (shopifyContext.hasStore && shopifyContext.store) {
+        const shopifyContextText = formatShopifyContextForAI(shopifyContext);
+        if (shopifyContextText) {
+          contextParts.push(shopifyContextText);
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to fetch Shopify context:', error);
+    }
+
+    // Get channel connections to understand what channels are used
+    const { data: connections } = await supabase
+      .from('channel_connections')
+      .select('provider, provider_account_name')
+      .eq('workspace_id', workspaceId)
+      .eq('status', 'active');
+
+    if (connections && connections.length > 0) {
+      const providers = [...new Set(connections.map(c => c.provider))];
+      contextParts.push(`You handle messages from: ${providers.join(', ')}.`);
+      
+      if (connections.some(c => c.provider === 'gmail')) {
+        const gmailAccounts = connections.filter(c => c.provider === 'gmail').map(c => c.provider_account_name || c.provider_account_id);
+        contextParts.push(`Gmail accounts: ${gmailAccounts.join(', ')}.`);
+      }
+    }
+
+    // Get recent message patterns to understand communication style
+    const { data: recentMessages } = await supabase
+      .from('messages')
+      .select('category, priority, actionability')
+      .eq('workspace_id', workspaceId)
+      .order('timestamp', { ascending: false })
+      .limit(50);
+
+    if (recentMessages && recentMessages.length > 0) {
+      const categories = [...new Set(recentMessages.map(m => m.category).filter(Boolean))];
+      const priorities = [...new Set(recentMessages.map(m => m.priority).filter(Boolean))];
+      
+      if (categories.length > 0) {
+        contextParts.push(`Common message categories: ${categories.join(', ')}.`);
+      }
+      if (priorities.length > 0) {
+        contextParts.push(`Message priorities typically range from: ${priorities.join(', ')}.`);
+      }
+    }
+
+    // Default context if nothing found
+    if (contextParts.length === 0) {
+      contextParts.push('You are an AI email assistant. Your role is to help manage and respond to messages professionally and efficiently.');
+    }
+
+    const generatedContext = contextParts.join('\n\n');
+
+    // Update workspace settings with generated context
+    const { data: existing } = await supabase
+      .from('workspace_settings')
+      .select('workspace_settings')
+      .eq('workspace_id', workspaceId)
+      .single();
+
+    const currentSettings = (existing?.workspace_settings || {}) as Record<string, any>;
+    const updatedSettings = {
+      ...currentSettings,
+      ai: {
+        ...((currentSettings.ai as Record<string, any>) || {}),
+        context: generatedContext,
+      },
+    };
+
+    await supabase
+      .from('workspace_settings')
+      .upsert({
+        workspace_id: workspaceId,
+        workspace_settings: updatedSettings,
+      });
+
+    revalidatePath(`/settings`);
+    return { success: true, context: generatedContext };
   });
 
 // ============================================================================

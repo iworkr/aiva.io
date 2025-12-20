@@ -262,6 +262,26 @@ export async function generateReplyDraft(
       }
     }
 
+    // Get workspace AI context and rules
+    let workspaceAIContext = "";
+    let workspaceAIRules = "";
+    
+    try {
+      const { data: wsSettings } = await supabase
+        .from('workspace_settings')
+        .select('workspace_settings')
+        .eq('workspace_id', workspaceId)
+        .single();
+
+      if (wsSettings?.workspace_settings) {
+        const aiSettings = (wsSettings.workspace_settings as any)?.ai || {};
+        workspaceAIContext = aiSettings.context || "";
+        workspaceAIRules = aiSettings.rules || "";
+      }
+    } catch (error) {
+      console.warn('[AI Reply] Failed to fetch workspace AI settings:', error);
+    }
+
     // Build prompt
     const prompt = `Generate a ${tone} email reply to the following message:
 
@@ -273,6 +293,13 @@ ${message.body}
 ${conversationContext ? `\n\nConversation Context:\n${conversationContext}` : ""}
 ${shopifyCustomerContext ? `\n\n${shopifyCustomerContext}` : ""}
 ${context ? `\n\nAdditional Context: ${context}` : ""}
+${workspaceAIContext ? `\n\nWORKSPACE CONTEXT (CRITICAL - Refer to this for understanding your role and the business):\n${workspaceAIContext}` : ""}
+${workspaceAIRules ? `\n\nWORKSPACE RULES (CRITICAL - You MUST follow these strictly):\n${workspaceAIRules}` : ""}
+
+${workspaceAIContext || workspaceAIRules ? `\n\n⚠️ CRITICAL INSTRUCTIONS:
+${workspaceAIContext ? `- REFER TO WORKSPACE CONTEXT above to understand your role, the business, products, and context before replying.` : ''}
+${workspaceAIRules ? `- FOLLOW WORKSPACE RULES above STRICTLY. These rules override default behavior.` : ''}
+` : ''}
 
 REQUIREMENTS:
 1. Tone: ${tone} (${tone === "formal" ? "Professional language, avoid contractions" : tone === "casual" ? "Friendly, conversational" : tone === "friendly" ? "Warm and approachable" : "Professional but approachable"})
@@ -283,6 +310,7 @@ REQUIREMENTS:
 6. End with appropriate closing
 7. NO signature (added automatically)
 8. NO "Dear/Hi" salutation - start directly with content
+${workspaceAIRules ? `9. STRICTLY follow the WORKSPACE RULES provided above` : ''}
 
 CONFIDENCE SCORE GUIDELINES (be realistic):
 - 0.90-1.00: Clear question with obvious answer, straightforward acknowledgment
@@ -333,20 +361,36 @@ Format as JSON:
       };
     }
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `You are an expert email assistant. Generate contextually appropriate replies.
+    // Build system message with context and rules
+    let systemMessage = `You are an expert email assistant. Generate contextually appropriate replies.
 
 CRITICAL: Confidence scores must be realistic and varied:
 - Only use 0.90+ for simple, clear responses (thank you, confirmation, etc.)
 - Use 0.70-0.89 for standard business replies with clear context
 - Use 0.50-0.69 for ambiguous situations or sensitive topics
-- Use below 0.50 when unsure about appropriate response
+- Use below 0.50 when unsure about appropriate response`;
 
-${shopifyCustomerContext ? `SHOPIFY CONTEXT: When the sender is a known Shopify customer, you can reference their order history to provide personalized responses. Mention specific order numbers, products, or purchase dates when relevant to the inquiry.` : ""}
+    // Add workspace context to system message (CRITICAL - AI must understand its role)
+    if (workspaceAIContext) {
+      systemMessage += `\n\nWORKSPACE CONTEXT (Your role and business context - refer to this before replying):\n${workspaceAIContext}`;
+    }
+
+    // Add workspace rules to system message (CRITICAL - AI must follow these strictly)
+    if (workspaceAIRules) {
+      systemMessage += `\n\nWORKSPACE RULES (You MUST follow these rules strictly when replying):\n${workspaceAIRules}`;
+    }
+
+    if (shopifyCustomerContext) {
+      systemMessage += `\n\nSHOPIFY CONTEXT: When the sender is a known Shopify customer, you can reference their order history to provide personalized responses. Mention specific order numbers, products, or purchase dates when relevant to the inquiry.`;
+    }
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: systemMessage,
+        },
 
 Be honest about uncertainty. Don't default to high confidence.
 IMPORTANT: Always return valid, complete JSON. Keep replies concise.`,
