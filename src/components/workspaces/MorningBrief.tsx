@@ -327,16 +327,14 @@ export async function MorningBrief() {
         />
       )}
 
-      {/* Briefing Items */}
-      {deduplicatedItems.length > 0 && (
-        <div id="briefing">
-          <BriefingSection 
-            items={deduplicatedItems} 
-            workspaceId={workspaceId}
-            userId={userId}
-          />
-        </div>
-      )}
+      {/* Briefing Items - Always render to show debug info */}
+      <div id="briefing">
+        <BriefingSection 
+          items={deduplicatedItems} 
+          workspaceId={workspaceId}
+          userId={userId}
+        />
+      </div>
 
       {/* AI Chat Input */}
       <AivaChatInput />
