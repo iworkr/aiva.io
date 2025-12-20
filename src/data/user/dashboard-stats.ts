@@ -325,7 +325,23 @@ export async function getNeedsAttentionItems(
   // Sort by timestamp descending
   items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-  return items.slice(0, limit);
+  const finalItems = items.slice(0, limit);
+  
+  // Extensive logging for debugging
+  console.log(`[Dashboard] getNeedsAttentionItems result:`, {
+    totalItemsBeforeLimit: items.length,
+    limit,
+    finalItemsCount: finalItems.length,
+    finalItems: finalItems.map(i => ({
+      messageId: i.messageId,
+      subject: i.subject,
+      hasDraft: i.hasDraft,
+      draftId: i.draftId,
+      timestamp: i.timestamp,
+    })),
+  });
+
+  return finalItems;
 }
 
 /**

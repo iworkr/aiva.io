@@ -38,6 +38,10 @@ import {
   type AttentionItem,
   type DailyBriefing,
 } from '@/data/user/dashboard-stats';
+import { rejectReviewItemAction, bulkDismissReviewItemsAction } from '@/data/user/review-queue';
+import { useAction } from 'next-safe-action/hooks';
+import { toast } from 'sonner';
+import { X, Trash2 } from 'lucide-react';
 
 interface AivaDashboardProps {
   workspaceId: string;
@@ -86,7 +90,15 @@ function StatCard({
   );
 }
 
-function AttentionItemCard({ item, onClick }: { item: AttentionItem; onClick?: () => void }) {
+function AttentionItemCard({ 
+  item, 
+  onClick,
+  onDismiss,
+}: { 
+  item: AttentionItem; 
+  onClick?: () => void;
+  onDismiss?: (messageId: string, e: React.MouseEvent) => void;
+}) {
   const typeConfig = {
     review: { color: 'text-amber-500', bg: 'bg-amber-100 dark:bg-amber-900/30', label: 'Needs Review' },
     high_priority: { color: 'text-red-500', bg: 'bg-red-100 dark:bg-red-900/30', label: 'High Priority' },
@@ -190,7 +202,20 @@ function AttentionItemCard({ item, onClick }: { item: AttentionItem; onClick?: (
                 {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
               </p>
             </div>
-            <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-1" />
+            <div className="flex flex-col items-end gap-2 flex-shrink-0">
+              {onDismiss && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                  onClick={(e) => onDismiss(item.messageId, e)}
+                  title="Dismiss"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+              <ArrowRight className="h-4 w-4 text-muted-foreground mt-1" />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -225,6 +250,26 @@ export function AivaDashboard({ workspaceId, userId, userName }: AivaDashboardPr
   const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const { execute: dismissItem, status: dismissStatus } = useAction(rejectReviewItemAction, {
+    onSuccess: () => {
+      toast.success('Item dismissed');
+      loadDashboardData();
+    },
+    onError: ({ error }) => {
+      toast.error(error.serverError || 'Failed to dismiss item');
+    },
+  });
+
+  const { execute: bulkDismiss, status: bulkDismissStatus } = useAction(bulkDismissReviewItemsAction, {
+    onSuccess: ({ data }) => {
+      toast.success(`Dismissed ${data?.dismissedCount || 0} items`);
+      loadDashboardData();
+    },
+    onError: ({ error }) => {
+      toast.error(error.serverError || 'Failed to dismiss items');
+    },
+  });
+
   const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
@@ -236,6 +281,17 @@ export function AivaDashboard({ workspaceId, userId, userName }: AivaDashboardPr
       setStats(statsData);
       setAttentionItems(itemsData);
       setBriefing(briefingData);
+      
+      // Debug logging
+      console.log('[Dashboard] Loaded attention items:', {
+        count: itemsData.length,
+        items: itemsData.map(i => ({
+          messageId: i.messageId,
+          subject: i.subject,
+          hasDraft: i.hasDraft,
+          draftId: i.draftId,
+        })),
+      });
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
     } finally {
@@ -246,6 +302,26 @@ export function AivaDashboard({ workspaceId, userId, userName }: AivaDashboardPr
   useEffect(() => {
     loadDashboardData();
   }, [loadDashboardData]);
+
+  const handleDismissItem = (messageId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dismissItem({
+      workspaceId,
+      messageId,
+      action: 'rejected',
+    });
+  };
+
+  const handleClearAll = () => {
+    if (attentionItems.length === 0) return;
+    const messageIds = attentionItems.map(item => item.messageId);
+    bulkDismiss({
+      workspaceId,
+      messageIds,
+      action: 'rejected',
+    });
+  };
 
   if (loading) {
     return (
@@ -335,14 +411,28 @@ export function AivaDashboard({ workspaceId, userId, userName }: AivaDashboardPr
               <AlertCircle className="h-5 w-5 text-amber-500" />
               What Needs Your Attention
             </h2>
-            {attentionItems.length > 0 && (
-              <Link href="/inbox?filter=needs_attention">
-                <Button variant="ghost" size="sm">
-                  View All
-                  <ArrowRight className="h-4 w-4 ml-1" />
-                </Button>
-              </Link>
-            )}
+            <div className="flex items-center gap-2">
+              {attentionItems.length > 0 && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleClearAll}
+                    disabled={bulkDismissStatus === 'executing'}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Clear All
+                  </Button>
+                  <Link href="/inbox?filter=needs_attention">
+                    <Button variant="ghost" size="sm">
+                      View All
+                      <ArrowRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </Link>
+                </>
+              )}
+            </div>
           </div>
 
           {attentionItems.length === 0 ? (
@@ -350,7 +440,11 @@ export function AivaDashboard({ workspaceId, userId, userName }: AivaDashboardPr
           ) : (
             <div className="space-y-3">
               {attentionItems.map((item) => (
-                <AttentionItemCard key={item.id} item={item} />
+                <AttentionItemCard 
+                  key={item.id} 
+                  item={item} 
+                  onDismiss={handleDismissItem}
+                />
               ))}
             </div>
           )}

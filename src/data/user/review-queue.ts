@@ -52,6 +52,12 @@ const markReviewedSchema = z.object({
   action: z.enum(['approved', 'rejected', 'handled_manually']),
 });
 
+const bulkDismissSchema = z.object({
+  workspaceId: z.string().uuid(),
+  messageIds: z.array(z.string().uuid()),
+  action: z.enum(['approved', 'rejected', 'handled_manually']).default('rejected'),
+});
+
 /**
  * Get all items in the review queue for a workspace
  */
@@ -366,5 +372,65 @@ export const rejectReviewItemAction = authActionClient
 
     revalidatePath('/inbox');
     return { success: true };
+  });
+
+/**
+ * Bulk dismiss multiple review items
+ */
+export const bulkDismissReviewItemsAction = authActionClient
+  .schema(bulkDismissSchema)
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    const { workspaceId, messageIds, action } = parsedInput;
+
+    const isMember = await isWorkspaceMember(userId, workspaceId);
+    if (!isMember) throw new Error('Not a workspace member');
+
+    const supabase = await createSupabaseUserServerActionClient();
+    const now = new Date().toISOString();
+
+    // Mark all messages as reviewed
+    const { error: updateError } = await supabase
+      .from('messages')
+      .update({
+        requires_human_review: false,
+        reviewed_at: now,
+        reviewed_by: userId,
+        review_context: {
+          action: `bulk_${action}`,
+          reviewedBy: userId,
+          reviewedAt: now,
+        },
+      })
+      .in('id', messageIds)
+      .eq('workspace_id', workspaceId);
+
+    if (updateError) {
+      throw new Error(`Failed to dismiss messages: ${updateError.message}`);
+    }
+
+    // Cancel any pending auto-sends for these messages
+    await supabase
+      .from('auto_send_queue')
+      .update({ status: 'cancelled' })
+      .in('message_id', messageIds)
+      .eq('status', 'pending');
+
+    // Log the bulk review action
+    await supabase.from('auto_send_log').insert(
+      messageIds.map(messageId => ({
+        workspace_id: workspaceId,
+        message_id: messageId,
+        action: `bulk_reviewed_${action}`,
+        details: {
+          reviewedBy: userId,
+          action,
+          bulkDismiss: true,
+        },
+      }))
+    );
+
+    revalidatePath('/');
+    revalidatePath('/inbox');
+    return { success: true, dismissedCount: messageIds.length };
   });
 
