@@ -384,16 +384,16 @@ CRITICAL: Confidence scores must be realistic and varied:
       systemMessage += `\n\nSHOPIFY CONTEXT: When the sender is a known Shopify customer, you can reference their order history to provide personalized responses. Mention specific order numbers, products, or purchase dates when relevant to the inquiry.`;
     }
 
+    // Add final instructions
+    systemMessage += `\n\nBe honest about uncertainty. Don't default to high confidence.
+IMPORTANT: Always return valid, complete JSON. Keep replies concise.`;
+
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
           content: systemMessage,
-        },
-
-Be honest about uncertainty. Don't default to high confidence.
-IMPORTANT: Always return valid, complete JSON. Keep replies concise.`,
         },
         {
           role: "user",
