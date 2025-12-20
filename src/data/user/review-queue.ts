@@ -276,6 +276,27 @@ export const approveReviewItemAction = authActionClient
             scheduled_send_at: new Date().toISOString(),
             confidence_score: draft?.confidence_score || 0.8,
           });
+
+          // Create calendar event if date/time information is available
+          // This happens when user approves, so the event is created immediately
+          try {
+            const { createCalendarEventFromSentEmail } = await import('@/lib/ai/scheduling');
+            const eventResult = await createCalendarEventFromSentEmail(
+              messageId,
+              draftId,
+              workspaceId,
+              userId
+            );
+            
+            if (eventResult.success) {
+              console.log('[Review Queue] Calendar event created:', eventResult.eventId);
+            } else {
+              console.log('[Review Queue] Calendar event not created:', eventResult.message);
+            }
+          } catch (eventError) {
+            console.error('[Review Queue] Error creating calendar event:', eventError);
+            // Don't fail the approval if calendar event creation fails
+          }
         }
       }
     }

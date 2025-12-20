@@ -562,10 +562,21 @@ IMPORTANT: Always return valid, complete JSON. Keep replies concise.`;
       };
     }
 
-    await supabase
+    const { error: messageUpdateError } = await supabase
       .from("messages")
       .update(messageUpdate)
       .eq("id", messageId);
+
+    if (messageUpdateError) {
+      console.error('[AI Reply] Failed to update message with draft info:', messageUpdateError);
+    } else {
+      console.log('[AI Reply] Message updated successfully:', {
+        messageId,
+        hasDraft: true,
+        requiresHumanReview: shouldHoldForReview,
+        reviewReason: shouldHoldForReview ? (finalReviewReason || 'draft_held_for_review') : undefined,
+      });
+    }
 
     // Log draft result for debugging
     console.log('[AI Reply] Draft result:', {
