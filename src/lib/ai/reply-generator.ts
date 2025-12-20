@@ -310,7 +310,8 @@ REQUIREMENTS:
 6. End with appropriate closing
 7. NO signature (added automatically)
 8. NO "Dear/Hi" salutation - start directly with content
-${workspaceAIRules ? `9. STRICTLY follow the WORKSPACE RULES provided above` : ''}
+9. DO NOT FABRICATE INFORMATION: Only use information explicitly provided in the context. If asked about policies, product details, or other information not in the context, acknowledge you don't have that information rather than making it up.
+${workspaceAIRules ? `10. STRICTLY follow the WORKSPACE RULES provided above` : ''}
 
 CONFIDENCE SCORE GUIDELINES (be realistic):
 - 0.90-1.00: Clear question with obvious answer, straightforward acknowledgment
@@ -368,7 +369,14 @@ CRITICAL: Confidence scores must be realistic and varied:
 - Only use 0.90+ for simple, clear responses (thank you, confirmation, etc.)
 - Use 0.70-0.89 for standard business replies with clear context
 - Use 0.50-0.69 for ambiguous situations or sensitive topics
-- Use below 0.50 when unsure about appropriate response`;
+- Use below 0.50 when unsure about appropriate response
+
+🚨 CRITICAL: DO NOT FABRICATE INFORMATION
+- ONLY use information explicitly provided in the context below
+- DO NOT make up policies, product categories, return policies, shipping details, or any other information
+- If information is not available in the context, say "I don't have that information" or "I'll need to check on that for you"
+- DO NOT infer or assume details that aren't explicitly stated
+- If asked about policies (returns, shipping, etc.) and they're not in the context, acknowledge you don't have that information`;
 
     // Add workspace context to system message (CRITICAL - AI must understand its role)
     if (workspaceAIContext) {
@@ -381,12 +389,13 @@ CRITICAL: Confidence scores must be realistic and varied:
     }
 
     if (shopifyCustomerContext) {
-      systemMessage += `\n\nSHOPIFY CONTEXT: When the sender is a known Shopify customer, you can reference their order history to provide personalized responses. Mention specific order numbers, products, or purchase dates when relevant to the inquiry.`;
+      systemMessage += `\n\nSHOPIFY CONTEXT: When the sender is a known Shopify customer, you can reference their order history to provide personalized responses. Mention specific order numbers, products, or purchase dates when relevant to the inquiry. ONLY use information from the order history provided - do not make up details.`;
     }
 
     // Add final instructions
     systemMessage += `\n\nBe honest about uncertainty. Don't default to high confidence.
-IMPORTANT: Always return valid, complete JSON. Keep replies concise.`;
+IMPORTANT: Always return valid, complete JSON. Keep replies concise.
+REMEMBER: If you don't have specific information (like return policies, product categories, shipping details), acknowledge that you don't have it rather than making it up.`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
