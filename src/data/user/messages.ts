@@ -1077,6 +1077,8 @@ export const sendReplyAction = authActionClient
     }
 
     // Send reply based on provider
+    let sentMessageId: string | undefined;
+    
     try {
       if (provider === 'gmail') {
         const { sendGmailMessage, getGmailAccessToken } = await import('@/lib/gmail/client');
@@ -1087,7 +1089,7 @@ export const sendReplyAction = authActionClient
           bodyLength: body.length,
           inReplyTo: providerMessageId || message.provider_message_id,
         });
-        await sendGmailMessage(accessToken, {
+        const sendResult = await sendGmailMessage(accessToken, {
           to,
           subject,
           body: body.trim(), // Ensure body is trimmed
@@ -1096,6 +1098,7 @@ export const sendReplyAction = authActionClient
             ? [message.provider_thread_id]
             : undefined,
         });
+        sentMessageId = sendResult.id;
       } else if (provider === 'outlook') {
         const { sendOutlookMessage, getOutlookAccessToken } = await import('@/lib/outlook/client');
         const accessToken = await getOutlookAccessToken(connection.id);
@@ -1105,14 +1108,62 @@ export const sendReplyAction = authActionClient
           bodyLength: body.length,
           inReplyTo: providerMessageId || message.provider_message_id,
         });
-        await sendOutlookMessage(accessToken, {
+        const sendResult = await sendOutlookMessage(accessToken, {
           to,
           subject,
           body: body.trim(), // Ensure body is trimmed
           inReplyTo: providerMessageId || message.provider_message_id,
         });
+        // For Outlook replies, the ID might be the original message ID
+        // We'll use a temporary ID for the outbound message
+        sentMessageId = sendResult.id || `outlook-sent-${Date.now()}`;
       } else {
         throw new Error(`Reply not supported for ${provider}`);
+      }
+
+      // Create outbound message record immediately so it appears in the thread
+      if (sentMessageId) {
+        console.log('[sendReplyAction] Creating outbound message record');
+        
+        // Get connection details to find user email
+        const { data: connectionDetails } = await supabase
+          .from('channel_connections')
+          .select('provider_account_id, provider_account_name')
+          .eq('id', connection.id)
+          .single();
+        
+        const senderEmail = connectionDetails?.provider_account_id || 
+                           connectionDetails?.provider_account_name || 
+                           to[0];
+        
+        try {
+          const { error: insertError } = await supabase
+            .from('messages')
+            .insert({
+              workspace_id: workspaceId,
+              channel_connection_id: connection.id,
+              provider_message_id: sentMessageId,
+              provider_thread_id: message.provider_thread_id, // Replies are in the same thread
+              subject: subject,
+              body: body.trim(),
+              snippet: body.trim().substring(0, 200),
+              sender_email: senderEmail,
+              sender_name: connectionDetails?.provider_account_name || undefined,
+              recipients: JSON.stringify(to.map(email => ({ email, type: 'to' }))),
+              timestamp: new Date().toISOString(),
+              is_read: true, // Sent messages are automatically "read"
+              thread_id: message.thread_id, // Link to same thread
+            });
+          
+          if (insertError) {
+            // If insert fails (e.g., duplicate or missing field), that's okay - Gmail sync will pick it up
+            console.warn('[sendReplyAction] Could not create outbound message record:', insertError.message);
+          } else {
+            console.log('[sendReplyAction] Outbound message record created successfully');
+          }
+        } catch (insertError) {
+          console.warn('[sendReplyAction] Error creating outbound message record:', insertError);
+        }
       }
 
       // Mark message as reviewed and handled
