@@ -1154,7 +1154,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                               </Button>
                             </div>
                           </div>
-                        )}
+                        ) : null}
 
                         <Separator />
 
