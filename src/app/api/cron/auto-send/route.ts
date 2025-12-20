@@ -9,6 +9,7 @@ import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClien
 import { sendReply } from '@/lib/email/send';
 import { getWorkspaceAutoSendSettings, updateQueueItemStatus } from '@/lib/workers/auto-send-worker';
 import { markMessageHandled } from '@/lib/inbox-zero/handler';
+import { createCalendarEventFromSentEmail } from '@/lib/ai/scheduling';
 
 // Verify cron secret to prevent unauthorized access
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -325,6 +326,39 @@ export async function GET(request: NextRequest) {
             .from('message_drafts')
             .update({ auto_sent: true, auto_sent_at: new Date().toISOString() })
             .eq('id', item.draft_id);
+
+          // Create calendar event if date/time information is available
+          try {
+            // Get a workspace member (preferably owner) for the calendar event creation
+            const { data: workspaceMember } = await supabase
+              .from('workspace_members')
+              .select('user_id')
+              .eq('workspace_id', item.workspace_id)
+              .order('role', { ascending: true }) // Owner first, then admin, etc.
+              .limit(1)
+              .single();
+
+            if (workspaceMember?.user_id) {
+              console.log(`   📅 Attempting to create calendar event...`);
+              const eventResult = await createCalendarEventFromSentEmail(
+                item.message_id,
+                item.draft_id,
+                item.workspace_id,
+                workspaceMember.user_id
+              );
+              
+              if (eventResult.success) {
+                console.log(`   ✅ Calendar event created: ${eventResult.eventId}`);
+              } else {
+                console.log(`   ℹ️ Calendar event not created: ${eventResult.message}`);
+              }
+            } else {
+              console.log(`   ⚠️ No workspace member found for calendar event creation`);
+            }
+          } catch (eventError) {
+            console.error(`   ⚠️ Error creating calendar event:`, eventError);
+            // Don't fail the email send if calendar event creation fails
+          }
 
           // Mark message as handled and archive in provider (Inbox Zero)
           console.log(`   📥 Marking message as handled and archiving...`);

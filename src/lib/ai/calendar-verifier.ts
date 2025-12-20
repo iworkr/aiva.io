@@ -59,7 +59,7 @@ interface DateTimeExtraction {
 /**
  * Extract date/time references from message using AI
  */
-async function extractDateTimeReferences(
+export async function extractDateTimeReferences(
   subject: string,
   body: string
 ): Promise<DateTimeExtraction> {
