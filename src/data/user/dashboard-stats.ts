@@ -178,7 +178,7 @@ export async function getNeedsAttentionItems(
       review_context,
       has_draft_reply,
       channel_connection:channel_connections(provider),
-      message_drafts!inner(
+      message_drafts(
         id,
         body,
         confidence_score,
@@ -192,12 +192,20 @@ export async function getNeedsAttentionItems(
     .eq('requires_human_review', true)
     .is('reviewed_at', null)
     .eq('handled_by_aiva', false) // Only show unhandled items
-    .eq('message_drafts.hold_for_review', true)
     .order('timestamp', { ascending: false })
-    .limit(limit);
+    .limit(limit * 2); // Get more to filter after
 
   for (const msg of reviewItems || []) {
-    const draft = (msg.message_drafts as any)?.[0];
+    // Filter to only include messages with held drafts
+    const drafts = (msg.message_drafts as any[]) || [];
+    const heldDraft = drafts.find((d: any) => d.hold_for_review === true);
+    
+    if (!heldDraft && drafts.length === 0) {
+      // Skip if no held draft (might have other drafts)
+      continue;
+    }
+    
+    const draft = heldDraft || drafts[0];
     const reviewContext = msg.review_context as any;
     
     items.push({
