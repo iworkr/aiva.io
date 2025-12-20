@@ -139,22 +139,7 @@ export function BriefingSection({ items, workspaceId, userId }: BriefingSectionP
     }
   };
 
-  // Debug logging
-  console.log('[BriefingSection] Rendering with items:', {
-    count: items.length,
-    visibleCount: visibleItems.length,
-    dismissedCount: dismissedItems.size,
-    items: visibleItems.map(i => ({
-      id: i.id,
-      messageId: i.messageId,
-      title: i.title,
-      type: i.type,
-    })),
-    workspaceId,
-    userId,
-  });
-
-  // Always render something for debugging, even if no items
+  // Always render something, even if no items
   if (visibleItems.length === 0) {
     return (
       <div id="briefing" className="space-y-1">
@@ -162,7 +147,7 @@ export function BriefingSection({ items, workspaceId, userId }: BriefingSectionP
           <h2 className="text-sm font-medium text-muted-foreground">What needs your attention</h2>
         </div>
         <div className="px-3 py-2 text-xs text-muted-foreground">
-          No items requiring attention. [DEBUG: BriefingSection rendered with 0 items]
+          No items requiring attention.
         </div>
       </div>
     );

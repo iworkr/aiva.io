@@ -311,12 +311,11 @@ REQUIREMENTS:
 7. NO signature (added automatically)
 8. NO "Dear/Hi" salutation - start directly with content
 9. DO NOT FABRICATE INFORMATION: Only use information explicitly provided in the context. If asked about policies, product details, or other information not in the context, acknowledge you don't have that information rather than making it up.
-10. MISSING INFORMATION HANDLING: If the message asks for information you don't have (policies, product details, pricing, availability, etc.):
-    - Still draft a helpful response acknowledging you'll check
-    - Use phrases like "Let me check on that for you" or "I'll need to verify that information"
-    - Set "hasMissingInformation" to true in your response
-    - Reduce confidence score appropriately (0.50-0.70 range)
-    - Set "isAutoSendable" to false if critical information is missing
+10. MISSING INFORMATION HANDLING: 
+    - For ROUTINE questions (policies, shipping times, return policies, general info): You can still auto-reply with a helpful acknowledgment like "Let me check on that for you" or "I'll get back to you with that information". Set "hasMissingInformation" to true but "isAutoSendable" to true if confidence is good (>= 0.60).
+    - For CRITICAL information (pricing quotes, delivery commitments, deadlines, availability for specific dates): Set "hasMissingInformation" to true and "isAutoSendable" to false. These require human verification.
+    - Only mark as missing critical information if it could cause problems if auto-replied incorrectly (pricing, commitments, deadlines).
+    - For routine policy/shipping questions, you can still auto-send a helpful acknowledgment.
 ${workspaceAIRules ? `11. STRICTLY follow the WORKSPACE RULES provided above` : ''}
 
 CONFIDENCE SCORE GUIDELINES (be realistic):
@@ -382,10 +381,11 @@ CRITICAL: Confidence scores must be realistic and varied:
 🚨 CRITICAL: DO NOT FABRICATE INFORMATION
 - ONLY use information explicitly provided in the context below
 - DO NOT make up policies, product categories, return policies, shipping details, or any other information
-- If information is not available in the context, respond with "Let me check on that for you" or "I'll need to verify that information"
+- If information is not available in the context, respond with "Let me check on that for you" or "I'll get back to you with that information"
 - DO NOT infer or assume details that aren't explicitly stated
-- If asked about policies (returns, shipping, etc.) and they're not in the context, acknowledge you don't have that information
-- When missing critical information, still draft a helpful response but mark it as requiring human follow-up`;
+- For ROUTINE questions (policies, shipping, returns): You can auto-reply with a helpful acknowledgment - set "isAutoSendable" to true if confidence is good (>= 0.60)
+- For CRITICAL information (pricing, commitments, deadlines): Mark as not auto-sendable and require human review
+- Only mark as "missing critical information" if it's truly critical (pricing, commitments, deadlines) - not for routine policy questions`;
 
     // Add workspace context to system message (CRITICAL - AI must understand its role)
     if (workspaceAIContext) {
@@ -404,11 +404,10 @@ CRITICAL: Confidence scores must be realistic and varied:
     // Add final instructions
     systemMessage += `\n\nBe honest about uncertainty. Don't default to high confidence.
 IMPORTANT: Always return valid, complete JSON. Keep replies concise.
-REMEMBER: If you don't have specific information (like return policies, product categories, shipping details):
-- Acknowledge that you don't have it rather than making it up
-- Still draft a helpful response saying you'll check
-- Set "hasMissingInformation" to true so it can be flagged for human review
-- This ensures the human can follow up with accurate information`;
+REMEMBER: Missing information handling:
+- ROUTINE questions (policies, shipping, returns): Can auto-reply with acknowledgment - set "isAutoSendable" to true if confidence >= 0.60
+- CRITICAL information (pricing, commitments, deadlines): Mark "isAutoSendable" to false - requires human review
+- Only mark as "missing critical information" for truly critical info that could cause problems if auto-replied incorrectly`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -514,14 +513,32 @@ REMEMBER: If you don't have specific information (like return policies, product 
     const hasMissingInfo = rawResult.hasMissingInformation === true;
     const missingInfoType = rawResult.missingInformationType || 'unknown';
     
+    // Critical missing information types that should always hold for review
+    // These are things that could cause problems if auto-replied incorrectly
+    const criticalMissingInfoTypes = ['pricing', 'commitment', 'availability', 'deadline', 'delivery_date'];
+    const isCriticalMissingInfo = hasMissingInfo && criticalMissingInfoTypes.includes(missingInfoType);
+    
     // Determine if draft should be held for human review
-    // Hold if: message flagged, calendar mismatch, low confidence, or missing critical information
-    const shouldHoldForReview = needsHumanReview || result.confidenceScore < 0.55 || hasMissingInfo;
+    // Hold if: 
+    // 1. Message explicitly flagged for review
+    // 2. Calendar mismatch detected
+    // 3. Low confidence (< 0.55)
+    // 4. Critical missing information (pricing, commitments, etc.)
+    // 5. Missing info AND AI says not auto-sendable AND confidence is below threshold
+    // Note: Routine missing info (policy, shipping) with good confidence can still auto-send
+    const shouldHoldForReview = needsHumanReview || 
+      result.confidenceScore < 0.55 || 
+      isCriticalMissingInfo ||
+      (hasMissingInfo && !result.isAutoSendable && result.confidenceScore < 0.70);
+    
     const finalReviewReason = reviewReason || 
-      (hasMissingInfo ? `missing_information_${missingInfoType}` : 
+      (isCriticalMissingInfo ? `missing_information_${missingInfoType}` : 
+       hasMissingInfo && !result.isAutoSendable ? `missing_information_${missingInfoType}` :
        result.confidenceScore < 0.55 ? 'low_confidence' : undefined);
+    
     const finalUncertaintyNotes = aiUncertaintyNotes || 
-      (hasMissingInfo ? `AI is missing critical information (${missingInfoType}) - human follow-up required` :
+      (isCriticalMissingInfo ? `AI is missing critical information (${missingInfoType}) - human follow-up required` :
+       hasMissingInfo && !result.isAutoSendable ? `AI is missing information (${missingInfoType}) and marked as not auto-sendable` :
        result.confidenceScore < 0.55 
         ? `AI confidence is ${Math.round(result.confidenceScore * 100)}% - below threshold for auto-send`
         : undefined);
