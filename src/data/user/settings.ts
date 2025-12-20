@@ -232,32 +232,40 @@ export const generateAIContextAction = authActionClient
         // Get store ID to query synced data (workspace_id might not be set)
         const { data: storeData } = await supabase
           .from('shopify_stores')
-          .select('id')
+          .select('id, workspace_id')
           .eq('shop_domain', store.shop_domain)
           .single();
         
         const storeId = storeData?.id;
+        const storeHasWorkspaceId = !!storeData?.workspace_id;
         
-        // Query by both workspace_id AND shopify_store_id to catch all synced data
+        console.log('[Generate Context] Store data:', {
+          storeId,
+          storeHasWorkspaceId,
+          storeWorkspaceId: storeData?.workspace_id,
+        });
+        
+        // Query by shopify_store_id (primary) and optionally workspace_id if store has it
+        // If store doesn't have workspace_id, products won't either, so only query by store_id
         let ordersQuery = supabase
           .from('shopify_orders')
           .select('*', { count: 'exact', head: true });
-        if (workspaceId) {
-          ordersQuery = ordersQuery.eq('workspace_id', workspaceId);
-        }
         if (storeId) {
           ordersQuery = ordersQuery.eq('shopify_store_id', storeId);
+        }
+        if (storeHasWorkspaceId && workspaceId) {
+          ordersQuery = ordersQuery.eq('workspace_id', workspaceId);
         }
         const { count: totalOrders } = await ordersQuery;
         
         let customersQuery = supabase
           .from('shopify_customers')
           .select('*', { count: 'exact', head: true });
-        if (workspaceId) {
-          customersQuery = customersQuery.eq('workspace_id', workspaceId);
-        }
         if (storeId) {
           customersQuery = customersQuery.eq('shopify_store_id', storeId);
+        }
+        if (storeHasWorkspaceId && workspaceId) {
+          customersQuery = customersQuery.eq('workspace_id', workspaceId);
         }
         const { count: totalCustomers } = await customersQuery;
         
@@ -265,13 +273,21 @@ export const generateAIContextAction = authActionClient
           .from('shopify_products')
           .select('*', { count: 'exact', head: true })
           .eq('status', 'active');
-        if (workspaceId) {
-          productsQuery = productsQuery.eq('workspace_id', workspaceId);
-        }
         if (storeId) {
           productsQuery = productsQuery.eq('shopify_store_id', storeId);
         }
+        if (storeHasWorkspaceId && workspaceId) {
+          productsQuery = productsQuery.eq('workspace_id', workspaceId);
+        }
         const { count: totalProducts } = await productsQuery;
+        
+        console.log('[Generate Context] Data counts:', {
+          totalOrders,
+          totalCustomers,
+          totalProducts,
+          queryByStoreId: !!storeId,
+          queryByWorkspaceId: storeHasWorkspaceId && !!workspaceId,
+        });
         
         if (totalOrders || totalCustomers || totalProducts) {
           shopifyParts.push(`\n### Store Statistics`);
@@ -285,15 +301,22 @@ export const generateAIContextAction = authActionClient
           .from('shopify_products')
           .select('title, vendor, product_type, body_html, variants, tags')
           .eq('status', 'active');
-        if (workspaceId) {
-          productsDataQuery = productsDataQuery.eq('workspace_id', workspaceId);
-        }
         if (storeId) {
           productsDataQuery = productsDataQuery.eq('shopify_store_id', storeId);
         }
-        const { data: products } = await productsDataQuery
+        if (storeHasWorkspaceId && workspaceId) {
+          productsDataQuery = productsDataQuery.eq('workspace_id', workspaceId);
+        }
+        const { data: products, error: productsError } = await productsDataQuery
           .order('created_at', { ascending: false })
           .limit(10);
+        
+        console.log('[Generate Context] Products query result:', {
+          productCount: products?.length || 0,
+          error: productsError?.message,
+          queryByStoreId: !!storeId,
+          queryByWorkspaceId: storeHasWorkspaceId && !!workspaceId,
+        });
         
         if (products && products.length > 0) {
           shopifyParts.push(`\n### Products Available`);
