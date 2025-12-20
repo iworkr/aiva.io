@@ -71,6 +71,11 @@ export function isOwnEmail(senderEmail: string, connectionEmail: string): boolea
 export function shouldExcludeSender(email: string, patterns: string[]): boolean {
   if (!email) return true; // No email = exclude
   
+  // Ensure patterns is an array
+  if (!patterns || !Array.isArray(patterns) || patterns.length === 0) {
+    return false; // No patterns = don't exclude
+  }
+  
   const lowerEmail = email.toLowerCase().trim();
   
   for (const pattern of patterns) {
@@ -113,6 +118,12 @@ export function shouldExcludeSender(email: string, patterns: string[]): boolean 
  */
 export function shouldExcludeCategory(category: string | null, excludedCategories: string[]): boolean {
   if (!category) return false; // No category = don't exclude (let other filters handle)
+  
+  // Ensure excludedCategories is an array
+  if (!excludedCategories || !Array.isArray(excludedCategories) || excludedCategories.length === 0) {
+    return false; // No excluded categories = don't exclude
+  }
+  
   return excludedCategories.includes(category.toLowerCase());
 }
 
@@ -186,8 +197,25 @@ export async function isWithinSenderCooldown(
 
   // Check if any of these messages were sent TO the sender
   for (const reply of recentReplies || []) {
-    const recipients = reply.recipients as Array<{ email: string }> | null;
-    if (recipients?.some(r => r.email?.toLowerCase() === senderEmail.toLowerCase())) {
+    // Handle recipients - it might be stored as JSON string, array, or null
+    let recipients: Array<{ email: string }> | null = null;
+    if (reply.recipients) {
+      if (Array.isArray(reply.recipients)) {
+        recipients = reply.recipients;
+      } else if (typeof reply.recipients === 'string') {
+        try {
+          recipients = JSON.parse(reply.recipients);
+        } catch {
+          // If parsing fails, skip this check
+          continue;
+        }
+      } else if (typeof reply.recipients === 'object') {
+        // If it's an object, try to convert to array
+        recipients = Array.isArray(reply.recipients) ? reply.recipients : null;
+      }
+    }
+    
+    if (recipients && Array.isArray(recipients) && recipients.some(r => r?.email?.toLowerCase() === senderEmail.toLowerCase())) {
       return { 
         withinCooldown: true, 
         lastReplyAt: new Date(reply.timestamp) 
@@ -203,7 +231,8 @@ export async function isWithinSenderCooldown(
  * Returns true if the email SHOULD be processed (allowed)
  */
 export function isDomainWhitelisted(email: string, whitelist: string[]): boolean {
-  if (!whitelist || whitelist.length === 0) {
+  // Ensure whitelist is an array
+  if (!whitelist || !Array.isArray(whitelist) || whitelist.length === 0) {
     return true; // No whitelist = all domains allowed
   }
   
@@ -218,7 +247,8 @@ export function isDomainWhitelisted(email: string, whitelist: string[]): boolean
  * Returns true if the email should be EXCLUDED (blocked)
  */
 export function isDomainBlacklisted(email: string, blacklist: string[]): boolean {
-  if (!blacklist || blacklist.length === 0) {
+  // Ensure blacklist is an array
+  if (!blacklist || !Array.isArray(blacklist) || blacklist.length === 0) {
     return false; // No blacklist = no domains blocked
   }
   

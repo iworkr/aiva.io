@@ -194,12 +194,21 @@ export async function GET(request: NextRequest) {
         const confidenceThreshold = wsSettings?.auto_send_confidence_threshold ?? 0.70;
         
         // Filter settings for smart auto-reply
+        // Ensure all array fields are actually arrays (database might return null or other types)
         const filterSettings = {
           connectionEmail: connection.provider_account_id || '',
-          excludedSenderPatterns: (wsSettings?.auto_send_excluded_senders as string[]) || DEFAULT_EXCLUDED_SENDER_PATTERNS,
-          excludedCategories: (wsSettings?.auto_send_excluded_categories as string[]) || DEFAULT_EXCLUDED_CATEGORIES,
-          domainWhitelist: (wsSettings?.auto_send_domain_whitelist as string[]) || [],
-          domainBlacklist: (wsSettings?.auto_send_domain_blacklist as string[]) || [],
+          excludedSenderPatterns: Array.isArray(wsSettings?.auto_send_excluded_senders) 
+            ? wsSettings.auto_send_excluded_senders 
+            : DEFAULT_EXCLUDED_SENDER_PATTERNS,
+          excludedCategories: Array.isArray(wsSettings?.auto_send_excluded_categories)
+            ? wsSettings.auto_send_excluded_categories
+            : DEFAULT_EXCLUDED_CATEGORIES,
+          domainWhitelist: Array.isArray(wsSettings?.auto_send_domain_whitelist)
+            ? wsSettings.auto_send_domain_whitelist
+            : [],
+          domainBlacklist: Array.isArray(wsSettings?.auto_send_domain_blacklist)
+            ? wsSettings.auto_send_domain_blacklist
+            : [],
           maxRepliesPerThread: wsSettings?.auto_send_max_replies_per_thread ?? 1,
           senderCooldownMinutes: wsSettings?.auto_send_sender_cooldown_minutes ?? 60,
         };
