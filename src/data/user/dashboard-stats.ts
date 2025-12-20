@@ -161,6 +161,17 @@ export async function getNeedsAttentionItems(
   const supabase = await createSupabaseUserServerActionClient();
   const items: AttentionItem[] = [];
 
+  // Get excluded categories from workspace settings
+  // Messages in excluded categories should NOT appear in "What needs your attention"
+  const { data: workspaceSettings } = await supabase
+    .from('workspace_settings')
+    .select('auto_send_excluded_categories')
+    .eq('workspace_id', workspaceId)
+    .single();
+
+  const excludedCategories = (workspaceSettings?.auto_send_excluded_categories as string[]) || [];
+  console.log(`[Dashboard] Excluded categories from settings:`, excludedCategories);
+
   // Get messages that require human review
   // These are messages where AI is uncertain or needs human verification
   const { data: reviewItems, error: reviewItemsError } = await supabase
@@ -202,7 +213,16 @@ export async function getNeedsAttentionItems(
   }
 
   for (const msg of reviewItems || []) {
-    // Include all messages that require human review
+    // Skip messages in excluded categories - they shouldn't appear in "What needs your attention"
+    if (msg.category && excludedCategories.length > 0) {
+      const categoryLower = msg.category.toLowerCase();
+      if (excludedCategories.some(excluded => excluded.toLowerCase() === categoryLower)) {
+        console.log(`[Dashboard] Skipping message ${msg.id} - category "${msg.category}" is in excluded categories`);
+        continue;
+      }
+    }
+    
+    // Include all messages that require human review (and are not in excluded categories)
     // Draft information will be enriched by the held drafts query below
     // This ensures messages appear even if RLS blocks the joined drafts
     const drafts = (msg.message_drafts as any[]) || [];
@@ -282,6 +302,15 @@ export async function getNeedsAttentionItems(
     if (msg.handled_by_aiva) continue;
     if (msg.workspace_id !== workspaceId) continue; // Safety check
     
+    // Skip messages in excluded categories - they shouldn't appear in "What needs your attention"
+    if (msg.category && excludedCategories.length > 0) {
+      const categoryLower = msg.category.toLowerCase();
+      if (excludedCategories.some(excluded => excluded.toLowerCase() === categoryLower)) {
+        console.log(`[Dashboard] Skipping held draft message ${msg.id} - category "${msg.category}" is in excluded categories`);
+        continue;
+      }
+    }
+    
     // If message was already added from first query, enrich it with draft info
     if (addedMessageIds.has(msg.id)) {
       const existingItem = items.find(i => i.messageId === msg.id);
@@ -322,8 +351,27 @@ export async function getNeedsAttentionItems(
     });
   }
 
-  // Sort by timestamp descending
-  items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  // Sort by priority: review reason > priority > timestamp
+  // Review reasons that need urgent attention: calendar_mismatch, sensitive_topic
+  // Then by message priority: urgent > high > medium > low
+  // Finally by timestamp: most recent first
+  items.sort((a, b) => {
+    // 1. Prioritize urgent review reasons
+    const urgentReasons = ['calendar_mismatch', 'sensitive_topic'];
+    const aIsUrgent = a.reviewReason && urgentReasons.includes(a.reviewReason);
+    const bIsUrgent = b.reviewReason && urgentReasons.includes(b.reviewReason);
+    if (aIsUrgent && !bIsUrgent) return -1;
+    if (!aIsUrgent && bIsUrgent) return 1;
+    
+    // 2. Then by message priority
+    const priorityOrder: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+    const aPriority = priorityOrder[a.priority || 'low'] ?? 3;
+    const bPriority = priorityOrder[b.priority || 'low'] ?? 3;
+    if (aPriority !== bPriority) return aPriority - bPriority;
+    
+    // 3. Finally by timestamp (most recent first)
+    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+  });
 
   const finalItems = items.slice(0, limit);
   
@@ -331,16 +379,19 @@ export async function getNeedsAttentionItems(
   console.log(`[Dashboard] getNeedsAttentionItems result:`, {
     workspaceId,
     userId,
+    excludedCategories,
     totalItemsBeforeLimit: items.length,
     limit,
     finalItemsCount: finalItems.length,
     finalItems: finalItems.map(i => ({
       messageId: i.messageId,
       subject: i.subject,
+      category: i.category,
+      priority: i.priority,
+      reviewReason: i.reviewReason,
       hasDraft: i.hasDraft,
       draftId: i.draftId,
       timestamp: i.timestamp,
-      reviewReason: i.reviewReason,
     })),
   });
   
