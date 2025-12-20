@@ -544,12 +544,27 @@ IMPORTANT: Always return valid, complete JSON. Keep replies concise.`;
     }
 
     // Update message to indicate draft exists
+    // If draft is held for review, also mark message as requiring human review
+    const messageUpdate: any = {
+      has_draft_reply: true,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (shouldHoldForReview) {
+      messageUpdate.requires_human_review = true;
+      messageUpdate.review_reason = finalReviewReason || 'draft_held_for_review';
+      messageUpdate.review_context = {
+        draftId: draft?.id,
+        confidenceScore: result.confidenceScore,
+        calendarContext: calendarContext,
+        aiUncertaintyNotes: finalUncertaintyNotes,
+        heldAt: new Date().toISOString(),
+      };
+    }
+
     await supabase
       .from("messages")
-      .update({
-        has_draft_reply: true,
-        updated_at: new Date().toISOString(),
-      })
+      .update(messageUpdate)
       .eq("id", messageId);
 
     // Log draft result for debugging

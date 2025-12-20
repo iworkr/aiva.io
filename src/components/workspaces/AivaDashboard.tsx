@@ -95,10 +95,29 @@ function AttentionItemCard({ item, onClick }: { item: AttentionItem; onClick?: (
   };
 
   const config = typeConfig[item.type];
+  
+  // Format review reason for display
+  const formatReviewReason = (reason?: string) => {
+    if (!reason) return 'Needs Review';
+    const reasonMap: Record<string, string> = {
+      calendar_mismatch: 'Calendar Mismatch',
+      low_confidence: 'Low Confidence',
+      commitment_confirmation: 'Needs Confirmation',
+      sensitive_topic: 'Sensitive Topic',
+      personal_relationship: 'Personal Relationship',
+      uncertain_context: 'Uncertain Context',
+      draft_held_for_review: 'Draft Held for Review',
+    };
+    return reasonMap[reason] || reason.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  const hasDraftInfo = item.hasDraft && (item.draftBody || item.confidenceScore !== undefined);
+  const isCalendarMismatch = item.reviewReason === 'calendar_mismatch';
+  const calendarInfo = item.calendarContext as any;
 
   return (
-    <Link href={`/inbox?message=${item.messageId}`}>
-      <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+    <Link href={`/inbox?message=${item.messageId}${item.draftId ? `&draft=${item.draftId}` : ''}`}>
+      <Card className="hover:bg-muted/50 transition-colors cursor-pointer border-l-4 border-l-amber-500">
         <CardContent className="py-4">
           <div className="flex items-start gap-3">
             <div className={`p-2 rounded-full ${config.bg}`}>
@@ -108,25 +127,70 @@ function AttentionItemCard({ item, onClick }: { item: AttentionItem; onClick?: (
               {item.type === 'unhandled' && <Mail className={`h-4 w-4 ${config.color}`} />}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <Badge variant="outline" className={`text-xs ${config.color}`}>
-                  {config.label}
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <Badge variant="outline" className={`text-xs ${config.color} border-amber-500`}>
+                  {formatReviewReason(item.reviewReason)}
                 </Badge>
                 {item.provider && (
                   <Badge variant="secondary" className="text-xs">
                     {item.provider}
                   </Badge>
                 )}
+                {hasDraftInfo && (
+                  <Badge variant="outline" className="text-xs border-blue-500 text-blue-600">
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    Draft Ready
+                  </Badge>
+                )}
+                {item.confidenceScore !== undefined && (
+                  <Badge variant="outline" className="text-xs">
+                    {Math.round(item.confidenceScore * 100)}% confidence
+                  </Badge>
+                )}
               </div>
-              <h4 className="font-medium truncate">{item.subject}</h4>
+              <h4 className="font-medium truncate mb-1">{item.subject}</h4>
               <p className="text-sm text-muted-foreground truncate">
                 {item.senderName || item.senderEmail}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
+              
+              {/* Show draft preview or calendar mismatch info */}
+              {hasDraftInfo && (
+                <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950/30 rounded text-xs">
+                  <p className="font-medium text-blue-900 dark:text-blue-300 mb-1">
+                    AI Draft Generated:
+                  </p>
+                  <p className="text-blue-800 dark:text-blue-400 line-clamp-2">
+                    {item.draftBody?.substring(0, 150)}
+                    {item.draftBody && item.draftBody.length > 150 ? '...' : ''}
+                  </p>
+                </div>
+              )}
+              
+              {isCalendarMismatch && calendarInfo && (
+                <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-950/30 rounded text-xs">
+                  <p className="font-medium text-amber-900 dark:text-amber-300 mb-1 flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    Calendar Issue:
+                  </p>
+                  <p className="text-amber-800 dark:text-amber-400">
+                    {calendarInfo.context || item.aiUncertaintyNotes || 'No matching calendar event found. Human verification needed.'}
+                  </p>
+                </div>
+              )}
+              
+              {item.aiUncertaintyNotes && !isCalendarMismatch && (
+                <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-950/30 rounded text-xs">
+                  <p className="text-amber-800 dark:text-amber-400">
+                    {item.aiUncertaintyNotes}
+                  </p>
+                </div>
+              )}
+              
+              <p className="text-xs text-muted-foreground mt-2">
                 {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
               </p>
             </div>
-            <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-1" />
           </div>
         </CardContent>
       </Card>

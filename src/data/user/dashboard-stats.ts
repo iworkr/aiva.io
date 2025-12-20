@@ -24,6 +24,7 @@ export interface AttentionItem {
   id: string;
   type: 'review' | 'high_priority' | 'scheduling' | 'unhandled';
   messageId: string;
+  draftId?: string;
   subject: string;
   senderEmail: string;
   senderName?: string;
@@ -33,6 +34,12 @@ export interface AttentionItem {
   category?: string;
   reviewReason?: string;
   provider?: string;
+  // Draft information (when draft is held for review)
+  draftBody?: string;
+  confidenceScore?: number;
+  calendarContext?: any;
+  aiUncertaintyNotes?: string;
+  hasDraft?: boolean;
 }
 
 export interface DailyBriefing {
@@ -154,7 +161,7 @@ export async function getNeedsAttentionItems(
   const supabase = await createSupabaseUserServerActionClient();
   const items: AttentionItem[] = [];
 
-  // ONLY get messages that require human review
+  // Get messages that require human review
   // These are messages where AI is uncertain or needs human verification
   const { data: reviewItems } = await supabase
     .from('messages')
@@ -169,20 +176,35 @@ export async function getNeedsAttentionItems(
       category,
       review_reason,
       review_context,
-      channel_connection:channel_connections(provider)
+      has_draft_reply,
+      channel_connection:channel_connections(provider),
+      message_drafts!inner(
+        id,
+        body,
+        confidence_score,
+        hold_for_review,
+        review_reason,
+        calendar_context,
+        ai_uncertainty_notes
+      )
     `)
     .eq('workspace_id', workspaceId)
     .eq('requires_human_review', true)
     .is('reviewed_at', null)
     .eq('handled_by_aiva', false) // Only show unhandled items
+    .eq('message_drafts.hold_for_review', true)
     .order('timestamp', { ascending: false })
     .limit(limit);
 
   for (const msg of reviewItems || []) {
+    const draft = (msg.message_drafts as any)?.[0];
+    const reviewContext = msg.review_context as any;
+    
     items.push({
       id: msg.id,
       type: 'review',
       messageId: msg.id,
+      draftId: draft?.id,
       subject: msg.subject || '(no subject)',
       senderEmail: msg.sender_email,
       senderName: msg.sender_name || undefined,
@@ -190,8 +212,75 @@ export async function getNeedsAttentionItems(
       timestamp: msg.timestamp,
       priority: msg.priority || undefined,
       category: msg.category || undefined,
-      reviewReason: msg.review_reason || undefined,
+      reviewReason: draft?.review_reason || msg.review_reason || 'needs_review',
       provider: (msg.channel_connection as any)?.provider,
+      // Draft information
+      draftBody: draft?.body,
+      confidenceScore: draft?.confidence_score || reviewContext?.confidenceScore,
+      calendarContext: draft?.calendar_context || reviewContext?.calendarContext,
+      aiUncertaintyNotes: draft?.ai_uncertainty_notes || reviewContext?.aiUncertaintyNotes,
+      hasDraft: !!draft || msg.has_draft_reply,
+    });
+  }
+
+  // Also get messages with held drafts that might not have requires_human_review set yet
+  // (for backward compatibility with older drafts)
+  const { data: heldDrafts } = await supabase
+    .from('message_drafts')
+    .select(`
+      id,
+      body,
+      confidence_score,
+      review_reason,
+      calendar_context,
+      ai_uncertainty_notes,
+      message:messages!inner(
+        id,
+        subject,
+        sender_email,
+        sender_name,
+        snippet,
+        timestamp,
+        priority,
+        category,
+        requires_human_review,
+        reviewed_at,
+        handled_by_aiva,
+        channel_connection:channel_connections(provider)
+      )
+    `)
+    .eq('workspace_id', workspaceId)
+    .eq('hold_for_review', true)
+    .is('message.reviewed_at', null)
+    .eq('message.handled_by_aiva', false)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  const addedMessageIds = new Set(items.map(i => i.messageId));
+  for (const draft of heldDrafts || []) {
+    const msg = draft.message as any;
+    if (!msg || addedMessageIds.has(msg.id)) continue;
+    
+    items.push({
+      id: draft.id,
+      type: 'review',
+      messageId: msg.id,
+      draftId: draft.id,
+      subject: msg.subject || '(no subject)',
+      senderEmail: msg.sender_email,
+      senderName: msg.sender_name || undefined,
+      snippet: msg.snippet || undefined,
+      timestamp: msg.timestamp,
+      priority: msg.priority || undefined,
+      category: msg.category || undefined,
+      reviewReason: draft.review_reason || 'draft_held_for_review',
+      provider: (msg.channel_connection as any)?.provider,
+      // Draft information
+      draftBody: draft.body,
+      confidenceScore: draft.confidence_score,
+      calendarContext: draft.calendar_context,
+      aiUncertaintyNotes: draft.ai_uncertainty_notes,
+      hasDraft: true,
     });
   }
 
