@@ -290,8 +290,22 @@ export function AivaDashboard({ workspaceId, userId, userName }: AivaDashboardPr
           subject: i.subject,
           hasDraft: i.hasDraft,
           draftId: i.draftId,
+          reviewReason: i.reviewReason,
+          timestamp: i.timestamp,
         })),
       });
+      
+      // Check specifically for the Thursday email
+      const thursdayEmail = itemsData.find(i => 
+        i.messageId === '367735ec-3639-4d13-b867-48e701d7da58' ||
+        i.subject?.includes('Thursday')
+      );
+      if (thursdayEmail) {
+        console.log('[Dashboard] ✅ Thursday email found in attention items:', thursdayEmail);
+      } else {
+        console.log('[Dashboard] ❌ Thursday email NOT found in attention items');
+        console.log('[Dashboard] All message IDs:', itemsData.map(i => i.messageId));
+      }
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
     } finally {

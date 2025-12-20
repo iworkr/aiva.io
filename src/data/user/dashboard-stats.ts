@@ -329,6 +329,8 @@ export async function getNeedsAttentionItems(
   
   // Extensive logging for debugging
   console.log(`[Dashboard] getNeedsAttentionItems result:`, {
+    workspaceId,
+    userId,
     totalItemsBeforeLimit: items.length,
     limit,
     finalItemsCount: finalItems.length,
@@ -338,8 +340,37 @@ export async function getNeedsAttentionItems(
       hasDraft: i.hasDraft,
       draftId: i.draftId,
       timestamp: i.timestamp,
+      reviewReason: i.reviewReason,
     })),
   });
+  
+  // Check specifically for the Thursday email
+  const thursdayEmail = finalItems.find(i => 
+    i.messageId === '367735ec-3639-4d13-b867-48e701d7da58' ||
+    i.subject?.includes('Thursday')
+  );
+  if (thursdayEmail) {
+    console.log(`[Dashboard] ✅ Thursday email found in final items:`, {
+      messageId: thursdayEmail.messageId,
+      subject: thursdayEmail.subject,
+      hasDraft: thursdayEmail.hasDraft,
+      draftId: thursdayEmail.draftId,
+    });
+  } else {
+    console.log(`[Dashboard] ❌ Thursday email NOT in final items`);
+    const allMessageIds = finalItems.map(i => i.messageId);
+    console.log(`[Dashboard] Final message IDs:`, allMessageIds);
+    
+    // Check if it was in items before limit
+    const thursdayInAll = items.find(i => 
+      i.messageId === '367735ec-3639-4d13-b867-48e701d7da58' ||
+      i.subject?.includes('Thursday')
+    );
+    if (thursdayInAll) {
+      console.log(`[Dashboard] ⚠️ Thursday email was in items but got filtered out by limit`);
+      console.log(`[Dashboard] Thursday email index:`, items.findIndex(i => i.messageId === '367735ec-3639-4d13-b867-48e701d7da58'));
+    }
+  }
 
   return finalItems;
 }
