@@ -332,19 +332,19 @@ export async function GET(request: NextRequest) {
             // Get a workspace member (preferably owner) for the calendar event creation
             const { data: workspaceMember } = await supabase
               .from('workspace_members')
-              .select('user_id')
+              .select('workspace_member_id, workspace_member_role')
               .eq('workspace_id', item.workspace_id)
-              .order('role', { ascending: true }) // Owner first, then admin, etc.
+              .order('workspace_member_role', { ascending: true }) // Owner first, then admin, etc.
               .limit(1)
               .single();
 
-            if (workspaceMember?.user_id) {
+            if (workspaceMember?.workspace_member_id) {
               console.log(`   📅 Attempting to create calendar event...`);
               const eventResult = await createCalendarEventFromSentEmail(
                 item.message_id,
                 item.draft_id,
                 item.workspace_id,
-                workspaceMember.user_id
+                workspaceMember.workspace_member_id
               );
               
               if (eventResult.success) {

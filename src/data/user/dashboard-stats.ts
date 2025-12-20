@@ -227,7 +227,7 @@ export async function getNeedsAttentionItems(
       confidenceScore: draft?.confidence_score || reviewContext?.confidenceScore,
       calendarContext: draft?.calendar_context || reviewContext?.calendarContext,
       aiUncertaintyNotes: draft?.ai_uncertainty_notes || reviewContext?.aiUncertaintyNotes,
-      hasDraft: !!draft || msg.has_draft_reply,
+      hasDraft: !!draft || !!msg.has_draft_reply,
     });
   }
 
@@ -285,9 +285,9 @@ export async function getNeedsAttentionItems(
       provider: (msg.channel_connection as any)?.provider,
       // Draft information
       draftBody: draft.body,
-      confidenceScore: draft.confidence_score,
-      calendarContext: draft.calendar_context,
-      aiUncertaintyNotes: draft.ai_uncertainty_notes,
+      confidenceScore: draft.confidence_score ?? undefined,
+      calendarContext: draft.calendar_context ?? undefined,
+      aiUncertaintyNotes: draft.ai_uncertainty_notes ?? undefined,
       hasDraft: true,
     });
   }

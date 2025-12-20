@@ -93,12 +93,12 @@ export async function GET(request: NextRequest) {
     // Get workspace smart filter settings
     const { data: workspaceSettings } = await supabase
       .from('workspace_settings')
-      .select('excluded_categories, excluded_senders, auto_send_enabled, auto_send_confidence_threshold')
+      .select('auto_send_excluded_categories, auto_send_excluded_senders, auto_send_enabled, auto_send_confidence_threshold')
       .eq('workspace_id', workspaceId)
       .single();
 
-    const excludedCategories = (workspaceSettings?.excluded_categories as string[]) || [];
-    const excludedSenders = (workspaceSettings?.excluded_senders as string[]) || [];
+    const excludedCategories = (workspaceSettings?.auto_send_excluded_categories as string[]) || [];
+    const excludedSenders = (workspaceSettings?.auto_send_excluded_senders as string[]) || [];
 
     // Analyze each message
     const analyzed = messages?.map(msg => {
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
 
       // Check 1: Actionability
       const validActionability = ['question', 'request', 'fyi', 'scheduling_intent', 'task'];
-      const hasValidActionability = msg.actionability && validActionability.includes(msg.actionability);
+      const hasValidActionability = !!(msg.actionability && validActionability.includes(msg.actionability));
       checks.actionability = hasValidActionability;
       if (!hasValidActionability) {
         reasons.push(`Actionability is '${msg.actionability || 'null'}' (needs: ${validActionability.join(', ')})`);

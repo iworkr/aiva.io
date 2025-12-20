@@ -302,34 +302,43 @@ export async function createCalendarEventFromSentEmail(
     // Create event title
     const title = message.subject || `Meeting with ${message.sender_name || message.sender_email}`;
 
-    // Create event
-    const result = await createEventAction({
-      workspaceId,
-      calendarConnectionId: calendarConnection.id,
-      providerEventId: `email_${messageId}_${Date.now()}`,
-      title,
-      description: `Created from email reply to ${message.sender_email}`,
-      startTime,
-      endTime,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-      isAllDay,
-      organizer: { 
-        email: calendarConnection.provider_account_email || '', 
-        name: '' 
-      },
-      attendees: [
-        {
-          email: message.sender_email,
-          name: message.sender_name || message.sender_email,
-          responseStatus: 'needsAction',
+    // Create event directly in database (we're already in a server context)
+    const { data: eventData, error: eventError } = await supabase
+      .from('events')
+      .insert({
+        workspace_id: workspaceId,
+        calendar_connection_id: calendarConnection.id,
+        provider_event_id: `email_${messageId}_${Date.now()}`,
+        title,
+        description: `Created from email reply to ${message.sender_email}`,
+        start_time: startTime,
+        end_time: endTime,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        is_all_day: isAllDay,
+        organizer: { 
+          email: calendarConnection.provider_account_email || '', 
+          name: '' 
         },
-      ],
-      createdFromMessageId: messageId,
-    });
+        attendees: [
+          {
+            email: message.sender_email,
+            name: message.sender_name || message.sender_email,
+            responseStatus: 'needsAction',
+          },
+        ],
+        created_from_message_id: messageId,
+      })
+      .select()
+      .single();
 
-    if (result.success && result.data) {
-      console.log('[Calendar Event] Event created successfully:', result.data.id);
-      return { success: true, eventId: result.data.id };
+    if (eventError) {
+      console.error('[Calendar Event] Error creating event:', eventError);
+      return { success: false, message: eventError.message };
+    }
+
+    if (eventData) {
+      console.log('[Calendar Event] Event created successfully:', eventData.id);
+      return { success: true, eventId: eventData.id };
     }
 
     return { success: false, message: 'Failed to create event' };
