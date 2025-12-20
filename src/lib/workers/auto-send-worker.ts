@@ -201,17 +201,42 @@ export async function isWithinSenderCooldown(
     let recipients: Array<{ email: string }> | null = null;
     if (reply.recipients) {
       if (Array.isArray(reply.recipients)) {
-        recipients = reply.recipients;
+        // Filter and validate: ensure each element is an object with an email string
+        recipients = reply.recipients
+          .filter((r): r is { email: string } => 
+            r !== null && 
+            typeof r === 'object' && 
+            'email' in r && 
+            typeof (r as { email?: unknown }).email === 'string'
+          ) as Array<{ email: string }>;
       } else if (typeof reply.recipients === 'string') {
         try {
-          recipients = JSON.parse(reply.recipients);
+          const parsed = JSON.parse(reply.recipients);
+          if (Array.isArray(parsed)) {
+            // Filter and validate parsed array
+            recipients = parsed
+              .filter((r): r is { email: string } => 
+                r !== null && 
+                typeof r === 'object' && 
+                'email' in r && 
+                typeof (r as { email?: unknown }).email === 'string'
+              ) as Array<{ email: string }>;
+          }
         } catch {
           // If parsing fails, skip this check
           continue;
         }
       } else if (typeof reply.recipients === 'object') {
         // If it's an object, try to convert to array
-        recipients = Array.isArray(reply.recipients) ? reply.recipients : null;
+        if (Array.isArray(reply.recipients)) {
+          recipients = reply.recipients
+            .filter((r): r is { email: string } => 
+              r !== null && 
+              typeof r === 'object' && 
+              'email' in r && 
+              typeof (r as { email?: unknown }).email === 'string'
+            ) as Array<{ email: string }>;
+        }
       }
     }
     
