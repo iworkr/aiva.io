@@ -154,7 +154,8 @@ export async function getNeedsAttentionItems(
   const supabase = await createSupabaseUserServerActionClient();
   const items: AttentionItem[] = [];
 
-  // Get review queue items
+  // ONLY get messages that require human review
+  // These are messages where AI is uncertain or needs human verification
   const { data: reviewItems } = await supabase
     .from('messages')
     .select(`
@@ -167,11 +168,13 @@ export async function getNeedsAttentionItems(
       priority,
       category,
       review_reason,
+      review_context,
       channel_connection:channel_connections(provider)
     `)
     .eq('workspace_id', workspaceId)
     .eq('requires_human_review', true)
     .is('reviewed_at', null)
+    .eq('handled_by_aiva', false) // Only show unhandled items
     .order('timestamp', { ascending: false })
     .limit(limit);
 
@@ -190,49 +193,6 @@ export async function getNeedsAttentionItems(
       reviewReason: msg.review_reason || undefined,
       provider: (msg.channel_connection as any)?.provider,
     });
-  }
-
-  // Get high priority unhandled messages (if we have room)
-  if (items.length < limit) {
-    const remainingLimit = limit - items.length;
-    const reviewIds = items.map(i => i.messageId);
-
-    const { data: highPriorityItems } = await supabase
-      .from('messages')
-      .select(`
-        id,
-        subject,
-        sender_email,
-        sender_name,
-        snippet,
-        timestamp,
-        priority,
-        category,
-        channel_connection:channel_connections(provider)
-      `)
-      .eq('workspace_id', workspaceId)
-      .eq('handled_by_aiva', false)
-      .eq('requires_human_review', false)
-      .in('priority', ['urgent', 'high'])
-      .not('id', 'in', `(${reviewIds.length > 0 ? reviewIds.join(',') : "''"})`)
-      .order('timestamp', { ascending: false })
-      .limit(remainingLimit);
-
-    for (const msg of highPriorityItems || []) {
-      items.push({
-        id: msg.id,
-        type: 'high_priority',
-        messageId: msg.id,
-        subject: msg.subject || '(no subject)',
-        senderEmail: msg.sender_email,
-        senderName: msg.sender_name || undefined,
-        snippet: msg.snippet || undefined,
-        timestamp: msg.timestamp,
-        priority: msg.priority || undefined,
-        category: msg.category || undefined,
-        provider: (msg.channel_connection as any)?.provider,
-      });
-    }
   }
 
   // Sort by timestamp descending

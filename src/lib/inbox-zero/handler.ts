@@ -61,10 +61,12 @@ export async function markMessageHandled(
   options: HandleMessageOptions
 ): Promise<HandleMessageResult> {
   const supabase = supabaseAdminClient;
+  const handledAt = new Date().toISOString();
   
   try {
     // Get inbox zero settings
     const settings = await getInboxZeroSettings(workspaceId);
+    console.log('[Inbox Zero] Settings:', { enabled: settings.enabled, autoArchive: settings.autoArchive, applyLabel: settings.applyLabel });
 
     // Get message details including provider info
     const { data: message, error: msgError } = await supabase
@@ -79,12 +81,20 @@ export async function markMessageHandled(
       .single();
 
     if (msgError || !message) {
+      console.error('[Inbox Zero] Message not found:', { messageId, error: msgError });
       return {
         success: false,
         archivedInProvider: false,
-        error: 'Message not found',
+        error: msgError?.message || 'Message not found',
       };
     }
+
+    console.log('[Inbox Zero] Processing message:', {
+      messageId,
+      providerMessageId: message.provider_message_id,
+      provider: (message.channel_connection as any)?.provider,
+      hasConnectionId: !!message.channel_connection_id,
+    });
 
     const handledAt = new Date().toISOString();
     let archivedInProvider = false;
@@ -100,30 +110,50 @@ export async function markMessageHandled(
         applyLabel: settings.applyLabel && (options.applyLabel ?? true),
       };
 
+      console.log('[Inbox Zero] Archive options:', { provider, ...archiveOptions });
+
       if (provider === 'gmail') {
-        const result = await handleGmailMessage(
-          message.channel_connection_id,
-          message.provider_message_id,
-          archiveOptions
-        );
-        archivedInProvider = result.success && result.actions.archived;
-        providerActions = result.actions;
+        try {
+          const result = await handleGmailMessage(
+            message.channel_connection_id,
+            message.provider_message_id,
+            archiveOptions
+          );
+          archivedInProvider = result.success && result.actions.archived;
+          providerActions = result.actions;
+          console.log('[Inbox Zero] Gmail result:', { success: result.success, actions: result.actions, error: result.error });
+        } catch (error) {
+          console.error('[Inbox Zero] Gmail archive error:', error);
+        }
       } else if (provider === 'outlook') {
-        const result = await handleOutlookMessage(
-          message.channel_connection_id,
-          message.provider_message_id,
-          {
-            ...archiveOptions,
-            applyCategory: archiveOptions.applyLabel, // Map applyLabel to applyCategory for Outlook
-          }
-        );
-        archivedInProvider = result.success && result.actions.archived;
-        providerActions = {
-          markedRead: result.actions.markedRead,
-          archived: result.actions.archived,
-          labeled: result.actions.categorized,
-        };
+        try {
+          const result = await handleOutlookMessage(
+            message.channel_connection_id,
+            message.provider_message_id,
+            {
+              ...archiveOptions,
+              applyCategory: archiveOptions.applyLabel, // Map applyLabel to applyCategory for Outlook
+            }
+          );
+          archivedInProvider = result.success && result.actions.archived;
+          providerActions = {
+            markedRead: result.actions.markedRead,
+            archived: result.actions.archived,
+            labeled: result.actions.categorized,
+          };
+          console.log('[Inbox Zero] Outlook result:', { success: result.success, actions: providerActions, error: result.error });
+        } catch (error) {
+          console.error('[Inbox Zero] Outlook archive error:', error);
+        }
+      } else {
+        console.warn('[Inbox Zero] Unsupported provider:', provider);
       }
+    } else {
+      console.log('[Inbox Zero] Skipping provider archive:', {
+        enabled: settings.enabled,
+        hasProviderMessageId: !!message.provider_message_id,
+        hasConnectionId: !!message.channel_connection_id,
+      });
     }
 
     // Update message in database
