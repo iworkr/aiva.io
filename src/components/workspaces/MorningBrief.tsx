@@ -70,6 +70,7 @@ interface BriefingItem {
   timestamp?: Date;
   href: string;
   metadata?: string;
+  messageId?: string; // For messages, store the messageId for dismissal
 }
 
 export async function MorningBrief() {
