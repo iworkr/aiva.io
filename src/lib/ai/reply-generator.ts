@@ -311,7 +311,13 @@ REQUIREMENTS:
 7. NO signature (added automatically)
 8. NO "Dear/Hi" salutation - start directly with content
 9. DO NOT FABRICATE INFORMATION: Only use information explicitly provided in the context. If asked about policies, product details, or other information not in the context, acknowledge you don't have that information rather than making it up.
-${workspaceAIRules ? `10. STRICTLY follow the WORKSPACE RULES provided above` : ''}
+10. MISSING INFORMATION HANDLING: If the message asks for information you don't have (policies, product details, pricing, availability, etc.):
+    - Still draft a helpful response acknowledging you'll check
+    - Use phrases like "Let me check on that for you" or "I'll need to verify that information"
+    - Set "hasMissingInformation" to true in your response
+    - Reduce confidence score appropriately (0.50-0.70 range)
+    - Set "isAutoSendable" to false if critical information is missing
+${workspaceAIRules ? `11. STRICTLY follow the WORKSPACE RULES provided above` : ''}
 
 CONFIDENCE SCORE GUIDELINES (be realistic):
 - 0.90-1.00: Clear question with obvious answer, straightforward acknowledgment
@@ -335,6 +341,8 @@ Format as JSON:
   "body": "<reply text>",
   "confidenceScore": <number 0.40-1.0>,
   "isAutoSendable": <boolean>,
+  "hasMissingInformation": <boolean - true if you're missing critical information needed to answer>,
+  "missingInformationType": "<string - optional: 'policy', 'product', 'pricing', 'availability', 'other', or null>",
   "toneReasoning": {
     "tone": "${tone}",
     "reasons": [
@@ -374,9 +382,10 @@ CRITICAL: Confidence scores must be realistic and varied:
 🚨 CRITICAL: DO NOT FABRICATE INFORMATION
 - ONLY use information explicitly provided in the context below
 - DO NOT make up policies, product categories, return policies, shipping details, or any other information
-- If information is not available in the context, say "I don't have that information" or "I'll need to check on that for you"
+- If information is not available in the context, respond with "Let me check on that for you" or "I'll need to verify that information"
 - DO NOT infer or assume details that aren't explicitly stated
-- If asked about policies (returns, shipping, etc.) and they're not in the context, acknowledge you don't have that information`;
+- If asked about policies (returns, shipping, etc.) and they're not in the context, acknowledge you don't have that information
+- When missing critical information, still draft a helpful response but mark it as requiring human follow-up`;
 
     // Add workspace context to system message (CRITICAL - AI must understand its role)
     if (workspaceAIContext) {
@@ -395,7 +404,11 @@ CRITICAL: Confidence scores must be realistic and varied:
     // Add final instructions
     systemMessage += `\n\nBe honest about uncertainty. Don't default to high confidence.
 IMPORTANT: Always return valid, complete JSON. Keep replies concise.
-REMEMBER: If you don't have specific information (like return policies, product categories, shipping details), acknowledge that you don't have it rather than making it up.`;
+REMEMBER: If you don't have specific information (like return policies, product categories, shipping details):
+- Acknowledge that you don't have it rather than making it up
+- Still draft a helpful response saying you'll check
+- Set "hasMissingInformation" to true so it can be flagged for human review
+- This ensures the human can follow up with accurate information`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -497,19 +510,29 @@ REMEMBER: If you don't have specific information (like return policies, product 
     // Get the user_id from the channel connection (the user who connected this channel)
     const connectionUserId = (message.channel_connection as any)?.user_id;
     
+    // Check if AI indicated missing information
+    const hasMissingInfo = rawResult.hasMissingInformation === true;
+    const missingInfoType = rawResult.missingInformationType || 'unknown';
+    
     // Determine if draft should be held for human review
-    // Hold if: message flagged, calendar mismatch, or low confidence
-    const shouldHoldForReview = needsHumanReview || result.confidenceScore < 0.55;
-    const finalReviewReason = reviewReason || (result.confidenceScore < 0.55 ? 'low_confidence' : undefined);
-    const finalUncertaintyNotes = aiUncertaintyNotes || (result.confidenceScore < 0.55 
-      ? `AI confidence is ${Math.round(result.confidenceScore * 100)}% - below threshold for auto-send`
-      : undefined);
+    // Hold if: message flagged, calendar mismatch, low confidence, or missing critical information
+    const shouldHoldForReview = needsHumanReview || result.confidenceScore < 0.55 || hasMissingInfo;
+    const finalReviewReason = reviewReason || 
+      (hasMissingInfo ? `missing_information_${missingInfoType}` : 
+       result.confidenceScore < 0.55 ? 'low_confidence' : undefined);
+    const finalUncertaintyNotes = aiUncertaintyNotes || 
+      (hasMissingInfo ? `AI is missing critical information (${missingInfoType}) - human follow-up required` :
+       result.confidenceScore < 0.55 
+        ? `AI confidence is ${Math.round(result.confidenceScore * 100)}% - below threshold for auto-send`
+        : undefined);
 
     console.log('[AI Reply] Human review check:', {
       needsHumanReview,
       reviewReason: finalReviewReason,
       confidenceScore: result.confidenceScore,
       shouldHoldForReview,
+      hasMissingInfo,
+      missingInfoType: hasMissingInfo ? missingInfoType : null,
     });
 
     // Store draft in database
@@ -528,6 +551,8 @@ REMEMBER: If you don't have specific information (like return policies, product 
         hasThreadContext: !!conversationContext,
         senderEmail: message.sender_email,
         senderName: message.sender_name,
+        hasMissingInformation: hasMissingInfo,
+        missingInformationType: hasMissingInfo ? missingInfoType : null,
       } as any,
       // Human review fields
       hold_for_review: shouldHoldForReview,

@@ -361,6 +361,10 @@ export const generateAIContextAction = authActionClient
               shopifyParts.push(`Vendors/Brands: ${Array.from(vendors).join(', ')}`);
             }
           }
+        } else if (totalProducts === 0) {
+          // No products synced yet - provide helpful context
+          shopifyParts.push(`\n### Products`);
+          shopifyParts.push(`Note: No products have been synced to the store yet. If customers ask about products, thank them for their interest and let them know the store is still being set up, or that you'll need to check product availability.`);
         }
         
         contextParts.push(shopifyParts.join('\n'));

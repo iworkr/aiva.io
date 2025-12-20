@@ -163,7 +163,7 @@ export async function getNeedsAttentionItems(
 
   // Get messages that require human review
   // These are messages where AI is uncertain or needs human verification
-  const { data: reviewItems } = await supabase
+  const { data: reviewItems, error: reviewItemsError } = await supabase
     .from('messages')
     .select(`
       id,
@@ -194,6 +194,12 @@ export async function getNeedsAttentionItems(
     .eq('handled_by_aiva', false) // Only show unhandled items
     .order('timestamp', { ascending: false })
     .limit(limit * 2); // Get more to filter after
+
+  if (reviewItemsError) {
+    console.error('[Dashboard] Error fetching review items:', reviewItemsError);
+  } else {
+    console.log(`[Dashboard] Found ${reviewItems?.length || 0} messages requiring review`);
+  }
 
   for (const msg of reviewItems || []) {
     // Filter to only include messages with held drafts
