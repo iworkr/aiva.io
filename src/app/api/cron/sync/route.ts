@@ -214,11 +214,12 @@ export async function GET(request: NextRequest) {
         };
 
         try {
+          // Classify messages that are missing priority, category, or actionability
           const { data: unclassifiedMessages } = await supabase
             .from('messages')
             .select('id, subject')
             .eq('workspace_id', connection.workspace_id)
-            .or('priority.is.null,category.is.null')
+            .or('priority.is.null,category.is.null,actionability.is.null')
             .order('created_at', { ascending: false })
             .limit(50);
 
@@ -250,7 +251,7 @@ export async function GET(request: NextRequest) {
           // Get messages that need drafts:
           // - Any actionability type that might need a response (excluding 'none')
           // - No existing draft
-          // - NOT flagged for human review (those need manual handling)
+          // - Include messages requiring human review (they still need drafts, just won't be auto-sent)
           // - Recent (last 24 hours)
           // - Include sender_email, category, provider_thread_id, labels for filtering
           const { data: actionableMessages } = await supabase
@@ -259,7 +260,7 @@ export async function GET(request: NextRequest) {
             .eq('workspace_id', connection.workspace_id)
             .in('actionability', ['question', 'request', 'fyi', 'scheduling_intent', 'task']) // All types except 'none'
             .eq('has_draft_reply', false)
-            .or('requires_human_review.is.null,requires_human_review.eq.false') // Skip messages flagged for human review
+            // Include messages requiring human review - they still need drafts for user review
             .gte('timestamp', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
             .order('timestamp', { ascending: false })
             .limit(15); // Limit to avoid timeouts, increased slightly to account for filtering
@@ -310,6 +311,7 @@ export async function GET(request: NextRequest) {
                 
                 // *** FULL SMART FILTER CHECK ***
                 // Check if this message should receive an auto-reply
+                // Note: Messages requiring human review still get drafts (for user review), but won't be auto-sent
                 const filterResult = await checkAutoReplyEligibility(
                   {
                     id: msg.id,
@@ -321,39 +323,50 @@ export async function GET(request: NextRequest) {
                   filterSettings
                 );
 
+                // If message requires human review, still generate draft (user needs to review it)
+                // But log that it was filtered for auto-send
                 if (!filterResult.eligible) {
-                  skippedByFilter++;
-                  console.log(`      ⏭️ SKIPPED: ${msg.subject?.substring(0, 30) || 'No subject'}`);
-                  console.log(`         Reason: ${filterResult.reason}`);
-                  
-                  // Log to auto_send_log for transparency
-                  await supabase.from('auto_send_log').insert({
-                    workspace_id: connection.workspace_id,
-                    message_id: msg.id,
-                    action: 'skipped',
-                    skip_reason: filterResult.reason,
-                    details: filterResult.details as any,
-                  });
-                  
-                  continue;
-                }
-
-                console.log(`      ✍️ Generating draft for: ${msg.subject?.substring(0, 40) || 'No subject'}...`);
-                
-                const draftResult = await generateReplyDraft(
-                  msg.id,
-                  connection.workspace_id,
-                  {
-                    useAdminClient: true,
-                    skipFeatureCheck: true,
+                  if (msg.requires_human_review) {
+                    console.log(`      ⚠️ Message requires human review but filtered for auto-send: ${filterResult.reason}`);
+                    console.log(`      ✍️ Still generating draft for human review...`);
+                    // Continue to draft generation below
+                  } else {
+                    skippedByFilter++;
+                    console.log(`      ⏭️ SKIPPED: ${msg.subject?.substring(0, 30) || 'No subject'}`);
+                    console.log(`         Reason: ${filterResult.reason}`);
+                    
+                    // Log to auto_send_log for transparency
+                    await supabase.from('auto_send_log').insert({
+                      workspace_id: connection.workspace_id,
+                      message_id: msg.id,
+                      action: 'skipped',
+                      skip_reason: filterResult.reason,
+                      details: filterResult.details as any,
+                    });
+                    
+                    continue;
                   }
-                );
+                }
                 
-                if (draftResult.body && !draftResult.error) {
-                  draftsGenerated++;
-                  console.log(`         ✅ Draft generated (confidence: ${draftResult.confidenceScore})`);
-                } else if (draftResult.error) {
-                  console.log(`         ⚠️ Draft error: ${draftResult.error}`);
+                // Generate draft (for both eligible messages and messages requiring human review)
+                if (filterResult.eligible || msg.requires_human_review) {
+                  console.log(`      ✍️ Generating draft for: ${msg.subject?.substring(0, 40) || 'No subject'}...`);
+                  
+                  const draftResult = await generateReplyDraft(
+                    msg.id,
+                    connection.workspace_id,
+                    {
+                      useAdminClient: true,
+                      skipFeatureCheck: true,
+                    }
+                  );
+                  
+                  if (draftResult.body && !draftResult.error) {
+                    draftsGenerated++;
+                    console.log(`         ✅ Draft generated (confidence: ${draftResult.confidenceScore})`);
+                  } else if (draftResult.error) {
+                    console.log(`         ⚠️ Draft error: ${draftResult.error}`);
+                  }
                 }
               } catch (draftErr) {
                 console.error(`         ❌ Failed to generate draft:`, draftErr instanceof Error ? draftErr.message : draftErr);

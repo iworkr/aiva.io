@@ -174,6 +174,7 @@ export async function getNeedsAttentionItems(
 
   // Get messages that require human review
   // These are messages where AI is uncertain or needs human verification
+  // INCLUDING auto-replied messages (handle_action = 'auto_replied') so user can review what was sent
   const { data: reviewItems, error: reviewItemsError } = await supabase
     .from('messages')
     .select(`
@@ -188,6 +189,8 @@ export async function getNeedsAttentionItems(
       review_reason,
       review_context,
       has_draft_reply,
+      handled_by_aiva,
+      handle_action,
       channel_connection:channel_connections(provider),
       message_drafts(
         id,
@@ -196,13 +199,16 @@ export async function getNeedsAttentionItems(
         hold_for_review,
         review_reason,
         calendar_context,
-        ai_uncertainty_notes
+        ai_uncertainty_notes,
+        auto_sent,
+        auto_sent_at
       )
     `)
     .eq('workspace_id', workspaceId)
     .eq('requires_human_review', true)
     .is('reviewed_at', null)
-    .eq('handled_by_aiva', false) // Only show unhandled items
+    // Include unhandled items OR auto-replied items (so user can review what was auto-sent)
+    .or('handled_by_aiva.eq.false,handle_action.eq.auto_replied')
     .order('timestamp', { ascending: false })
     .limit(limit * 2); // Get more to filter after
 
@@ -230,11 +236,15 @@ export async function getNeedsAttentionItems(
     const draft = heldDraft || drafts[0];
     const reviewContext = msg.review_context as any;
     
+    // Check if this message was auto-replied (so we can show it differently)
+    const wasAutoReplied = msg.handled_by_aiva && msg.handle_action === 'auto_replied';
+    const autoSentDraft = wasAutoReplied ? drafts.find((d: any) => d.auto_sent === true) : null;
+    
     items.push({
       id: msg.id,
       type: 'review',
       messageId: msg.id,
-      draftId: draft?.id,
+      draftId: draft?.id || autoSentDraft?.id,
       subject: msg.subject || '(no subject)',
       senderEmail: msg.sender_email,
       senderName: msg.sender_name || undefined,
@@ -242,10 +252,13 @@ export async function getNeedsAttentionItems(
       timestamp: msg.timestamp,
       priority: msg.priority || undefined,
       category: msg.category || undefined,
-      reviewReason: draft?.review_reason || msg.review_reason || 'needs_review',
+      reviewReason: wasAutoReplied 
+        ? 'auto_replied_needs_review' 
+        : (draft?.review_reason || msg.review_reason || 'needs_review'),
       provider: (msg.channel_connection as any)?.provider,
       // Draft information (may be empty if RLS blocks drafts, will be enriched below)
-      draftBody: draft?.body,
+      // For auto-replied messages, show the auto-sent draft
+      draftBody: wasAutoReplied ? (autoSentDraft?.body || draft?.body) : draft?.body,
       confidenceScore: draft?.confidence_score || reviewContext?.confidenceScore,
       calendarContext: draft?.calendar_context || reviewContext?.calendarContext,
       aiUncertaintyNotes: draft?.ai_uncertainty_notes || reviewContext?.aiUncertaintyNotes,

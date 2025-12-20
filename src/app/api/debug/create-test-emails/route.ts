@@ -235,6 +235,8 @@ joseph.evan.lewis@gmail.com</p>`,
             actionability: 'request',
             priority: 'high',
             category: 'customer_inquiry',
+            handled_by_aiva: false, // Ensure it appears in requires attention
+            reviewed_at: null, // Ensure it's not marked as reviewed
           })
           .eq('id', messageId);
       }
@@ -251,6 +253,8 @@ joseph.evan.lewis@gmail.com</p>`,
             actionability: 'question',
             priority: 'medium',
             category: 'customer_inquiry',
+            handled_by_aiva: false, // Ensure it appears in requires attention if auto-replied
+            reviewed_at: null, // Ensure it's not marked as reviewed
           })
           .eq('id', messageId);
       }
@@ -326,6 +330,18 @@ export async function POST(request: NextRequest) {
 
     if (result?.data && !(result.data as any).isDuplicate) {
       const messageId = (result.data as any).data?.id || (result.data as any).id;
+      
+      // Ensure the message is set up for processing
+      if (messageId) {
+        await supabase
+          .from('messages')
+          .update({
+            handled_by_aiva: false,
+            reviewed_at: null,
+            // Don't set requires_human_review - let classification determine this
+          })
+          .eq('id', messageId);
+      }
       
       return NextResponse.json({
         success: true,
