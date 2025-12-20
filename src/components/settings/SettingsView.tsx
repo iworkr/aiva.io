@@ -236,8 +236,14 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
           setAutoTasks(settings.ai.autoExtractTasks ?? false);
           setAutoEvents(settings.ai.autoCreateEvents ?? false);
           setDefaultTone(settings.ai.defaultReplyTone || 'professional');
-          setAiContext(settings.ai.context || '');
-          setAiRules(settings.ai.rules || '');
+          const context = settings.ai.context || '';
+          const rules = settings.ai.rules || '';
+          setAiContext(context);
+          setAiRules(rules);
+          setLastSavedAiContext(context);
+          setLastSavedAiRules(rules);
+          setAiContextUnsaved(false);
+          setAiRulesUnsaved(false);
         }
 
         // Set notification settings
@@ -332,8 +338,14 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
         setAutoTasks(settings.ai.autoExtractTasks ?? false);
         setAutoEvents(settings.ai.autoCreateEvents ?? false);
         setDefaultTone(settings.ai.defaultReplyTone || 'professional');
-        setAiContext(settings.ai.context || '');
-        setAiRules(settings.ai.rules || '');
+        const context = settings.ai.context || '';
+        const rules = settings.ai.rules || '';
+        setAiContext(context);
+        setAiRules(rules);
+        setLastSavedAiContext(context);
+        setLastSavedAiRules(rules);
+        setAiContextUnsaved(false);
+        setAiRulesUnsaved(false);
       }
 
       if (settings?.notifications) {
@@ -410,6 +422,11 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   const { execute: saveAISettings, status: aiStatus } = useAction(updateAISettingsAction, {
     onSuccess: () => {
       // Don't show toast for every auto-save to avoid spam
+      // But mark as saved
+      setLastSavedAiContext(aiContext);
+      setLastSavedAiRules(aiRules);
+      setAiContextUnsaved(false);
+      setAiRulesUnsaved(false);
     },
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to save setting');
@@ -493,6 +510,12 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   const autoSendSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const filterSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Track unsaved changes for AI Context and Rules
+  const [aiContextUnsaved, setAiContextUnsaved] = useState(false);
+  const [aiRulesUnsaved, setAiRulesUnsaved] = useState(false);
+  const [lastSavedAiContext, setLastSavedAiContext] = useState('');
+  const [lastSavedAiRules, setLastSavedAiRules] = useState('');
+
   // Auto-save AI settings when switches/selects change
   const triggerAIAutoSave = useCallback((updates: { 
     autoClassify?: boolean; 
@@ -509,17 +532,30 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
     }
     
     aiSaveTimerRef.current = setTimeout(() => {
+      const contextToSave = updates.aiContext !== undefined ? updates.aiContext : aiContext;
+      const rulesToSave = updates.aiRules !== undefined ? updates.aiRules : aiRules;
+      
       saveAISettings({
         workspaceId,
         autoClassify: updates.autoClassify ?? autoClassify,
         autoExtractTasks: updates.autoTasks ?? autoTasks,
         autoCreateEvents: updates.autoEvents ?? autoEvents,
         defaultReplyTone: (updates.defaultTone ?? defaultTone) as any,
-        aiContext: updates.aiContext !== undefined ? updates.aiContext : aiContext,
-        aiRules: updates.aiRules !== undefined ? updates.aiRules : aiRules,
+        aiContext: contextToSave,
+        aiRules: rulesToSave,
       });
-    }, 500);
-  }, [workspaceId, autoClassify, autoTasks, autoEvents, defaultTone, saveAISettings]);
+      
+      // Mark as saved
+      if (updates.aiContext !== undefined) {
+        setLastSavedAiContext(contextToSave);
+        setAiContextUnsaved(false);
+      }
+      if (updates.aiRules !== undefined) {
+        setLastSavedAiRules(rulesToSave);
+        setAiRulesUnsaved(false);
+      }
+    }, 1000); // Increased to 1 second for text areas
+  }, [workspaceId, autoClassify, autoTasks, autoEvents, defaultTone, aiContext, aiRules, saveAISettings]);
 
   // Auto-save notification settings when switches change
   const triggerNotifAutoSave = useCallback((updates: { 
@@ -586,12 +622,36 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
 
   const handleAiContextChange = (value: string) => {
     setAiContext(value);
+    setAiContextUnsaved(value !== lastSavedAiContext);
     triggerAIAutoSave({ aiContext: value });
   };
 
   const handleAiRulesChange = (value: string) => {
     setAiRules(value);
+    setAiRulesUnsaved(value !== lastSavedAiRules);
     triggerAIAutoSave({ aiRules: value });
+  };
+
+  // Manual save function for AI Context and Rules
+  const handleSaveAIContextAndRules = () => {
+    if (aiSaveTimerRef.current) {
+      clearTimeout(aiSaveTimerRef.current);
+    }
+    
+    saveAISettings({
+      workspaceId,
+      autoClassify,
+      autoExtractTasks: autoTasks,
+      autoCreateEvents: autoEvents,
+      defaultReplyTone: defaultTone as any,
+      aiContext,
+      aiRules,
+    });
+    
+    setLastSavedAiContext(aiContext);
+    setLastSavedAiRules(aiRules);
+    setAiContextUnsaved(false);
+    setAiRulesUnsaved(false);
   };
 
   // Generate AI context action
@@ -783,15 +843,31 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
     }
   }, [settingsInitialized]);
 
-  // Cleanup timers on unmount
+  // Cleanup timers on unmount and save pending changes
   useEffect(() => {
     return () => {
-      if (aiSaveTimerRef.current) clearTimeout(aiSaveTimerRef.current);
+      // Save any pending AI Context/Rules changes before unmounting
+      if (aiSaveTimerRef.current) {
+        clearTimeout(aiSaveTimerRef.current);
+      }
+      if ((aiContextUnsaved || aiRulesUnsaved) && hasInitializedRef.current) {
+        // Flush pending save
+        saveAISettings({
+          workspaceId,
+          autoClassify,
+          autoExtractTasks: autoTasks,
+          autoCreateEvents: autoEvents,
+          defaultReplyTone: defaultTone as any,
+          aiContext,
+          aiRules,
+        });
+      }
+      
       if (notifSaveTimerRef.current) clearTimeout(notifSaveTimerRef.current);
       if (syncSaveTimerRef.current) clearTimeout(syncSaveTimerRef.current);
       if (filterSaveTimerRef.current) clearTimeout(filterSaveTimerRef.current);
     };
-  }, []);
+  }, [workspaceId, aiContext, aiRules, aiContextUnsaved, aiRulesUnsaved, autoClassify, autoTasks, autoEvents, defaultTone, saveAISettings]);
 
   const handleChangePassword = () => {
     router.push('/update-password');
@@ -983,29 +1059,51 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="ai-context">AI Context</Label>
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="ai-context">AI Context</Label>
+                        {aiContextUnsaved && (
+                          <span className="text-xs text-amber-600 dark:text-amber-500 flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            Unsaved changes
+                          </span>
+                        )}
+                        {aiStatus === 'executing' && !aiContextUnsaved && (
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            Saving...
+                          </span>
+                        )}
+                        {!aiContextUnsaved && aiStatus !== 'executing' && lastSavedAiContext === aiContext && aiContext && (
+                          <span className="text-xs text-green-600 dark:text-green-500 flex items-center gap-1">
+                            <CheckCircle className="h-3 w-3" />
+                            Saved
+                          </span>
+                        )}
+                      </div>
                       <p className="text-sm text-muted-foreground">
                         Describe your business, role, and what the AI should know about you. This helps the AI understand your context before replying.
                       </p>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleGenerateContext}
-                      disabled={!hasPro || loadingPro || isGeneratingContext || generateContextStatus === 'executing'}
-                    >
-                      {generateContextStatus === 'executing' || isGeneratingContext ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Generating...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="h-4 w-4 mr-2" />
-                          Auto-Generate
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleGenerateContext}
+                        disabled={!hasPro || loadingPro || isGeneratingContext || generateContextStatus === 'executing'}
+                      >
+                        {generateContextStatus === 'executing' || isGeneratingContext ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Generating...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4 mr-2" />
+                            Auto-Generate
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                   <Textarea
                     id="ai-context"
@@ -1015,9 +1113,31 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                     className="min-h-[120px] font-mono text-sm"
                     disabled={!hasPro || loadingPro}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    {aiContext ? `${aiContext.length} characters` : 'Leave empty to auto-generate from your workspace data (Shopify, emails, etc.)'}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      {aiContext ? `${aiContext.length} characters` : 'Leave empty to auto-generate from your workspace data (Shopify, emails, etc.)'}
+                    </p>
+                    {aiContextUnsaved && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSaveAIContextAndRules}
+                        disabled={aiStatus === 'executing' || !hasPro || loadingPro}
+                      >
+                        {aiStatus === 'executing' ? (
+                          <>
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="h-3 w-3 mr-1" />
+                            Save
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 <Separator />
@@ -1025,7 +1145,27 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                 {/* AI Rules */}
                 <div className="space-y-2">
                   <div className="space-y-0.5">
-                    <Label htmlFor="ai-rules">AI Rules</Label>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="ai-rules">AI Rules</Label>
+                      {aiRulesUnsaved && (
+                        <span className="text-xs text-amber-600 dark:text-amber-500 flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          Unsaved changes
+                        </span>
+                      )}
+                      {aiStatus === 'executing' && !aiRulesUnsaved && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Saving...
+                        </span>
+                      )}
+                      {!aiRulesUnsaved && aiStatus !== 'executing' && lastSavedAiRules === aiRules && aiRules && (
+                        <span className="text-xs text-green-600 dark:text-green-500 flex items-center gap-1">
+                          <CheckCircle className="h-3 w-3" />
+                          Saved
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-muted-foreground">
                       Set strict rules the AI must follow when replying. Examples: language style, which emails to reply to, topics to avoid, etc.
                     </p>
@@ -1038,9 +1178,31 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                     className="min-h-[120px] font-mono text-sm"
                     disabled={!hasPro || loadingPro}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    {aiRules ? `${aiRules.length} characters` : 'Optional: Add rules to guide AI behavior'}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      {aiRules ? `${aiRules.length} characters` : 'Optional: Add rules to guide AI behavior'}
+                    </p>
+                    {aiRulesUnsaved && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSaveAIContextAndRules}
+                        disabled={aiStatus === 'executing' || !hasPro || loadingPro}
+                      >
+                        {aiStatus === 'executing' ? (
+                          <>
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="h-3 w-3 mr-1" />
+                            Save
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 {!hasPro && (
