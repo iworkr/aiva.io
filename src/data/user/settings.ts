@@ -294,8 +294,12 @@ export const generateAIContextAction = authActionClient
       } else {
         console.log('[Generate Context] No Shopify store found for workspace:', {
           workspaceId,
-          allStoresCount: allStores?.length || 0,
-          error: allStoresError?.message,
+          userId,
+          workspaceStoresCount: workspaceStores?.length || 0,
+          userStoresCount: userStores?.length || 0,
+          totalStores: allStores.length,
+          workspaceError: workspaceError?.message,
+          userError: userError?.message,
         });
       }
     } catch (error) {
