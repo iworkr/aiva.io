@@ -63,6 +63,7 @@ import {
   updateSyncSettingsAction,
   updateAutoSendSettingsAction,
   updateAutoSendFiltersAction,
+  updateInboxZeroSettingsAction,
   pauseAutoSendAction,
   resumeAutoSendAction,
   getWorkspaceSettings,
@@ -184,6 +185,13 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   const [humanReviewForSensitive, setHumanReviewForSensitive] = useState(true);
   const [humanReviewConfidenceThreshold, setHumanReviewConfidenceThreshold] = useState(0.60);
   
+  // Inbox Zero settings state
+  const [inboxZeroEnabled, setInboxZeroEnabled] = useState(true);
+  const [autoArchiveHandled, setAutoArchiveHandled] = useState(true);
+  const [applyAivaLabel, setApplyAivaLabel] = useState(true);
+  const [dailyDigestEnabled, setDailyDigestEnabled] = useState(true);
+  const [dailyDigestTime, setDailyDigestTime] = useState('18:00');
+  
   // Check Pro subscription status
   const { hasPro, loading: loadingPro } = useProSubscription(workspaceId);
 
@@ -263,6 +271,15 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
         }
         if (settings?.syncFrequency) {
           setSyncFrequency(String(settings.syncFrequency));
+        }
+
+        // Set Inbox Zero settings
+        if (settings?.inboxZero) {
+          setInboxZeroEnabled(settings.inboxZero.enabled ?? true);
+          setAutoArchiveHandled(settings.inboxZero.autoArchiveHandled ?? true);
+          setApplyAivaLabel(settings.inboxZero.applyAivaLabel ?? true);
+          setDailyDigestEnabled(settings.inboxZero.dailyDigestEnabled ?? true);
+          setDailyDigestTime(settings.inboxZero.dailyDigestTime || '18:00');
         }
 
         // Set auto-send settings
@@ -405,6 +422,24 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
         setMaxRepliesPerThread(filters.maxRepliesPerThread ?? 1);
         setSenderCooldownMinutes(filters.senderCooldownMinutes ?? 60);
       }
+
+      // Initialize Inbox Zero settings from cache
+      const settings = cachedSettings.settings as {
+        inboxZero?: {
+          enabled?: boolean;
+          autoArchiveHandled?: boolean;
+          applyAivaLabel?: boolean;
+          dailyDigestEnabled?: boolean;
+          dailyDigestTime?: string;
+        };
+      };
+      if (settings?.inboxZero) {
+        setInboxZeroEnabled(settings.inboxZero.enabled ?? true);
+        setAutoArchiveHandled(settings.inboxZero.autoArchiveHandled ?? true);
+        setApplyAivaLabel(settings.inboxZero.applyAivaLabel ?? true);
+        setDailyDigestEnabled(settings.inboxZero.dailyDigestEnabled ?? true);
+        setDailyDigestTime(settings.inboxZero.dailyDigestTime || '18:00');
+      }
       
       setSettingsInitialized(true);
     }
@@ -503,6 +538,16 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
     },
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to save filter settings');
+    },
+  });
+
+  // Inbox Zero Settings - auto-save
+  const { execute: saveInboxZeroSettings, status: inboxZeroStatus } = useAction(updateInboxZeroSettingsAction, {
+    onSuccess: () => {
+      toast.success('Inbox Zero setting updated', { duration: 2000 });
+    },
+    onError: ({ error }) => {
+      toast.error(error.serverError || 'Failed to save Inbox Zero setting');
     },
   });
 
@@ -1791,8 +1836,15 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                     </div>
                     <Switch
                       id="inbox-zero-enabled"
-                      checked={true}
-                      disabled
+                      checked={inboxZeroEnabled}
+                      disabled={inboxZeroStatus === 'executing'}
+                      onCheckedChange={(checked) => {
+                        setInboxZeroEnabled(checked);
+                        saveInboxZeroSettings({
+                          workspaceId,
+                          inboxZeroEnabled: checked,
+                        });
+                      }}
                     />
                   </div>
 
@@ -1803,19 +1855,45 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                     <Label>When Aiva handles a message:</Label>
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2">
-                        <Checkbox id="mark-read" checked disabled />
+                        <Checkbox 
+                          id="mark-read" 
+                          checked={true} 
+                          disabled 
+                        />
                         <Label htmlFor="mark-read" className="text-sm font-normal">
                           Mark as read
                         </Label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Checkbox id="archive" checked disabled />
+                        <Checkbox 
+                          id="archive" 
+                          checked={autoArchiveHandled}
+                          disabled={!inboxZeroEnabled || inboxZeroStatus === 'executing'}
+                          onCheckedChange={(checked) => {
+                            setAutoArchiveHandled(checked);
+                            saveInboxZeroSettings({
+                              workspaceId,
+                              autoArchiveHandled: checked,
+                            });
+                          }}
+                        />
                         <Label htmlFor="archive" className="text-sm font-normal">
                           Archive (remove from inbox)
                         </Label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Checkbox id="apply-label" checked disabled />
+                        <Checkbox 
+                          id="apply-label" 
+                          checked={applyAivaLabel}
+                          disabled={!inboxZeroEnabled || inboxZeroStatus === 'executing'}
+                          onCheckedChange={(checked) => {
+                            setApplyAivaLabel(checked);
+                            saveInboxZeroSettings({
+                              workspaceId,
+                              applyAivaLabel: checked,
+                            });
+                          }}
+                        />
                         <Label htmlFor="apply-label" className="text-sm font-normal">
                           Apply &quot;Handled by Aiva&quot; label
                         </Label>
@@ -1835,17 +1913,32 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                         </p>
                       </div>
                       <Switch
-                        checked={true}
-                        disabled
+                        checked={dailyDigestEnabled}
+                        disabled={inboxZeroStatus === 'executing'}
+                        onCheckedChange={(checked) => {
+                          setDailyDigestEnabled(checked);
+                          saveInboxZeroSettings({
+                            workspaceId,
+                            dailyDigestEnabled: checked,
+                          });
+                        }}
                       />
                     </div>
                     <div className="flex items-center gap-3">
                       <Label className="text-sm text-muted-foreground">Send at:</Label>
                       <Input
                         type="time"
-                        defaultValue="18:00"
+                        value={dailyDigestTime}
                         className="w-32"
-                        disabled
+                        disabled={!dailyDigestEnabled || inboxZeroStatus === 'executing'}
+                        onChange={(e) => {
+                          const newTime = e.target.value;
+                          setDailyDigestTime(newTime);
+                          saveInboxZeroSettings({
+                            workspaceId,
+                            dailyDigestTime: newTime,
+                          });
+                        }}
                       />
                     </div>
                   </div>

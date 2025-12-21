@@ -68,13 +68,15 @@ export async function markMessageHandled(
     const settings = await getInboxZeroSettings(workspaceId);
     console.log('[Inbox Zero] Settings:', { enabled: settings.enabled, autoArchive: settings.autoArchive, applyLabel: settings.applyLabel });
 
-    // Get message details including provider info
+    // Get message details including provider info and review status
     const { data: message, error: msgError } = await supabase
       .from('messages')
       .select(`
         id,
         provider_message_id,
         channel_connection_id,
+        requires_human_review,
+        reviewed_at,
         channel_connection:channel_connections(provider)
       `)
       .eq('id', messageId)
@@ -86,6 +88,26 @@ export async function markMessageHandled(
         success: false,
         archivedInProvider: false,
         error: msgError?.message || 'Message not found',
+      };
+    }
+
+    // Prevent handling messages that require human review (unless manually handled)
+    // Manual actions (manually_dismissed, manually_handled) are allowed to proceed
+    if (
+      message.requires_human_review && 
+      !message.reviewed_at && 
+      options.action !== 'manually_dismissed' && 
+      options.action !== 'manually_handled'
+    ) {
+      console.warn('[Inbox Zero] Cannot handle message that requires human review:', {
+        messageId,
+        requiresHumanReview: message.requires_human_review,
+        action: options.action,
+      });
+      return {
+        success: false,
+        archivedInProvider: false,
+        error: 'Message requires human review and cannot be auto-handled',
       };
     }
 

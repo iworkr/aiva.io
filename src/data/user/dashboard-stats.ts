@@ -75,6 +75,15 @@ export async function getDashboardStats(
   today.setHours(0, 0, 0, 0);
   const todayISO = today.toISOString();
 
+  // Check if Zero Inbox is enabled
+  const { data: workspaceSettings } = await supabase
+    .from('workspace_settings')
+    .select('inbox_zero_enabled')
+    .eq('workspace_id', workspaceId)
+    .single();
+  
+  const isZeroInboxEnabled = workspaceSettings?.inbox_zero_enabled ?? true;
+
   // Messages received today
   const { count: messagesReceivedToday } = await supabase
     .from('messages')
@@ -98,7 +107,7 @@ export async function getDashboardStats(
     .eq('action', 'sent')
     .gte('created_at', todayISO);
 
-  // Review queue count
+  // Review queue count (always includes messages requiring review, regardless of Zero Inbox)
   const { count: reviewQueueCount } = await supabase
     .from('messages')
     .select('id', { count: 'exact', head: true })
@@ -116,15 +125,23 @@ export async function getDashboardStats(
     .gte('timestamp', todayISO);
 
   // Active conversations (unique threads in last 7 days)
+  // When Zero Inbox is enabled, only count threads with unhandled messages
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  const { data: threads } = await supabase
+  
+  let threadsQuery = supabase
     .from('messages')
     .select('provider_thread_id')
     .eq('workspace_id', workspaceId)
     .gte('timestamp', sevenDaysAgo.toISOString())
     .not('provider_thread_id', 'is', null);
-
+  
+  // If Zero Inbox is enabled, only count threads with unhandled messages
+  if (isZeroInboxEnabled) {
+    threadsQuery = threadsQuery.eq('handled_by_aiva', false);
+  }
+  
+  const { data: threads } = await threadsQuery;
   const uniqueThreads = new Set(threads?.map(t => t.provider_thread_id) || []);
 
   // Calculate time saved (estimate: 2 min per handled message)

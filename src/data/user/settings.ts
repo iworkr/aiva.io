@@ -83,6 +83,15 @@ const updateAutoSendFiltersSchema = z.object({
   senderCooldownMinutes: z.number().min(0).max(1440).optional(), // 0-24 hours
 });
 
+const updateInboxZeroSettingsSchema = z.object({
+  workspaceId: z.string().uuid(),
+  inboxZeroEnabled: z.boolean().optional(),
+  autoArchiveHandled: z.boolean().optional(),
+  applyAivaLabel: z.boolean().optional(),
+  dailyDigestEnabled: z.boolean().optional(),
+  dailyDigestTime: z.string().optional(), // "HH:MM" format
+});
+
 // ============================================================================
 // AI SETTINGS
 // ============================================================================
@@ -878,6 +887,51 @@ export const updateAutoSendFiltersAction = authActionClient
     return { success: true };
   });
 
+// ============================================================================
+// INBOX ZERO SETTINGS
+// ============================================================================
+
+export const updateInboxZeroSettingsAction = authActionClient
+  .schema(updateInboxZeroSettingsSchema)
+  .action(async ({ parsedInput, ctx: { userId } }) => {
+    const { workspaceId, ...settings } = parsedInput;
+
+    const isMember = await isWorkspaceMember(userId, workspaceId);
+    if (!isMember) throw new Error('Not a workspace member');
+
+    const supabase = await createSupabaseUserServerActionClient();
+
+    // Build update object with only provided fields
+    const updateData: Record<string, any> = {};
+    
+    if (settings.inboxZeroEnabled !== undefined) {
+      updateData.inbox_zero_enabled = settings.inboxZeroEnabled;
+    }
+    if (settings.autoArchiveHandled !== undefined) {
+      updateData.auto_archive_handled = settings.autoArchiveHandled;
+    }
+    if (settings.applyAivaLabel !== undefined) {
+      updateData.apply_aiva_label = settings.applyAivaLabel;
+    }
+    if (settings.dailyDigestEnabled !== undefined) {
+      updateData.daily_digest_enabled = settings.dailyDigestEnabled;
+    }
+    if (settings.dailyDigestTime !== undefined) {
+      updateData.daily_digest_time = settings.dailyDigestTime;
+    }
+
+    const { error } = await supabase
+      .from('workspace_settings')
+      .update(updateData)
+      .eq('workspace_id', workspaceId);
+
+    if (error) throw new Error(error.message);
+
+    revalidatePath(`/settings`);
+    revalidatePath(`/`); // Revalidate homepage to update message counts
+    return { success: true };
+  });
+
 // Get auto-send filter settings for a workspace
 export async function getAutoSendFilters(workspaceId: string, userId: string) {
   const isMember = await isWorkspaceMember(userId, workspaceId);
@@ -1008,7 +1062,7 @@ export async function getWorkspaceSettings(workspaceId: string, userId: string) 
 
   const { data, error } = await supabase
     .from('workspace_settings')
-    .select('workspace_settings')
+    .select('workspace_settings, inbox_zero_enabled, auto_archive_handled, apply_aiva_label, daily_digest_enabled, daily_digest_time')
     .eq('workspace_id', workspaceId)
     .single();
 
@@ -1017,7 +1071,16 @@ export async function getWorkspaceSettings(workspaceId: string, userId: string) 
     throw new Error(error.message);
   }
 
-  return data?.workspace_settings || {};
+  return {
+    ...(data?.workspace_settings || {}),
+    inboxZero: {
+      enabled: data?.inbox_zero_enabled ?? true,
+      autoArchiveHandled: data?.auto_archive_handled ?? true,
+      applyAivaLabel: data?.apply_aiva_label ?? true,
+      dailyDigestEnabled: data?.daily_digest_enabled ?? true,
+      dailyDigestTime: data?.daily_digest_time || '18:00',
+    },
+  };
 }
 
 export async function getUserProfile(userId: string) {
