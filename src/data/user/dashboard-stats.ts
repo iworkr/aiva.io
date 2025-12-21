@@ -327,35 +327,32 @@ export async function getNeedsAttentionItems(
       }
     }
     
-    // 4. Exclude very old messages (>30 days) unless they're high/urgent priority
-    // 30 days is more reasonable - some messages might need attention even if older
-    if (msg.timestamp) {
-      const messageAge = Date.now() - new Date(msg.timestamp).getTime();
-      const thirtyDaysAgo = 30 * 24 * 60 * 60 * 1000;
-      if (messageAge > thirtyDaysAgo && msg.priority !== 'urgent' && msg.priority !== 'high') {
-        return true;
-      }
-    }
-    
-    // 5. Exclude messages that have been reviewed but not handled
+    // 4. Exclude messages that have been reviewed but not handled
     // These are likely stale or already processed
     if (msg.reviewed_at && !msg.handled_by_aiva) {
       return true;
     }
     
-    // 6. Exclude system/magic link messages that are old (>7 days)
-    // These are typically one-time verification links that expire quickly
+    // 5. Exclude system magic link messages from auth systems (not security alerts)
+    // These are one-time authentication links from our own systems that AI can't handle
+    // BUT: Don't exclude security alerts like "Verify phone number" or "Action needed on Facebook"
+    // Those are real actionable items that need human attention
+    const senderLower = (msg.sender_email || '').toLowerCase();
     const subjectLower = (msg.subject || '').toLowerCase();
-    const isSystemMessage = subjectLower.includes('magic link') || 
-                           subjectLower.includes('verify your email') ||
-                           subjectLower.includes('verify your phone');
-    if (isSystemMessage && msg.timestamp) {
-      const messageAge = Date.now() - new Date(msg.timestamp).getTime();
-      const sevenDaysAgo = 7 * 24 * 60 * 60 * 1000;
-      if (messageAge > sevenDaysAgo) {
-        return true; // Magic links expire, no need to show old ones
-      }
+    
+    // Only exclude magic links from our own auth systems (Supabase Auth, Aiva Auth)
+    // These are system-generated auth links, not real security alerts
+    const isSystemAuthLink = 
+      (subjectLower.includes('magic link') && 
+       (senderLower.includes('noreply@mail.app.supabase.io') || 
+        senderLower.includes('no-reply@tryaiva.io')));
+    
+    if (isSystemAuthLink) {
+      return true; // System auth magic links - not actionable by AI
     }
+    
+    // NOTE: Security alerts like "Verify phone number" or "Action needed on Facebook"
+    // are in security_alert category and are actionable, so they will show
     
     // NOTE: We DON'T exclude 'notification' or 'social' categories by default
     // because they might contain actionable items (e.g., "Action needed on your Facebook account")
@@ -463,13 +460,21 @@ export async function getNeedsAttentionItems(
     );
     
     // Show the message if:
-    // - It has a draft held for review (needs human attention)
-    // - It has no draft at all (AI hasn't generated a response yet - needs human attention)
-    // - It was already auto-replied (show for review/acknowledgment)
+    // - It has a draft held for review (needs human attention) - always show
+    // - It has no draft at all (AI hasn't generated a response yet - needs human attention) - always show
     // Don't show if it has an auto-sendable draft (will be handled by auto-send cron)
-    if (heldDraft || !hasAutoSendableDraft || autoSentDraft) {
+    // Don't show if it was already auto-replied (already handled, no need for review)
+    if (heldDraft) {
+      // Always show held drafts - they need human review
       addMessageToItems(msg, 'unhandled');
+    } else if (!hasAutoSendableDraft) {
+      // No auto-sendable draft - needs human attention
+      addMessageToItems(msg, 'unhandled');
+    } else if (autoSentDraft) {
+      // Was already auto-replied - don't show (already handled, regardless of age)
+      console.log(`[Dashboard] Skipping actionable message ${msg.id} - was already auto-replied (handled)`);
     } else {
+      // Has auto-sendable draft - will be handled by auto-send cron
       console.log(`[Dashboard] Skipping actionable message ${msg.id} - has auto-sendable draft (will be handled by auto-send cron)`);
     }
   }

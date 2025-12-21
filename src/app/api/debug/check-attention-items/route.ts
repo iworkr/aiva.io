@@ -228,19 +228,31 @@ export async function GET(request: NextRequest) {
         if (!isActionable) return true;
       }
       
-      // 4. Exclude very old messages (>30 days unless high/urgent)
-      if (msg.timestamp) {
-        const messageAge = Date.now() - new Date(msg.timestamp).getTime();
-        const thirtyDaysAgo = 30 * 24 * 60 * 60 * 1000;
-        if (messageAge > thirtyDaysAgo && msg.priority !== 'urgent' && msg.priority !== 'high') {
-          return true;
-        }
-      }
-      
-      // 5. Exclude reviewed but not handled
+      // 4. Exclude reviewed but not handled
       if (msg.reviewed_at && !msg.handled_by_aiva) {
         return true;
       }
+      
+      // 5. Exclude system magic link messages from auth systems (not security alerts)
+      // These are one-time authentication links from our own systems that AI can't handle
+      // BUT: Don't exclude security alerts like "Verify phone number" or "Action needed on Facebook"
+      // Those are real actionable items that need human attention
+      const senderLower = (msg.sender_email || '').toLowerCase();
+      const subjectLower = (msg.subject || '').toLowerCase();
+      
+      // Only exclude magic links from our own auth systems (Supabase Auth, Aiva Auth)
+      // These are system-generated auth links, not real security alerts
+      const isSystemAuthLink = 
+        (subjectLower.includes('magic link') && 
+         (senderLower.includes('noreply@mail.app.supabase.io') || 
+          senderLower.includes('no-reply@tryaiva.io')));
+      
+      if (isSystemAuthLink) {
+        return true; // System auth magic links - not actionable by AI
+      }
+      
+      // NOTE: Security alerts like "Verify phone number" or "Action needed on Facebook"
+      // are in security_alert category and are actionable, so they will show
       
       return false;
     };
@@ -299,10 +311,14 @@ export async function GET(request: NextRequest) {
       const isQueued = queuedMessageIds.has(msg.id);
       
       // Match dashboard logic exactly:
-      // Show if: heldDraft OR (!hasAutoSendableDraft) OR autoSentDraft
+      // Show if: heldDraft OR (!hasAutoSendableDraft)
       // But only if not excluded and not queued
-      // CRITICAL: If hasAutoSendableDraft is true and there's no heldDraft and no autoSentDraft, DON'T show
-      const shouldShow = !isExcluded && !isQueued && (!!heldDraft || !hasAutoSendableDraft || !!autoSentDraft);
+      // CRITICAL: If hasAutoSendableDraft is true and there's no heldDraft, DON'T show
+      // CRITICAL: If autoSentDraft, DON'T show (already handled, regardless of age)
+      const shouldShow = !isExcluded && !isQueued && (
+        !!heldDraft || 
+        !hasAutoSendableDraft
+      );
       
       // Calculate age for exclusion reason
       let ageDays = null;
@@ -338,13 +354,13 @@ export async function GET(request: NextRequest) {
         wouldAppear: shouldShow,
         showReason: shouldShow ? (
           heldDraft ? 'has_held_draft' :
-          autoSentDraft ? 'was_auto_replied' :
           !hasAutoSendableDraft ? 'no_auto_sendable_draft' :
           'unknown'
         ) : (
           isExcluded ? 'excluded' :
           isQueued ? 'queued_for_auto_send' :
           hasAutoSendableDraft ? 'has_auto_sendable_draft' :
+          autoSentDraft ? 'was_auto_replied_already_handled' :
           'unknown'
         ),
       };
