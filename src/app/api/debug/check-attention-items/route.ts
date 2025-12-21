@@ -284,7 +284,7 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // 7. Process actionable messages (matching dashboard logic)
+    // 7. Process actionable messages (matching dashboard logic exactly)
     const processedActionableItems = (actionableItems || []).map((msg: any) => {
       const drafts = (msg.message_drafts as any[]) || [];
       const heldDraft = drafts.find((d: any) => d.hold_for_review === true);
@@ -297,7 +297,18 @@ export async function GET(request: NextRequest) {
       
       const isExcluded = shouldExcludeMessage(msg);
       const isQueued = queuedMessageIds.has(msg.id);
-      const shouldShow = !isExcluded && !isQueued && (heldDraft || !hasAutoSendableDraft || autoSentDraft);
+      
+      // Match dashboard logic exactly:
+      // Show if: heldDraft OR (!hasAutoSendableDraft) OR autoSentDraft
+      // But only if not excluded and not queued
+      // CRITICAL: If hasAutoSendableDraft is true and there's no heldDraft and no autoSentDraft, DON'T show
+      const shouldShow = !isExcluded && !isQueued && (!!heldDraft || !hasAutoSendableDraft || !!autoSentDraft);
+      
+      // Calculate age for exclusion reason
+      let ageDays = null;
+      if (msg.timestamp) {
+        ageDays = Math.round((Date.now() - new Date(msg.timestamp).getTime()) / (24 * 60 * 60 * 1000));
+      }
       
       return {
         messageId: msg.id,
@@ -305,6 +316,7 @@ export async function GET(request: NextRequest) {
         senderEmail: msg.sender_email,
         senderName: msg.sender_name,
         timestamp: msg.timestamp,
+        ageDays,
         actionability: msg.actionability,
         category: msg.category,
         priority: msg.priority,
@@ -320,9 +332,21 @@ export async function GET(request: NextRequest) {
           ['marketing', 'junk_email', 'newsletter'].includes(msg.category?.toLowerCase() || '') ? 'promotional_category' :
           msg.priority === 'noise' ? 'noise_priority' :
           msg.reviewed_at && !msg.handled_by_aiva ? 'reviewed_not_handled' :
-          'age_filter'
+          ageDays && ageDays > 30 && msg.priority !== 'urgent' && msg.priority !== 'high' ? `age_filter_${ageDays}_days` :
+          'unknown'
         ) : null,
         wouldAppear: shouldShow,
+        showReason: shouldShow ? (
+          heldDraft ? 'has_held_draft' :
+          autoSentDraft ? 'was_auto_replied' :
+          !hasAutoSendableDraft ? 'no_auto_sendable_draft' :
+          'unknown'
+        ) : (
+          isExcluded ? 'excluded' :
+          isQueued ? 'queued_for_auto_send' :
+          hasAutoSendableDraft ? 'has_auto_sendable_draft' :
+          'unknown'
+        ),
       };
     });
 

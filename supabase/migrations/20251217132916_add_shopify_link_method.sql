@@ -25,3 +25,4 @@ COMMENT ON COLUMN public.shopify_stores.link_method IS 'How the Aiva account was
 
 
 
+

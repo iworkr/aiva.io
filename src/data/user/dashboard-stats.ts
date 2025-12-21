@@ -294,6 +294,8 @@ export async function getNeedsAttentionItems(
     reviewed_at?: string | null;
     handled_by_aiva?: boolean | null;
     actionability?: string | null;
+    subject?: string | null;
+    sender_email?: string | null;
   }): boolean => {
     // 1. Check excluded categories (user-configured)
     // If user explicitly excluded a category, respect that
@@ -339,6 +341,20 @@ export async function getNeedsAttentionItems(
     // These are likely stale or already processed
     if (msg.reviewed_at && !msg.handled_by_aiva) {
       return true;
+    }
+    
+    // 6. Exclude system/magic link messages that are old (>7 days)
+    // These are typically one-time verification links that expire quickly
+    const subjectLower = (msg.subject || '').toLowerCase();
+    const isSystemMessage = subjectLower.includes('magic link') || 
+                           subjectLower.includes('verify your email') ||
+                           subjectLower.includes('verify your phone');
+    if (isSystemMessage && msg.timestamp) {
+      const messageAge = Date.now() - new Date(msg.timestamp).getTime();
+      const sevenDaysAgo = 7 * 24 * 60 * 60 * 1000;
+      if (messageAge > sevenDaysAgo) {
+        return true; // Magic links expire, no need to show old ones
+      }
     }
     
     // NOTE: We DON'T exclude 'notification' or 'social' categories by default

@@ -404,3 +404,4 @@ COMMENT ON TABLE public.shopify_sync_logs IS 'Audit log of Shopify sync operatio
 
 
 
+
