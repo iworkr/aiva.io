@@ -112,13 +112,40 @@ function AttentionItemCard({
   const formatReviewReason = (reason?: string) => {
     if (!reason) return 'Needs Review';
     const reasonMap: Record<string, string> = {
+      // Calendar-related
       calendar_mismatch: 'Calendar Mismatch',
+      no_calendar_connected: 'No Calendar Connected',
+      calendar_check_failed: 'Calendar Check Failed',
+      scheduling_confirmation: 'Scheduling Confirmation',
+      // Category-based
+      customer_complaint: 'Customer Complaint',
+      sales_lead_requires_review: 'Sales Lead',
+      bill_requires_review: 'Bill',
+      invoice_requires_review: 'Invoice',
+      // Priority-based
+      high_priority_urgent: 'Urgent Priority',
+      high_priority_high: 'High Priority',
+      // AI decision-based
       low_confidence: 'Low Confidence',
+      not_auto_sendable: 'Not Auto-Sendable',
       commitment_confirmation: 'Needs Confirmation',
       sensitive_topic: 'Sensitive Topic',
       personal_relationship: 'Personal Relationship',
       uncertain_context: 'Uncertain Context',
+      flagged_by_classifier: 'AI Flagged',
+      // Missing information
+      missing_information_pricing: 'Missing Pricing Info',
+      missing_information_commitment: 'Missing Commitment Info',
+      missing_information_availability: 'Missing Availability',
+      missing_information_deadline: 'Missing Deadline',
+      missing_information_delivery_date: 'Missing Delivery Date',
+      missing_information_other: 'Missing Information',
+      // Auto-replied
+      auto_replied_needs_review: 'Auto-Replied (Needs Follow-up)',
+      auto_replied_acknowledgement_needs_followup: 'Auto-Acknowledged (Needs Follow-up)',
+      // Generic
       draft_held_for_review: 'Draft Held for Review',
+      needs_review: 'Needs Review',
     };
     return reasonMap[reason] || reason.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };

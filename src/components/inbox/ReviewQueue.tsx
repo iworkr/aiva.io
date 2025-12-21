@@ -63,6 +63,29 @@ const REVIEW_REASON_CONFIG: Record<string, { icon: React.ComponentType<any>; col
   personal_relationship: { icon: Users, color: 'text-pink-500', label: 'Personal Context Needed' },
   uncertain_context: { icon: HelpCircle, color: 'text-gray-500', label: 'Unclear Context' },
   flagged_by_classifier: { icon: AlertCircle, color: 'text-yellow-500', label: 'AI Flagged' },
+  // Category-based review reasons
+  customer_complaint: { icon: AlertTriangle, color: 'text-red-500', label: 'Customer Complaint' },
+  sales_lead_requires_review: { icon: MessageSquare, color: 'text-blue-500', label: 'Sales Lead' },
+  bill_requires_review: { icon: AlertCircle, color: 'text-orange-500', label: 'Bill' },
+  invoice_requires_review: { icon: AlertCircle, color: 'text-orange-500', label: 'Invoice' },
+  // Priority-based review reasons
+  high_priority_urgent: { icon: AlertCircle, color: 'text-red-500', label: 'Urgent Priority' },
+  high_priority_high: { icon: AlertCircle, color: 'text-orange-500', label: 'High Priority' },
+  // AI decision-based
+  not_auto_sendable: { icon: Shield, color: 'text-yellow-500', label: 'Not Auto-Sendable' },
+  // Missing information
+  missing_information_pricing: { icon: HelpCircle, color: 'text-purple-500', label: 'Missing Pricing Info' },
+  missing_information_commitment: { icon: HelpCircle, color: 'text-purple-500', label: 'Missing Commitment Info' },
+  missing_information_availability: { icon: HelpCircle, color: 'text-purple-500', label: 'Missing Availability' },
+  missing_information_deadline: { icon: HelpCircle, color: 'text-purple-500', label: 'Missing Deadline' },
+  missing_information_delivery_date: { icon: HelpCircle, color: 'text-purple-500', label: 'Missing Delivery Date' },
+  missing_information_other: { icon: HelpCircle, color: 'text-purple-500', label: 'Missing Information' },
+  // Auto-replied but needs follow-up
+  auto_replied_needs_review: { icon: Check, color: 'text-blue-500', label: 'Auto-Replied (Needs Follow-up)' },
+  auto_replied_acknowledgement_needs_followup: { icon: Check, color: 'text-blue-500', label: 'Auto-Acknowledged (Needs Follow-up)' },
+  // Generic
+  draft_held_for_review: { icon: AlertCircle, color: 'text-yellow-500', label: 'Draft Held for Review' },
+  needs_review: { icon: AlertCircle, color: 'text-yellow-500', label: 'Needs Review' },
 };
 
 function ReviewReasonBadge({ reason }: { reason: string }) {

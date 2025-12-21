@@ -521,6 +521,20 @@ REMEMBER: Missing information handling:
     // Check if message is a complaint - complaints should always require human review
     const isComplaint = message.category === 'customer_complaint';
     
+    // Check for categories that should always require human review
+    // These are business-critical or sensitive categories that need human judgment
+    const alwaysReviewCategories = [
+      'customer_complaint',  // Complaints need human handling
+      'sales_lead',          // Business opportunities need human follow-up
+      'bill',                // Financial matters need verification
+      'invoice',             // Financial matters need verification
+    ];
+    const isAlwaysReviewCategory = message.category && alwaysReviewCategories.includes(message.category);
+    
+    // Check for high-priority messages that should always get human attention
+    // These are important messages that shouldn't be auto-replied
+    const isHighPriority = message.priority === 'high' || message.priority === 'urgent';
+    
     // If AI marked as not auto-sendable, it should require human review
     // (unless it was already auto-sent, which is handled separately)
     const shouldRequireReviewIfNotAutoSendable = !result.isAutoSendable;
@@ -533,17 +547,23 @@ REMEMBER: Missing information handling:
     // 4. Critical missing information (pricing, commitments, etc.)
     // 5. Missing info AND AI says not auto-sendable AND confidence is below threshold
     // 6. Message is a complaint (customer_complaint category)
-    // 7. AI marked as not auto-sendable (should always require review)
+    // 7. Message is in a category that always requires review (sales_lead, bill, invoice)
+    // 8. Message has high/urgent priority
+    // 9. AI marked as not auto-sendable (should always require review)
     // Note: Routine missing info (policy, shipping) with good confidence can still auto-send
     const shouldHoldForReview = needsHumanReview || 
       result.confidenceScore < 0.55 || 
       isCriticalMissingInfo ||
       isComplaint ||
+      isAlwaysReviewCategory ||
+      isHighPriority ||
       shouldRequireReviewIfNotAutoSendable ||
       (hasMissingInfo && !result.isAutoSendable && result.confidenceScore < 0.70);
     
     const finalReviewReason = reviewReason || 
       (isComplaint ? 'customer_complaint' :
+       isAlwaysReviewCategory ? `${message.category}_requires_review` :
+       isHighPriority ? `high_priority_${message.priority}` :
        shouldRequireReviewIfNotAutoSendable ? 'not_auto_sendable' :
        isCriticalMissingInfo ? `missing_information_${missingInfoType}` : 
        hasMissingInfo && !result.isAutoSendable ? `missing_information_${missingInfoType}` :
@@ -551,6 +571,8 @@ REMEMBER: Missing information handling:
     
     const finalUncertaintyNotes = aiUncertaintyNotes || 
       (isComplaint ? 'Customer complaint requires human review' :
+       isAlwaysReviewCategory ? `${message.category} messages require human review for proper handling` :
+       isHighPriority ? `High priority message (${message.priority}) requires human attention` :
        shouldRequireReviewIfNotAutoSendable ? 'AI marked this message as not suitable for auto-send - human review required' :
        isCriticalMissingInfo ? `AI is missing critical information (${missingInfoType}) - human follow-up required` :
        hasMissingInfo && !result.isAutoSendable ? `AI is missing information (${missingInfoType}) and marked as not auto-sendable` :
@@ -566,6 +588,10 @@ REMEMBER: Missing information handling:
       hasMissingInfo,
       missingInfoType: hasMissingInfo ? missingInfoType : null,
       isComplaint,
+      isAlwaysReviewCategory,
+      isHighPriority,
+      category: message.category,
+      priority: message.priority,
       isAutoSendable: result.isAutoSendable,
       shouldRequireReviewIfNotAutoSendable,
     });
