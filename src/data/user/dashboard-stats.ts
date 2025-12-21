@@ -287,10 +287,65 @@ export async function getNeedsAttentionItems(
   }
 
   // Helper function to check if a message should be excluded
-  const shouldExcludeMessage = (msg: { category?: string | null }): boolean => {
-    if (!msg.category || excludedCategories.length === 0) return false;
-    const categoryLower = msg.category.toLowerCase();
-    return excludedCategories.some(excluded => excluded.toLowerCase() === categoryLower);
+  const shouldExcludeMessage = (msg: { 
+    category?: string | null; 
+    priority?: string | null;
+    timestamp?: string;
+    reviewed_at?: string | null;
+    handled_by_aiva?: boolean | null;
+    actionability?: string | null;
+  }): boolean => {
+    // 1. Check excluded categories (user-configured)
+    // If user explicitly excluded a category, respect that
+    if (msg.category && excludedCategories.length > 0) {
+      const categoryLower = msg.category.toLowerCase();
+      if (excludedCategories.some(excluded => excluded.toLowerCase() === categoryLower)) {
+        return true;
+      }
+    }
+    
+    // 2. Exclude truly non-actionable categories (promotional/junk)
+    // BUT: If a message is actionable (request/question/scheduling_intent), it might need attention
+    // even if in these categories (e.g., "Action needed on your Facebook account" in notification category)
+    const promotionalCategories = ['marketing', 'junk_email', 'newsletter'];
+    if (msg.category && promotionalCategories.includes(msg.category.toLowerCase())) {
+      // Only exclude if it's NOT actionable - if it's actionable, it might need human attention
+      const isActionable = msg.actionability && ['request', 'question', 'scheduling_intent'].includes(msg.actionability);
+      if (!isActionable) {
+        return true;
+      }
+    }
+    
+    // 3. Exclude messages with 'noise' priority (these are typically marketing/junk)
+    // BUT: If actionable, still show it (might be misclassified)
+    if (msg.priority === 'noise') {
+      const isActionable = msg.actionability && ['request', 'question', 'scheduling_intent'].includes(msg.actionability);
+      if (!isActionable) {
+        return true;
+      }
+    }
+    
+    // 4. Exclude very old messages (>30 days) unless they're high/urgent priority
+    // 30 days is more reasonable - some messages might need attention even if older
+    if (msg.timestamp) {
+      const messageAge = Date.now() - new Date(msg.timestamp).getTime();
+      const thirtyDaysAgo = 30 * 24 * 60 * 60 * 1000;
+      if (messageAge > thirtyDaysAgo && msg.priority !== 'urgent' && msg.priority !== 'high') {
+        return true;
+      }
+    }
+    
+    // 5. Exclude messages that have been reviewed but not handled
+    // These are likely stale or already processed
+    if (msg.reviewed_at && !msg.handled_by_aiva) {
+      return true;
+    }
+    
+    // NOTE: We DON'T exclude 'notification' or 'social' categories by default
+    // because they might contain actionable items (e.g., "Action needed on your Facebook account")
+    // The user's excluded categories list will handle filtering these if desired
+    
+    return false;
   };
 
   // Helper function to add a message to items
@@ -363,12 +418,19 @@ export async function getNeedsAttentionItems(
 
   // Process actionable messages (request, question, scheduling_intent)
   // These should appear in "What needs your attention" if:
-  // 1. They're not in excluded categories
+  // 1. They're not in excluded categories or non-actionable categories
   // 2. They don't have an auto-sendable draft (or the draft is held for review)
   // 3. They're not already queued for auto-send
+  // 4. They're not stale (>7 days old unless high priority)
   // If a message has a draft that can be auto-sent, it will be handled by auto-send cron,
   // so we don't need to show it here unless the draft is held for review
   for (const msg of actionableItems || []) {
+    // First check if message should be excluded (categories, priority, age, etc.)
+    if (shouldExcludeMessage(msg)) {
+      console.log(`[Dashboard] Skipping actionable message ${msg.id} - excluded by filter (category: ${msg.category}, priority: ${msg.priority}, age: ${msg.timestamp ? Math.round((Date.now() - new Date(msg.timestamp).getTime()) / (24 * 60 * 60 * 1000)) + ' days' : 'unknown'})`);
+      continue;
+    }
+    
     // Skip if already queued for auto-send
     if (queuedMessageIds.has(msg.id)) {
       console.log(`[Dashboard] Skipping actionable message ${msg.id} - already in auto-send queue`);
