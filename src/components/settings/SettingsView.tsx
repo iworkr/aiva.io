@@ -235,6 +235,13 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
           };
           timezone?: string;
           syncFrequency?: number;
+          inboxZero?: {
+            enabled?: boolean;
+            autoArchiveHandled?: boolean;
+            applyAivaLabel?: boolean;
+            dailyDigestEnabled?: boolean;
+            dailyDigestTime?: string;
+          };
         };
         const profile = data.profile;
 
@@ -424,7 +431,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
       }
 
       // Initialize Inbox Zero settings from cache
-      const settings = cachedSettings.settings as {
+      const inboxZeroSettings = cachedSettings.settings as {
         inboxZero?: {
           enabled?: boolean;
           autoArchiveHandled?: boolean;
@@ -433,12 +440,12 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
           dailyDigestTime?: string;
         };
       };
-      if (settings?.inboxZero) {
-        setInboxZeroEnabled(settings.inboxZero.enabled ?? true);
-        setAutoArchiveHandled(settings.inboxZero.autoArchiveHandled ?? true);
-        setApplyAivaLabel(settings.inboxZero.applyAivaLabel ?? true);
-        setDailyDigestEnabled(settings.inboxZero.dailyDigestEnabled ?? true);
-        setDailyDigestTime(settings.inboxZero.dailyDigestTime || '18:00');
+      if (inboxZeroSettings?.inboxZero) {
+        setInboxZeroEnabled(inboxZeroSettings.inboxZero.enabled ?? true);
+        setAutoArchiveHandled(inboxZeroSettings.inboxZero.autoArchiveHandled ?? true);
+        setApplyAivaLabel(inboxZeroSettings.inboxZero.applyAivaLabel ?? true);
+        setDailyDigestEnabled(inboxZeroSettings.inboxZero.dailyDigestEnabled ?? true);
+        setDailyDigestTime(inboxZeroSettings.inboxZero.dailyDigestTime || '18:00');
       }
       
       setSettingsInitialized(true);
@@ -1870,10 +1877,11 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                           checked={autoArchiveHandled}
                           disabled={!inboxZeroEnabled || inboxZeroStatus === 'executing'}
                           onCheckedChange={(checked) => {
-                            setAutoArchiveHandled(checked);
+                            const value = checked === true;
+                            setAutoArchiveHandled(value);
                             saveInboxZeroSettings({
                               workspaceId,
-                              autoArchiveHandled: checked,
+                              autoArchiveHandled: value,
                             });
                           }}
                         />
@@ -1887,10 +1895,11 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                           checked={applyAivaLabel}
                           disabled={!inboxZeroEnabled || inboxZeroStatus === 'executing'}
                           onCheckedChange={(checked) => {
-                            setApplyAivaLabel(checked);
+                            const value = checked === true;
+                            setApplyAivaLabel(value);
                             saveInboxZeroSettings({
                               workspaceId,
-                              applyAivaLabel: checked,
+                              applyAivaLabel: value,
                             });
                           }}
                         />

@@ -1072,7 +1072,7 @@ export async function getWorkspaceSettings(workspaceId: string, userId: string) 
   }
 
   return {
-    ...(data?.workspace_settings || {}),
+    ...(data?.workspace_settings && typeof data.workspace_settings === 'object' ? data.workspace_settings : {}),
     inboxZero: {
       enabled: data?.inbox_zero_enabled ?? true,
       autoArchiveHandled: data?.auto_archive_handled ?? true,
