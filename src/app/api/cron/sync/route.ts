@@ -243,7 +243,7 @@ export async function GET(request: NextRequest) {
           }
 
           // Also auto-handle messages that are already classified but not handled
-          // This processes messages with actionability = 'none' that don't require review
+          // 1. Messages with actionability = 'none' that don't require review
           const { data: unhandledNoActionMessages } = await supabase
             .from('messages')
             .select('id, subject, actionability, requires_human_review, handled_by_aiva')
@@ -269,6 +269,56 @@ export async function GET(request: NextRequest) {
               }
             }
             console.log(`   📊 Auto-handled ${autoHandledCount}/${unhandledNoActionMessages.length} messages`);
+          }
+
+          // 2. Messages in excluded categories (should be auto-handled even if they require review)
+          // If a category is excluded, it means the user doesn't want to see it, so auto-handle it
+          if (filterSettings.excludedCategories.length > 0) {
+            // Fetch all unhandled messages and filter by excluded categories in code
+            // This avoids type issues with .in() on category enum
+            const { data: unhandledMessages } = await supabase
+              .from('messages')
+              .select('id, subject, category, requires_human_review, handled_by_aiva')
+              .eq('workspace_id', connection.workspace_id)
+              .or('handled_by_aiva.is.null,handled_by_aiva.eq.false')
+              .order('created_at', { ascending: false })
+              .limit(100); // Get more to filter after
+            
+            // Filter to only excluded categories
+            const excludedCategoryMessages = (unhandledMessages || []).filter(msg => 
+              msg.category && filterSettings.excludedCategories.some(
+                excluded => excluded.toLowerCase() === msg.category?.toLowerCase()
+              )
+            ).slice(0, 50); // Limit to 50 after filtering
+
+            if (excludedCategoryMessages && excludedCategoryMessages.length > 0) {
+              console.log(`   🗑️ Auto-handling ${excludedCategoryMessages.length} messages in excluded categories...`);
+              let excludedHandledCount = 0;
+              
+              for (const msg of excludedCategoryMessages) {
+                try {
+                  // Use manually_dismissed action to bypass the requires_human_review check
+                  // This allows us to auto-handle messages in excluded categories even if they require review
+                  const { markMessageHandled } = await import('@/lib/inbox-zero/handler');
+                  const result = await markMessageHandled(msg.id, connection.workspace_id, {
+                    action: 'manually_dismissed', // Use this to bypass review check
+                    markRead: true,
+                    archive: true,
+                    applyLabel: true,
+                  });
+                  
+                  if (result.success) {
+                    excludedHandledCount++;
+                    console.log(`      ✅ Auto-handled excluded category: ${msg.category} - ${msg.subject?.substring(0, 30) || 'No subject'}`);
+                  } else {
+                    console.warn(`      ⚠️ Failed to auto-handle ${msg.id}: ${result.error}`);
+                  }
+                } catch (handleErr) {
+                  console.error(`      ❌ Failed to auto-handle excluded category message ${msg.id}:`, handleErr instanceof Error ? handleErr.message : handleErr);
+                }
+              }
+              console.log(`   📊 Auto-handled ${excludedHandledCount}/${excludedCategoryMessages.length} excluded category messages`);
+            }
           }
         } catch (classifyError) {
           console.error(`   ❌ Classification error:`, classifyError);

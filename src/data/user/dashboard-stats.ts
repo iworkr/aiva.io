@@ -239,12 +239,18 @@ export async function getNeedsAttentionItems(
   }
 
   for (const msg of reviewItems || []) {
-    // IMPORTANT: Messages requiring human review should ALWAYS appear, regardless of excluded categories
-    // Excluded categories only apply to auto-sending, not to showing messages that need human review
-    // If a message requires human review, it means the AI is uncertain or needs verification,
-    // so the user should see it even if it's in a normally excluded category
+    // Skip messages in excluded categories - they should be auto-handled and not shown
+    // If a category is excluded, it means the user doesn't want to see messages in that category,
+    // even if they require human review. These should be auto-handled by the sync cron.
+    if (msg.category && excludedCategories.length > 0) {
+      const categoryLower = msg.category.toLowerCase();
+      if (excludedCategories.some(excluded => excluded.toLowerCase() === categoryLower)) {
+        console.log(`[Dashboard] Skipping message ${msg.id} - category "${msg.category}" is in excluded categories (should be auto-handled)`);
+        continue;
+      }
+    }
     
-    // Include all messages that require human review (no category filtering)
+    // Include messages that require human review (and are not in excluded categories)
     // Draft information will be enriched by the held drafts query below
     // This ensures messages appear even if RLS blocks the joined drafts
     const drafts = (msg.message_drafts as any[]) || [];

@@ -124,19 +124,18 @@ export async function GET(request: NextRequest) {
       }
       
       // Messages that would appear in MorningBrief
-      // IMPORTANT: All messages requiring human review should appear, regardless of category
-      // Category filtering only applies to auto-sending, not to showing messages that need review
-      // The only requirement is that they haven't been reviewed yet (reviewed_at IS NULL)
-      analysis.wouldAppearInMorningBrief.push({
-        id: msg.id,
-        subject: msg.subject,
-        category: msg.category,
-        handled_by_aiva: msg.handled_by_aiva,
-        handle_action: msg.handle_action,
-        note: isExcludedCategory 
-          ? 'Would appear despite excluded category (requires human review)' 
-          : 'Would appear normally',
-      });
+      // Messages in excluded categories should NOT appear - they should be auto-handled
+      // Only messages NOT in excluded categories should appear
+      if (!isExcludedCategory) {
+        analysis.wouldAppearInMorningBrief.push({
+          id: msg.id,
+          subject: msg.subject,
+          category: msg.category,
+          handled_by_aiva: msg.handled_by_aiva,
+          handle_action: msg.handle_action,
+          note: 'Would appear normally',
+        });
+      }
     }
 
     return NextResponse.json({
