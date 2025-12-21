@@ -332,6 +332,10 @@ export async function MorningBrief() {
     attentionItemsCount: attentionItems?.length || 0,
     briefingItemsCount: briefingItems.length,
     deduplicatedItemsCount: deduplicatedItems.length,
+    unreadCount,
+    activeConversationsResultCount: isZeroInboxEnabled 
+      ? (activeConversationsResult?.data?.length || 0)
+      : (activeConversationsResult && 'count' in activeConversationsResult ? (activeConversationsResult as { count: number | null }).count : 0),
     hasThursdayEmail: deduplicatedItems.some(item => 
       item.title?.includes('Thursday') || item.id === '367735ec-3639-4d13-b867-48e701d7da58'
     ),

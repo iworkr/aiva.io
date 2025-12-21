@@ -120,6 +120,52 @@ When Zero Inbox is enabled and `auto_archive_handled` is `true`:
 
 **Important**: Messages requiring human review (`requires_human_review = true`) are **NOT archived** until they are reviewed, ensuring they remain visible and accessible.
 
+## Auto-Handling Logic
+
+When Zero Inbox is enabled, the sync cron job automatically handles messages in the following order:
+
+1. **Messages with `actionability = 'none'`** that don't require human review:
+   - These are informational messages (FYI, notifications, confirmations)
+   - Automatically marked as handled, read, and archived
+   - Processed during sync cron runs
+
+2. **Messages in excluded categories**:
+   - Categories marked as excluded in filter settings (e.g., marketing, social, notification)
+   - Auto-handled even if they require human review (using `manually_dismissed` action to bypass review check)
+   - Ensures excluded categories don't appear in dashboard
+
+3. **Read messages that are not actionable**:
+   - Messages that are already read (`is_read = true`) and have `actionability = 'none'`
+   - If a user reads a message and it doesn't require action, it should be auto-handled
+   - This helps maintain Zero Inbox by cleaning up messages that have been reviewed but don't need a response
+
+4. **Actionable messages with auto-replies**:
+   - Messages that require a response get drafts generated
+   - If auto-send is enabled and confidence is high, drafts are queued for auto-send
+   - After auto-send, messages are marked as handled and archived
+   - This ensures that messages that received auto-replies are also zeroed out
+
+## Why Some Messages Aren't Auto-Handled
+
+Messages that remain unhandled (and thus appear in counts) are:
+
+1. **Actionable messages waiting for auto-reply**:
+   - Messages that need a response but haven't received a draft yet
+   - Messages with drafts that are below confidence threshold
+   - Messages with drafts that are held for human review
+   - These will be handled once a reply is sent (manually or automatically)
+
+2. **Messages requiring human review**:
+   - Messages flagged by AI as needing human attention
+   - Messages with low confidence scores
+   - Messages with scheduling confirmations that don't match calendar
+   - These must be reviewed by a human before being handled
+
+3. **Messages that haven't been processed yet**:
+   - New messages that haven't been classified
+   - Messages waiting for sync cron to process them
+   - Messages in cooldown period (sync cron has 2-minute cooldown between syncs)
+
 ## Best Practices
 
 1. **Always check Zero Inbox setting** before querying messages for counts

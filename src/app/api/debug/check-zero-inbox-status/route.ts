@@ -62,12 +62,13 @@ export async function GET(request: NextRequest) {
       .eq('is_read', false);
 
     // Count unread AND unhandled (what should show in MorningBrief when Zero Inbox enabled)
+    // Include NULL as unhandled (matches MorningBrief query logic)
     const { count: unreadUnhandledCount } = await supabase
       .from('messages')
       .select('*', { count: 'exact', head: true })
       .eq('workspace_id', workspaceId)
       .eq('is_read', false)
-      .eq('handled_by_aiva', false);
+      .or('handled_by_aiva.is.null,handled_by_aiva.eq.false');
 
     // Count messages requiring human review
     const { count: requiresReviewCount } = await supabase
@@ -85,6 +86,7 @@ export async function GET(request: NextRequest) {
       .eq('handled_by_aiva', false);
 
     // Get sample of unread unhandled messages
+    // Include NULL as unhandled (matches MorningBrief query logic)
     const { data: sampleUnreadUnhandled } = await supabase
       .from('messages')
       .select(`
@@ -97,13 +99,16 @@ export async function GET(request: NextRequest) {
         handled_at,
         handle_action,
         requires_human_review,
-        reviewed_at
+        reviewed_at,
+        actionability,
+        category,
+        priority
       `)
       .eq('workspace_id', workspaceId)
       .eq('is_read', false)
-      .eq('handled_by_aiva', false)
+      .or('handled_by_aiva.is.null,handled_by_aiva.eq.false')
       .order('timestamp', { ascending: false })
-      .limit(10);
+      .limit(20);
 
     // Get breakdown by handle_action
     const { data: handleActionBreakdown } = await supabase

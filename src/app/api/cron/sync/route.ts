@@ -320,6 +320,52 @@ export async function GET(request: NextRequest) {
               console.log(`   📊 Auto-handled ${excludedHandledCount}/${excludedCategoryMessages.length} excluded category messages`);
             }
           }
+
+          // 3. Read messages that are not actionable (Zero Inbox: if read and no action needed, auto-handle)
+          // Check if Zero Inbox is enabled for this workspace
+          const { data: zeroInboxSettings } = await supabase
+            .from('workspace_settings')
+            .select('inbox_zero_enabled')
+            .eq('workspace_id', connection.workspace_id)
+            .single();
+
+          const isZeroInboxEnabled = zeroInboxSettings?.inbox_zero_enabled ?? false;
+
+          if (isZeroInboxEnabled) {
+            // Fetch read messages that are not actionable and not handled
+            const { data: readNoActionMessages } = await supabase
+              .from('messages')
+              .select('id, subject, actionability, is_read, requires_human_review, handled_by_aiva')
+              .eq('workspace_id', connection.workspace_id)
+              .eq('is_read', true)
+              .eq('actionability', 'none')
+              .eq('requires_human_review', false)
+              .or('handled_by_aiva.is.null,handled_by_aiva.eq.false')
+              .order('created_at', { ascending: false })
+              .limit(50); // Process up to 50 read no-action messages per run
+
+            if (readNoActionMessages && readNoActionMessages.length > 0) {
+              console.log(`   📖 Auto-handling ${readNoActionMessages.length} read messages with no action needed...`);
+              let readHandledCount = 0;
+              
+              for (const msg of readNoActionMessages) {
+                try {
+                  const { handleNoActionNeeded } = await import('@/lib/inbox-zero/handler');
+                  const result = await handleNoActionNeeded(msg.id, connection.workspace_id);
+                  
+                  if (result.success) {
+                    readHandledCount++;
+                    console.log(`      ✅ Auto-handled read message: ${msg.subject?.substring(0, 30) || 'No subject'}`);
+                  } else {
+                    console.warn(`      ⚠️ Failed to auto-handle read message ${msg.id}: ${result.error}`);
+                  }
+                } catch (handleErr) {
+                  console.error(`      ❌ Failed to auto-handle read message ${msg.id}:`, handleErr instanceof Error ? handleErr.message : handleErr);
+                }
+              }
+              console.log(`   📊 Auto-handled ${readHandledCount}/${readNoActionMessages.length} read no-action messages`);
+            }
+          }
         } catch (classifyError) {
           console.error(`   ❌ Classification error:`, classifyError);
         }
