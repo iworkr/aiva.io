@@ -183,7 +183,7 @@ export async function GET(request: NextRequest) {
         console.log(`   📝 Fetching draft ${item.draft_id?.substring(0, 8)}...`);
         const { data: draft, error: draftError } = await supabase
           .from('message_drafts')
-          .select('body, hold_for_review, review_reason')
+          .select('body, hold_for_review, review_reason, context_data')
           .eq('id', item.draft_id)
           .single();
 
@@ -326,6 +326,35 @@ export async function GET(request: NextRequest) {
             .from('message_drafts')
             .update({ auto_sent: true, auto_sent_at: new Date().toISOString() })
             .eq('id', item.draft_id);
+
+          // Check if this auto-sent reply was just an acknowledgement that still needs human follow-up
+          // If the draft has missing information, mark message as requiring human review
+          // so it appears in "requires attention" for the user to follow up
+          const contextData = draft.context_data as any;
+          const hasMissingInfo = contextData?.hasMissingInformation === true;
+          const missingInfoType = contextData?.missingInformationType;
+          
+          if (hasMissingInfo) {
+            console.log(`   ⚠️ Auto-sent acknowledgement has missing information (${missingInfoType}) - marking for human follow-up`);
+            
+            // Mark message as requiring human review so it appears in "requires attention"
+            // This allows the user to see that Aiva sent an acknowledgement but still needs to follow up
+            await supabase
+              .from('messages')
+              .update({
+                requires_human_review: true,
+                review_reason: `auto_replied_acknowledgement_needs_followup_${missingInfoType || 'information'}`,
+                review_context: {
+                  autoSentAt: new Date().toISOString(),
+                  draftId: item.draft_id,
+                  missingInformationType: missingInfoType,
+                  note: 'Aiva auto-sent an acknowledgement but still needs human follow-up to provide complete answer',
+                },
+                // Keep handled_by_aiva = true (it was auto-sent) but requires_human_review = true (needs follow-up)
+                // This way it appears in "requires attention" (which I already fixed to include auto-replied messages)
+              })
+              .eq('id', item.message_id);
+          }
 
           // Create calendar event if date/time information is available
           try {

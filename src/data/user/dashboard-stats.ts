@@ -253,7 +253,9 @@ export async function getNeedsAttentionItems(
       priority: msg.priority || undefined,
       category: msg.category || undefined,
       reviewReason: wasAutoReplied 
-        ? 'auto_replied_needs_review' 
+        ? (msg.review_reason?.startsWith('auto_replied_acknowledgement') 
+           ? msg.review_reason 
+           : 'auto_replied_needs_review')
         : (draft?.review_reason || msg.review_reason || 'needs_review'),
       provider: (msg.channel_connection as any)?.provider,
       // Draft information (may be empty if RLS blocks drafts, will be enriched below)
