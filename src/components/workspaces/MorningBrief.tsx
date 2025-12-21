@@ -205,40 +205,47 @@ export async function MorningBrief() {
   ]);
 
   // Calculate new vs active conversations
-  // Filter out messages in excluded categories - these should be auto-handled and not counted
+  // With Zero Inbox enabled, these should match the actionable items count
+  // Use attentionItems which already has all the filtering logic applied
   let newMessages = 0;
-  if (unreadMessages && Array.isArray(unreadMessages)) {
-    // Filter out messages in excluded categories
-    const filteredUnread = unreadMessages.filter((msg: any) => {
-      if (!msg.category || excludedCategories.length === 0) return true;
-      const categoryLower = msg.category.toLowerCase();
-      return !excludedCategories.some(excluded => excluded.toLowerCase() === categoryLower);
-    });
-    newMessages = filteredUnread.length;
-  }
-  
-  // For active conversations, if Zero Inbox is enabled, count unique threads
-  // Otherwise, use the count from the query
   let activeConversations = 0;
+  
   if (isZeroInboxEnabled) {
-    // Count unique thread IDs from unhandled messages, excluding excluded categories
-    if (activeConversationsResult?.data && Array.isArray(activeConversationsResult.data)) {
-      // Filter out messages in excluded categories
-      const filteredThreads = activeConversationsResult.data.filter((msg: any) => {
-        if (!msg.category || excludedCategories.length === 0) return true;
-        const categoryLower = msg.category.toLowerCase();
-        return !excludedCategories.some(excluded => excluded.toLowerCase() === categoryLower);
-      });
+    // With Zero Inbox: count only actionable items that need attention
+    // This matches what's shown in "What needs your attention"
+    newMessages = attentionItems.length;
+    
+    // Count unique threads from actionable items
+    // We need to fetch thread IDs for the attention items
+    if (attentionItems.length > 0) {
+      const messageIds = attentionItems.map(item => item.messageId);
+      const { data: messagesWithThreads } = await supabase
+        .from('messages')
+        .select('provider_thread_id')
+        .eq('workspace_id', workspaceId)
+        .in('id', messageIds)
+        .not('provider_thread_id', 'is', null);
       
       const uniqueThreads = new Set(
-        filteredThreads
+        (messagesWithThreads || [])
           .map((msg: any) => msg.provider_thread_id)
           .filter(Boolean)
       );
       activeConversations = uniqueThreads.size;
     }
   } else {
-    // Legacy behavior: count all messages
+    // Legacy behavior: count all unread/unhandled messages
+    if (unreadMessages && Array.isArray(unreadMessages)) {
+      // Filter out messages in excluded categories
+      const filteredUnread = unreadMessages.filter((msg: any) => {
+        if (!msg.category || excludedCategories.length === 0) return true;
+        const categoryLower = msg.category.toLowerCase();
+        return !excludedCategories.some(excluded => excluded.toLowerCase() === categoryLower);
+      });
+      newMessages = filteredUnread.length;
+    }
+    
+    // Count all messages (legacy behavior)
     if (activeConversationsResult && 'count' in activeConversationsResult) {
       activeConversations = (activeConversationsResult as { count: number | null }).count || 0;
     }

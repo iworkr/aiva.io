@@ -3,8 +3,8 @@
  * This helps diagnose issues with the dashboard query
  */
 
-import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
