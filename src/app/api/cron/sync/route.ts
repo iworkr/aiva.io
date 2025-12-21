@@ -243,19 +243,20 @@ export async function GET(request: NextRequest) {
           }
 
           // Also auto-handle messages that are already classified but not handled
-          // 1. Messages with actionability = 'none' that don't require review
+          // 1. Messages with actionability = 'none' OR 'fyi' that don't require review
+          // Both 'none' and 'fyi' mean "no response needed" - they should be auto-handled
           const { data: unhandledNoActionMessages } = await supabase
             .from('messages')
             .select('id, subject, actionability, requires_human_review, handled_by_aiva')
             .eq('workspace_id', connection.workspace_id)
-            .eq('actionability', 'none')
+            .in('actionability', ['none', 'fyi']) // Both mean "no response needed"
             .eq('requires_human_review', false)
             .or('handled_by_aiva.is.null,handled_by_aiva.eq.false')
             .order('created_at', { ascending: false })
             .limit(50); // Process up to 50 no-action messages per run
 
           if (unhandledNoActionMessages && unhandledNoActionMessages.length > 0) {
-            console.log(`   🧹 Auto-handling ${unhandledNoActionMessages.length} no-action messages...`);
+            console.log(`   🧹 Auto-handling ${unhandledNoActionMessages.length} no-action messages (actionability: none/fyi)...`);
             let autoHandledCount = 0;
             
             for (const msg of unhandledNoActionMessages) {
@@ -263,7 +264,7 @@ export async function GET(request: NextRequest) {
                 const { handleNoActionNeeded } = await import('@/lib/inbox-zero/handler');
                 await handleNoActionNeeded(msg.id, connection.workspace_id);
                 autoHandledCount++;
-                console.log(`      ✅ Auto-handled: ${msg.subject?.substring(0, 30) || 'No subject'}`);
+                console.log(`      ✅ Auto-handled (${msg.actionability}): ${msg.subject?.substring(0, 30) || 'No subject'}`);
               } catch (handleErr) {
                 console.error(`      ❌ Failed to auto-handle ${msg.id}:`, handleErr instanceof Error ? handleErr.message : handleErr);
               }
@@ -333,19 +334,20 @@ export async function GET(request: NextRequest) {
 
           if (isZeroInboxEnabled) {
             // Fetch read messages that are not actionable and not handled
+            // Both 'none' and 'fyi' mean "no response needed" - they should be auto-handled
             const { data: readNoActionMessages } = await supabase
               .from('messages')
               .select('id, subject, actionability, is_read, requires_human_review, handled_by_aiva')
               .eq('workspace_id', connection.workspace_id)
               .eq('is_read', true)
-              .eq('actionability', 'none')
+              .in('actionability', ['none', 'fyi']) // Both mean "no response needed"
               .eq('requires_human_review', false)
               .or('handled_by_aiva.is.null,handled_by_aiva.eq.false')
               .order('created_at', { ascending: false })
               .limit(50); // Process up to 50 read no-action messages per run
 
             if (readNoActionMessages && readNoActionMessages.length > 0) {
-              console.log(`   📖 Auto-handling ${readNoActionMessages.length} read messages with no action needed...`);
+              console.log(`   📖 Auto-handling ${readNoActionMessages.length} read messages with no action needed (actionability: none/fyi)...`);
               let readHandledCount = 0;
               
               for (const msg of readNoActionMessages) {
@@ -355,7 +357,7 @@ export async function GET(request: NextRequest) {
                   
                   if (result.success) {
                     readHandledCount++;
-                    console.log(`      ✅ Auto-handled read message: ${msg.subject?.substring(0, 30) || 'No subject'}`);
+                    console.log(`      ✅ Auto-handled read message (${msg.actionability}): ${msg.subject?.substring(0, 30) || 'No subject'}`);
                   } else {
                     console.warn(`      ⚠️ Failed to auto-handle read message ${msg.id}: ${result.error}`);
                   }

@@ -5,9 +5,8 @@
 
 'use server';
 
-import { createSupabaseUserServerActionClient } from '@/supabase-clients/user/createSupabaseUserServerActionClient';
-import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
 import { isWorkspaceMember } from '@/data/user/workspaces';
+import { createSupabaseUserServerActionClient } from '@/supabase-clients/user/createSupabaseUserServerActionClient';
 
 export interface DashboardStats {
   messagesReceivedToday: number;
@@ -238,19 +237,70 @@ export async function getNeedsAttentionItems(
     console.log(`[Dashboard] Found ${reviewItems?.length || 0} messages requiring review`);
   }
 
-  for (const msg of reviewItems || []) {
+  // Also get actionable messages (request, question, scheduling_intent) that are unhandled
+  // These should appear in "What needs your attention" if:
+  // 1. They're not in excluded categories
+  // 2. They're unhandled
+  // 3. They don't have an auto-sendable draft (or the draft is held for review)
+  // The idea is: if the AI can respond automatically, it will (via auto-send), so we only show
+  // messages that need human intervention/attention
+  const { data: actionableItems, error: actionableItemsError } = await supabase
+    .from('messages')
+    .select(`
+      id,
+      subject,
+      sender_email,
+      sender_name,
+      snippet,
+      timestamp,
+      priority,
+      category,
+      actionability,
+      requires_human_review,
+      has_draft_reply,
+      handled_by_aiva,
+      handle_action,
+      channel_connection:channel_connections(provider),
+      message_drafts(
+        id,
+        body,
+        confidence_score,
+        hold_for_review,
+        review_reason,
+        calendar_context,
+        ai_uncertainty_notes,
+        auto_sent,
+        auto_sent_at
+      )
+    `)
+    .eq('workspace_id', workspaceId)
+    .in('actionability', ['request', 'question', 'scheduling_intent'])
+    .eq('requires_human_review', false) // Only include if they don't require review (review items are handled above)
+    .or('handled_by_aiva.is.null,handled_by_aiva.eq.false') // Only unhandled messages
+    .order('timestamp', { ascending: false })
+    .limit(limit * 3); // Get more to filter after (we'll filter out those with auto-sendable drafts)
+
+  if (actionableItemsError) {
+    console.error('[Dashboard] Error fetching actionable items:', actionableItemsError);
+  } else {
+    console.log(`[Dashboard] Found ${actionableItems?.length || 0} actionable messages`);
+  }
+
+  // Helper function to check if a message should be excluded
+  const shouldExcludeMessage = (msg: { category?: string | null }): boolean => {
+    if (!msg.category || excludedCategories.length === 0) return false;
+    const categoryLower = msg.category.toLowerCase();
+    return excludedCategories.some(excluded => excluded.toLowerCase() === categoryLower);
+  };
+
+  // Helper function to add a message to items
+  const addMessageToItems = (msg: any, type: 'review' | 'unhandled' = 'review') => {
     // Skip messages in excluded categories - they should be auto-handled and not shown
-    // If a category is excluded, it means the user doesn't want to see messages in that category,
-    // even if they require human review. These should be auto-handled by the sync cron.
-    if (msg.category && excludedCategories.length > 0) {
-      const categoryLower = msg.category.toLowerCase();
-      if (excludedCategories.some(excluded => excluded.toLowerCase() === categoryLower)) {
-        console.log(`[Dashboard] Skipping message ${msg.id} - category "${msg.category}" is in excluded categories (should be auto-handled)`);
-        continue;
-      }
+    if (shouldExcludeMessage(msg)) {
+      console.log(`[Dashboard] Skipping message ${msg.id} - category "${msg.category}" is in excluded categories (should be auto-handled)`);
+      return;
     }
     
-    // Include messages that require human review (and are not in excluded categories)
     // Draft information will be enriched by the held drafts query below
     // This ensures messages appear even if RLS blocks the joined drafts
     const drafts = (msg.message_drafts as any[]) || [];
@@ -264,7 +314,7 @@ export async function getNeedsAttentionItems(
     
     items.push({
       id: msg.id,
-      type: 'review',
+      type: type === 'review' ? 'review' : 'unhandled',
       messageId: msg.id,
       draftId: draft?.id || autoSentDraft?.id,
       subject: msg.subject || '(no subject)',
@@ -278,7 +328,7 @@ export async function getNeedsAttentionItems(
         ? (msg.review_reason?.startsWith('auto_replied_acknowledgement') 
            ? msg.review_reason 
            : 'auto_replied_needs_review')
-        : (draft?.review_reason || msg.review_reason || 'needs_review'),
+        : (draft?.review_reason || msg.review_reason || (type === 'unhandled' ? 'actionable' : 'needs_review')),
       provider: (msg.channel_connection as any)?.provider,
       // Draft information (may be empty if RLS blocks drafts, will be enriched below)
       // For auto-replied messages, show the auto-sent draft
@@ -288,6 +338,62 @@ export async function getNeedsAttentionItems(
       aiUncertaintyNotes: draft?.ai_uncertainty_notes || reviewContext?.aiUncertaintyNotes,
       hasDraft: !!draft || !!msg.has_draft_reply,
     });
+  };
+
+  // Process messages that require human review
+  for (const msg of reviewItems || []) {
+    addMessageToItems(msg, 'review');
+  }
+
+  // Check which actionable messages are already in the auto-send queue
+  // If they're queued for auto-send, we don't need to show them (they'll be handled automatically)
+  const actionableMessageIds = (actionableItems || []).map((m: any) => m.id);
+  let queuedMessageIds = new Set<string>();
+  if (actionableMessageIds.length > 0) {
+    const { data: queueItems } = await supabase
+      .from('auto_send_queue')
+      .select('message_id, status')
+      .eq('workspace_id', workspaceId)
+      .in('message_id', actionableMessageIds)
+      .eq('status', 'pending'); // Only check pending items (processing/sent/failed are handled)
+    
+    queuedMessageIds = new Set((queueItems || []).map((q: any) => q.message_id));
+    console.log(`[Dashboard] Found ${queuedMessageIds.size} actionable messages already in auto-send queue`);
+  }
+
+  // Process actionable messages (request, question, scheduling_intent)
+  // These should appear in "What needs your attention" if:
+  // 1. They're not in excluded categories
+  // 2. They don't have an auto-sendable draft (or the draft is held for review)
+  // 3. They're not already queued for auto-send
+  // If a message has a draft that can be auto-sent, it will be handled by auto-send cron,
+  // so we don't need to show it here unless the draft is held for review
+  for (const msg of actionableItems || []) {
+    // Skip if already queued for auto-send
+    if (queuedMessageIds.has(msg.id)) {
+      console.log(`[Dashboard] Skipping actionable message ${msg.id} - already in auto-send queue`);
+      continue;
+    }
+    
+    const drafts = (msg.message_drafts as any[]) || [];
+    const heldDraft = drafts.find((d: any) => d.hold_for_review === true);
+    const autoSentDraft = drafts.find((d: any) => d.auto_sent === true);
+    const hasAutoSendableDraft = drafts.some((d: any) => 
+      !d.hold_for_review && 
+      !d.auto_sent && 
+      d.body // Has a draft body
+    );
+    
+    // Show the message if:
+    // - It has a draft held for review (needs human attention)
+    // - It has no draft at all (AI hasn't generated a response yet - needs human attention)
+    // - It was already auto-replied (show for review/acknowledgment)
+    // Don't show if it has an auto-sendable draft (will be handled by auto-send cron)
+    if (heldDraft || !hasAutoSendableDraft || autoSentDraft) {
+      addMessageToItems(msg, 'unhandled');
+    } else {
+      console.log(`[Dashboard] Skipping actionable message ${msg.id} - has auto-sendable draft (will be handled by auto-send cron)`);
+    }
   }
 
   // Also get messages with held drafts that might not have requires_human_review set yet

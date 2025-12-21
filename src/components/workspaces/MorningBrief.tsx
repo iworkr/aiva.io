@@ -107,10 +107,10 @@ export async function MorningBrief() {
   const workspaceId = workspace.id;
   const userId = user.id;
 
-  // Get workspace settings for timezone and Zero Inbox
+  // Get workspace settings for timezone, Zero Inbox, and excluded categories
   const { data: workspaceSettings } = await supabase
     .from('workspace_settings')
-    .select('workspace_settings, inbox_zero_enabled')
+    .select('workspace_settings, inbox_zero_enabled, auto_send_excluded_categories')
     .eq('workspace_id', workspaceId)
     .single();
 
@@ -119,6 +119,9 @@ export async function MorningBrief() {
   
   // Check if Zero Inbox is enabled (default to true if not set)
   const isZeroInboxEnabled = workspaceSettings?.inbox_zero_enabled ?? true;
+  
+  // Get excluded categories - messages in these categories should be auto-handled and not counted
+  const excludedCategories = (workspaceSettings?.auto_send_excluded_categories as string[]) || [];
 
   // Get user profile for display name
   const { data: userProfile } = await supabase
@@ -132,9 +135,10 @@ export async function MorningBrief() {
     : getUserDisplayName(user);
 
   // Build base query for unread messages
+  // We need to fetch messages with category to filter by excluded categories
   let unreadQuery = supabase
     .from('messages')
-    .select('*', { count: 'exact', head: true })
+    .select('id, category, handled_by_aiva')
     .eq('workspace_id', workspaceId)
     .eq('is_read', false);
   
@@ -148,11 +152,11 @@ export async function MorningBrief() {
   // Active conversations = unique threads that have at least one unhandled message
   let activeConversationsQuery;
   if (isZeroInboxEnabled) {
-    // Count unique threads with at least one unhandled message
+    // Get unique threads with at least one unhandled message (need category to filter)
     // Handle both false and NULL (NULL means unhandled, treat as false)
     activeConversationsQuery = supabase
       .from('messages')
-      .select('provider_thread_id', { count: 'exact', head: false })
+      .select('provider_thread_id, category, handled_by_aiva')
       .eq('workspace_id', workspaceId)
       .or('handled_by_aiva.is.null,handled_by_aiva.eq.false')
       .not('provider_thread_id', 'is', null);
@@ -167,18 +171,18 @@ export async function MorningBrief() {
   // Fetch crucial data - Use getNeedsAttentionItems for messages requiring human review
   const [
     attentionItems,
-    { count: unreadCount },
+    { data: unreadMessages },
     activeConversationsResult,
     { data: upcomingEvents },
     { count: todayEventsCount },
   ] = await Promise.all([
-    // Messages that need human attention (requires_human_review = true)
+    // Messages that need human attention (requires_human_review = true or actionable)
     getNeedsAttentionItems(workspaceId, userId, 20),
     
-    // Unread messages count (excluding handled if Zero Inbox enabled)
+    // Unread messages (need to filter by excluded categories in code)
     unreadQuery,
     
-    // Active conversations count
+    // Active conversations (need to filter by excluded categories in code)
     activeConversationsQuery,
     
     // Upcoming events (today and tomorrow)
@@ -201,16 +205,33 @@ export async function MorningBrief() {
   ]);
 
   // Calculate new vs active conversations
-  const newMessages = unreadCount || 0;
+  // Filter out messages in excluded categories - these should be auto-handled and not counted
+  let newMessages = 0;
+  if (unreadMessages && Array.isArray(unreadMessages)) {
+    // Filter out messages in excluded categories
+    const filteredUnread = unreadMessages.filter((msg: any) => {
+      if (!msg.category || excludedCategories.length === 0) return true;
+      const categoryLower = msg.category.toLowerCase();
+      return !excludedCategories.some(excluded => excluded.toLowerCase() === categoryLower);
+    });
+    newMessages = filteredUnread.length;
+  }
   
   // For active conversations, if Zero Inbox is enabled, count unique threads
   // Otherwise, use the count from the query
   let activeConversations = 0;
   if (isZeroInboxEnabled) {
-    // Count unique thread IDs from unhandled messages
+    // Count unique thread IDs from unhandled messages, excluding excluded categories
     if (activeConversationsResult?.data && Array.isArray(activeConversationsResult.data)) {
+      // Filter out messages in excluded categories
+      const filteredThreads = activeConversationsResult.data.filter((msg: any) => {
+        if (!msg.category || excludedCategories.length === 0) return true;
+        const categoryLower = msg.category.toLowerCase();
+        return !excludedCategories.some(excluded => excluded.toLowerCase() === categoryLower);
+      });
+      
       const uniqueThreads = new Set(
-        activeConversationsResult.data
+        filteredThreads
           .map((msg: any) => msg.provider_thread_id)
           .filter(Boolean)
       );
@@ -327,12 +348,13 @@ export async function MorningBrief() {
     workspaceId,
     userId,
     isZeroInboxEnabled,
+    excludedCategories,
     newMessages,
     activeConversations,
     attentionItemsCount: attentionItems?.length || 0,
     briefingItemsCount: briefingItems.length,
     deduplicatedItemsCount: deduplicatedItems.length,
-    unreadCount,
+    unreadMessagesCount: unreadMessages?.length || 0,
     activeConversationsResultCount: isZeroInboxEnabled 
       ? (activeConversationsResult?.data?.length || 0)
       : (activeConversationsResult && 'count' in activeConversationsResult ? (activeConversationsResult as { count: number | null }).count : 0),
