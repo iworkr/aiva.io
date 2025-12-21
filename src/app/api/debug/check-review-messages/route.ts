@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
 
     // Get messages that would pass the getNeedsAttentionItems query
     // (requires_human_review = true AND reviewed_at IS NULL)
+    // NOTE: We removed the handled_by_aiva filter, so ALL messages requiring review should appear
     const { data: unreviewedMessages, error: unreviewedError } = await supabase
       .from('messages')
       .select(`
@@ -76,6 +77,8 @@ export async function GET(request: NextRequest) {
       .eq('workspace_id', workspaceId)
       .eq('requires_human_review', true)
       .is('reviewed_at', null)
+      // REMOVED: .or('handled_by_aiva.eq.false,handle_action.eq.auto_replied')
+      // All messages requiring review should appear regardless of handled status
       .order('timestamp', { ascending: false });
 
     if (unreviewedError) {
