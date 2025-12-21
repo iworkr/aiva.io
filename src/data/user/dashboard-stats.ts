@@ -328,8 +328,11 @@ export async function getNeedsAttentionItems(
     }
     
     // 4. Exclude messages that have been reviewed but not handled
-    // These are likely stale or already processed
-    if (msg.reviewed_at && !msg.handled_by_aiva) {
+    // BUT: Don't exclude if they have scheduling_intent (scheduling items need attention even if reviewed)
+    // BUT: Don't exclude if they have a held draft (held drafts need human review regardless of reviewed status)
+    // These are likely stale or already processed, unless they're scheduling-related or have held drafts
+    // Note: We can't check for held drafts here (draft info not available), so we'll check later in the actionable items loop
+    if (msg.reviewed_at && !msg.handled_by_aiva && msg.actionability !== 'scheduling_intent') {
       return true;
     }
     
@@ -349,6 +352,71 @@ export async function getNeedsAttentionItems(
     
     if (isSystemAuthLink) {
       return true; // System auth magic links - not actionable by AI
+    }
+    
+    // 6. Exclude personal and internal category messages (these are typically test messages or internal notes)
+    // BUT: Don't exclude if they have scheduling_intent (scheduling items need attention even if personal)
+    // Personal/internal messages are usually not business-critical and if they're actionable,
+    // they're likely test messages like "Hi Aiva!" or "Test Auto Send"
+    // Exception: Scheduling items (like "Lunch on Thursday") should show even if personal
+    if ((msg.category === 'personal' || msg.category === 'internal') && msg.actionability !== 'scheduling_intent') {
+      return true; // Personal/internal messages don't need attention in business context (unless scheduling)
+    }
+    
+    // 7. Exclude test messages in client_support category (these are misclassified test messages)
+    // Test messages from the user's own email in client_support should be filtered
+    // These are typically test messages like "Hi Aiva!", "Test Auto Send", "Does this work?"
+    const senderLower = (msg.sender_email || '').toLowerCase();
+    const subjectLower = (msg.subject || '').toLowerCase();
+    
+    // Check if this is a test message in client_support category
+    // Test messages often have short subjects, test-related keywords, or are from the user themselves
+    const isTestMessageInClientSupport = 
+      msg.category === 'client_support' &&
+      (
+        // Test-related keywords in subject
+        subjectLower.includes('test') ||
+        subjectLower.includes('hi aiva') ||
+        subjectLower.includes('aiva replies') ||
+        subjectLower.includes('auto reply') ||
+        subjectLower.includes('auto send') ||
+        subjectLower.includes('does this work') ||
+        subjectLower.includes('please help') ||
+        subjectLower.includes('help me aiva') ||
+        // Very short subjects (likely test messages)
+        (subjectLower.length < 15 && !subjectLower.includes('urgent') && !subjectLower.includes('important'))
+      );
+    
+    if (isTestMessageInClientSupport) {
+      return true; // Test messages in client_support don't need attention
+    }
+    
+    // 8. Exclude non-actionable client_support messages (feedback requests, promotional)
+    // Some client_support messages are just feedback requests or promotional and don't need urgent attention
+    if (msg.category === 'client_support') {
+      const subjectLower = (msg.subject || '').toLowerCase();
+      // Feedback requests (e.g., "Tell us how we did!")
+      if (subjectLower.includes('tell us how we did') || 
+          subjectLower.includes('how did we do') ||
+          subjectLower.includes('rate us') ||
+          subjectLower.includes('feedback')) {
+        return true; // Feedback requests don't need urgent attention
+      }
+      // Promotional support messages (e.g., "Want to test...")
+      if (subjectLower.includes('want to test') || 
+          subjectLower.includes('try our') ||
+          subjectLower.includes('still haven')) {
+        return true; // Promotional support messages don't need urgent attention
+      }
+    }
+    
+    // 9. Exclude welcome/onboarding messages in other categories
+    if (msg.category === 'other' || msg.category === 'client_support') {
+      const subjectLower = (msg.subject || '').toLowerCase();
+      if (subjectLower.includes('welcome to') || 
+          subjectLower.includes('confirm your email and launch')) {
+        return true; // Welcome/onboarding messages don't need urgent attention
+      }
     }
     
     // NOTE: Security alerts like "Verify phone number" or "Action needed on Facebook"
@@ -438,18 +506,7 @@ export async function getNeedsAttentionItems(
   // If a message has a draft that can be auto-sent, it will be handled by auto-send cron,
   // so we don't need to show it here unless the draft is held for review
   for (const msg of actionableItems || []) {
-    // First check if message should be excluded (categories, priority, age, etc.)
-    if (shouldExcludeMessage(msg)) {
-      console.log(`[Dashboard] Skipping actionable message ${msg.id} - excluded by filter (category: ${msg.category}, priority: ${msg.priority}, age: ${msg.timestamp ? Math.round((Date.now() - new Date(msg.timestamp).getTime()) / (24 * 60 * 60 * 1000)) + ' days' : 'unknown'})`);
-      continue;
-    }
-    
-    // Skip if already queued for auto-send
-    if (queuedMessageIds.has(msg.id)) {
-      console.log(`[Dashboard] Skipping actionable message ${msg.id} - already in auto-send queue`);
-      continue;
-    }
-    
+    // Get draft information first - held drafts should always show regardless of exclusion rules
     const drafts = (msg.message_drafts as any[]) || [];
     const heldDraft = drafts.find((d: any) => d.hold_for_review === true);
     const autoSentDraft = drafts.find((d: any) => d.auto_sent === true);
@@ -459,15 +516,30 @@ export async function getNeedsAttentionItems(
       d.body // Has a draft body
     );
     
+    // If message has a held draft, always show it (needs human review regardless of other filters)
+    if (heldDraft) {
+      addMessageToItems(msg, 'unhandled');
+      continue;
+    }
+    
+    // Skip if already queued for auto-send
+    if (queuedMessageIds.has(msg.id)) {
+      console.log(`[Dashboard] Skipping actionable message ${msg.id} - already in auto-send queue`);
+      continue;
+    }
+    
+    // Now check if message should be excluded (categories, priority, age, etc.)
+    // But only if it doesn't have a held draft (which we already handled above)
+    if (shouldExcludeMessage(msg)) {
+      console.log(`[Dashboard] Skipping actionable message ${msg.id} - excluded by filter (category: ${msg.category}, priority: ${msg.priority}, age: ${msg.timestamp ? Math.round((Date.now() - new Date(msg.timestamp).getTime()) / (24 * 60 * 60 * 1000)) + ' days' : 'unknown'})`);
+      continue;
+    }
+    
     // Show the message if:
-    // - It has a draft held for review (needs human attention) - always show
     // - It has no draft at all (AI hasn't generated a response yet - needs human attention) - always show
     // Don't show if it has an auto-sendable draft (will be handled by auto-send cron)
     // Don't show if it was already auto-replied (already handled, no need for review)
-    if (heldDraft) {
-      // Always show held drafts - they need human review
-      addMessageToItems(msg, 'unhandled');
-    } else if (!hasAutoSendableDraft) {
+    if (!hasAutoSendableDraft) {
       // No auto-sendable draft - needs human attention
       addMessageToItems(msg, 'unhandled');
     } else if (autoSentDraft) {

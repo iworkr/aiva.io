@@ -229,7 +229,10 @@ export async function GET(request: NextRequest) {
       }
       
       // 4. Exclude reviewed but not handled
-      if (msg.reviewed_at && !msg.handled_by_aiva) {
+      // BUT: Don't exclude if they have scheduling_intent (scheduling items need attention even if reviewed)
+      // BUT: Don't exclude if they have a held draft (held drafts need human review regardless of reviewed status)
+      // Note: We can't check for held drafts here (draft info not available), so we'll check later in the actionable items loop
+      if (msg.reviewed_at && !msg.handled_by_aiva && msg.actionability !== 'scheduling_intent') {
         return true;
       }
       
@@ -249,6 +252,71 @@ export async function GET(request: NextRequest) {
       
       if (isSystemAuthLink) {
         return true; // System auth magic links - not actionable by AI
+      }
+      
+      // 6. Exclude personal and internal category messages (these are typically test messages or internal notes)
+      // BUT: Don't exclude if they have scheduling_intent (scheduling items need attention even if personal)
+      // Personal/internal messages are usually not business-critical and if they're actionable,
+      // they're likely test messages like "Hi Aiva!" or "Test Auto Send"
+      // Exception: Scheduling items (like "Lunch on Thursday") should show even if personal
+      if ((msg.category === 'personal' || msg.category === 'internal') && msg.actionability !== 'scheduling_intent') {
+        return true; // Personal/internal messages don't need attention in business context (unless scheduling)
+      }
+      
+      // 7. Exclude test messages in client_support category (these are misclassified test messages)
+      // Test messages from the user's own email in client_support should be filtered
+      // These are typically test messages like "Hi Aiva!", "Test Auto Send", "Does this work?"
+      const senderLower = (msg.sender_email || '').toLowerCase();
+      const subjectLower = (msg.subject || '').toLowerCase();
+      
+      // Check if this is a test message in client_support category
+      // Test messages often have short subjects, test-related keywords, or are from the user themselves
+      const isTestMessageInClientSupport = 
+        msg.category === 'client_support' &&
+        (
+          // Test-related keywords in subject
+          subjectLower.includes('test') ||
+          subjectLower.includes('hi aiva') ||
+          subjectLower.includes('aiva replies') ||
+          subjectLower.includes('auto reply') ||
+          subjectLower.includes('auto send') ||
+          subjectLower.includes('does this work') ||
+          subjectLower.includes('please help') ||
+          subjectLower.includes('help me aiva') ||
+          // Very short subjects (likely test messages)
+          (subjectLower.length < 15 && !subjectLower.includes('urgent') && !subjectLower.includes('important'))
+        );
+      
+      if (isTestMessageInClientSupport) {
+        return true; // Test messages in client_support don't need attention
+      }
+      
+      // 8. Exclude non-actionable client_support messages (feedback requests, promotional)
+      // Some client_support messages are just feedback requests or promotional and don't need urgent attention
+      if (msg.category === 'client_support') {
+        const subjectLower = (msg.subject || '').toLowerCase();
+        // Feedback requests (e.g., "Tell us how we did!")
+        if (subjectLower.includes('tell us how we did') || 
+            subjectLower.includes('how did we do') ||
+            subjectLower.includes('rate us') ||
+            subjectLower.includes('feedback')) {
+          return true; // Feedback requests don't need urgent attention
+        }
+        // Promotional support messages (e.g., "Want to test...")
+        if (subjectLower.includes('want to test') || 
+            subjectLower.includes('try our') ||
+            subjectLower.includes('still haven')) {
+          return true; // Promotional support messages don't need urgent attention
+        }
+      }
+      
+      // 9. Exclude welcome/onboarding messages in other categories
+      if (msg.category === 'other' || msg.category === 'client_support') {
+        const subjectLower = (msg.subject || '').toLowerCase();
+        if (subjectLower.includes('welcome to') || 
+            subjectLower.includes('confirm your email and launch')) {
+          return true; // Welcome/onboarding messages don't need urgent attention
+        }
       }
       
       // NOTE: Security alerts like "Verify phone number" or "Action needed on Facebook"
@@ -307,18 +375,41 @@ export async function GET(request: NextRequest) {
         d.body
       );
       
-      const isExcluded = shouldExcludeMessage(msg);
+      // If message has a held draft, always show it (needs human review regardless of other filters)
+      // This matches the dashboard logic where held drafts are checked BEFORE exclusion rules
+      if (heldDraft) {
+        const ageDays = msg.timestamp ? Math.round((Date.now() - new Date(msg.timestamp).getTime()) / (24 * 60 * 60 * 1000)) : null;
+        return {
+          messageId: msg.id,
+          subject: msg.subject,
+          senderEmail: msg.sender_email,
+          senderName: msg.sender_name,
+          timestamp: msg.timestamp,
+          ageDays,
+          actionability: msg.actionability,
+          category: msg.category,
+          priority: msg.priority,
+          handled_by_aiva: msg.handled_by_aiva,
+          reviewed_at: msg.reviewed_at,
+          hasDraft: drafts.length > 0,
+          hasHeldDraft: true,
+          hasAutoSendableDraft,
+          isExcluded: false, // Held drafts bypass exclusion
+          isQueued: queuedMessageIds.has(msg.id),
+          exclusionReason: null,
+          wouldAppear: !queuedMessageIds.has(msg.id), // Show unless queued
+          showReason: 'has_held_draft',
+        };
+      }
+      
       const isQueued = queuedMessageIds.has(msg.id);
+      const isExcluded = shouldExcludeMessage(msg);
       
       // Match dashboard logic exactly:
-      // Show if: heldDraft OR (!hasAutoSendableDraft)
-      // But only if not excluded and not queued
+      // Show if: (!hasAutoSendableDraft) AND not excluded AND not queued
       // CRITICAL: If hasAutoSendableDraft is true and there's no heldDraft, DON'T show
       // CRITICAL: If autoSentDraft, DON'T show (already handled, regardless of age)
-      const shouldShow = !isExcluded && !isQueued && (
-        !!heldDraft || 
-        !hasAutoSendableDraft
-      );
+      const shouldShow = !isExcluded && !isQueued && !hasAutoSendableDraft;
       
       // Calculate age for exclusion reason
       let ageDays = null;
