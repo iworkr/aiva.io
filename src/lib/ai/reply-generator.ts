@@ -518,6 +518,13 @@ REMEMBER: Missing information handling:
     const criticalMissingInfoTypes = ['pricing', 'commitment', 'availability', 'deadline', 'delivery_date'];
     const isCriticalMissingInfo = hasMissingInfo && criticalMissingInfoTypes.includes(missingInfoType);
     
+    // Check if message is a complaint - complaints should always require human review
+    const isComplaint = message.category === 'customer_complaint';
+    
+    // If AI marked as not auto-sendable, it should require human review
+    // (unless it was already auto-sent, which is handled separately)
+    const shouldRequireReviewIfNotAutoSendable = !result.isAutoSendable;
+    
     // Determine if draft should be held for human review
     // Hold if: 
     // 1. Message explicitly flagged for review
@@ -525,19 +532,27 @@ REMEMBER: Missing information handling:
     // 3. Low confidence (< 0.55)
     // 4. Critical missing information (pricing, commitments, etc.)
     // 5. Missing info AND AI says not auto-sendable AND confidence is below threshold
+    // 6. Message is a complaint (customer_complaint category)
+    // 7. AI marked as not auto-sendable (should always require review)
     // Note: Routine missing info (policy, shipping) with good confidence can still auto-send
     const shouldHoldForReview = needsHumanReview || 
       result.confidenceScore < 0.55 || 
       isCriticalMissingInfo ||
+      isComplaint ||
+      shouldRequireReviewIfNotAutoSendable ||
       (hasMissingInfo && !result.isAutoSendable && result.confidenceScore < 0.70);
     
     const finalReviewReason = reviewReason || 
-      (isCriticalMissingInfo ? `missing_information_${missingInfoType}` : 
+      (isComplaint ? 'customer_complaint' :
+       shouldRequireReviewIfNotAutoSendable ? 'not_auto_sendable' :
+       isCriticalMissingInfo ? `missing_information_${missingInfoType}` : 
        hasMissingInfo && !result.isAutoSendable ? `missing_information_${missingInfoType}` :
        result.confidenceScore < 0.55 ? 'low_confidence' : undefined);
     
     const finalUncertaintyNotes = aiUncertaintyNotes || 
-      (isCriticalMissingInfo ? `AI is missing critical information (${missingInfoType}) - human follow-up required` :
+      (isComplaint ? 'Customer complaint requires human review' :
+       shouldRequireReviewIfNotAutoSendable ? 'AI marked this message as not suitable for auto-send - human review required' :
+       isCriticalMissingInfo ? `AI is missing critical information (${missingInfoType}) - human follow-up required` :
        hasMissingInfo && !result.isAutoSendable ? `AI is missing information (${missingInfoType}) and marked as not auto-sendable` :
        result.confidenceScore < 0.55 
         ? `AI confidence is ${Math.round(result.confidenceScore * 100)}% - below threshold for auto-send`
@@ -550,6 +565,9 @@ REMEMBER: Missing information handling:
       shouldHoldForReview,
       hasMissingInfo,
       missingInfoType: hasMissingInfo ? missingInfoType : null,
+      isComplaint,
+      isAutoSendable: result.isAutoSendable,
+      shouldRequireReviewIfNotAutoSendable,
     });
 
     // Store draft in database
