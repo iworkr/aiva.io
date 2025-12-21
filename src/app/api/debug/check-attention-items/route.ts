@@ -318,6 +318,23 @@ export async function GET(request: NextRequest) {
         }
       }
       
+      // 10. Exclude messages from Aiva's own email (aivaioapp@gmail.com) in client_support category
+      // These are typically Aiva replying to itself from marketing threads and don't need attention
+      if (msg.category === 'client_support' && senderLower.includes('aivaioapp@gmail.com')) {
+        return true; // Aiva replying to itself from marketing threads
+      }
+      
+      // 11. Exclude promotional messages misclassified as customer_inquiry
+      // Messages from promotional domains like "createanything.com" that are misclassified
+      if (msg.category === 'customer_inquiry') {
+        // Check for promotional domains or subjects
+        if (senderLower.includes('createanything.com') ||
+            subjectLower.includes('saw you tried') ||
+            subjectLower.includes('try anything')) {
+          return true; // Promotional messages misclassified as customer inquiry
+        }
+      }
+      
       // NOTE: Security alerts like "Verify phone number" or "Action needed on Facebook"
       // are in security_alert category and are actionable, so they will show
       
