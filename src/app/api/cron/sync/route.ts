@@ -128,10 +128,13 @@ export async function GET(request: NextRequest) {
       console.log(`\n🔄 Syncing ${connection.provider}: ${connection.provider_account_name}...`);
       
       // Rate limit protection: Skip if last sync was less than 2 minutes ago
+      // Reduced from 5 minutes to 2 minutes to process messages faster
+      // Gmail quota: 1 billion quota units per day, ~250 units per message fetch
+      // This allows ~4000 messages per day, so 2 minutes is safe for most use cases
       if (connection.last_sync_at) {
         const lastSyncTime = new Date(connection.last_sync_at).getTime();
         const timeSinceLastSync = Date.now() - lastSyncTime;
-        const minSyncInterval = 5 * 60 * 1000; // 5 minutes minimum between syncs (Gmail quota protection)
+        const minSyncInterval = 2 * 60 * 1000; // 2 minutes minimum between syncs (reduced from 5 minutes)
         
         if (timeSinceLastSync < minSyncInterval) {
           const waitTime = Math.ceil((minSyncInterval - timeSinceLastSync) / 1000);
@@ -147,7 +150,7 @@ export async function GET(request: NextRequest) {
           case 'gmail':
             console.log('   📧 Starting Gmail sync...');
             syncResult = await syncGmailMessages(connection.id, connection.workspace_id, {
-              maxMessages: 10, // Reduced to 10 to avoid rate limiting
+              maxMessages: 25, // Increased from 10 to 25 to process more messages per run
               useAdminClient: true, // Critical: use admin client for cron jobs
             });
             break;
@@ -155,7 +158,7 @@ export async function GET(request: NextRequest) {
           case 'outlook':
             console.log('   📧 Starting Outlook sync...');
             syncResult = await syncOutlookMessages(connection.id, connection.workspace_id, {
-              maxMessages: 20,
+              maxMessages: 50, // Increased from 20 to 50 to process more messages per run
               useAdminClient: true, // Critical: use admin client for cron jobs
             });
             break;
@@ -215,13 +218,14 @@ export async function GET(request: NextRequest) {
 
         try {
           // Classify messages that are missing priority, category, or actionability
+          // Increased limit from 50 to 100 to process more messages per run
           const { data: unclassifiedMessages } = await supabase
             .from('messages')
             .select('id, subject')
             .eq('workspace_id', connection.workspace_id)
             .or('priority.is.null,category.is.null,actionability.is.null')
             .order('created_at', { ascending: false })
-            .limit(50);
+            .limit(100); // Increased from 50 to 100 to process more messages per run
 
           if (unclassifiedMessages && unclassifiedMessages.length > 0) {
             console.log(`   🤖 Classifying ${unclassifiedMessages.length} messages...`);

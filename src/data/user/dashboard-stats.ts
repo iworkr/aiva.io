@@ -191,7 +191,9 @@ export async function getNeedsAttentionItems(
 
   // Get messages that require human review
   // These are messages where AI is uncertain or needs human verification
-  // INCLUDING auto-replied messages (handle_action = 'auto_replied') so user can review what was sent
+  // IMPORTANT: Include ALL messages requiring human review, regardless of handled status
+  // The only filter is that they haven't been reviewed yet (reviewed_at IS NULL)
+  // This ensures users see all messages that need their attention, even if they were auto-handled
   const { data: reviewItems, error: reviewItemsError } = await supabase
     .from('messages')
     .select(`
@@ -224,8 +226,9 @@ export async function getNeedsAttentionItems(
     .eq('workspace_id', workspaceId)
     .eq('requires_human_review', true)
     .is('reviewed_at', null)
-    // Include unhandled items OR auto-replied items (so user can review what was auto-sent)
-    .or('handled_by_aiva.eq.false,handle_action.eq.auto_replied')
+    // REMOVED: .or('handled_by_aiva.eq.false,handle_action.eq.auto_replied')
+    // All messages requiring human review should appear, regardless of handled status
+    // The only requirement is that they haven't been reviewed yet (reviewed_at IS NULL)
     .order('timestamp', { ascending: false })
     .limit(limit * 2); // Get more to filter after
 
