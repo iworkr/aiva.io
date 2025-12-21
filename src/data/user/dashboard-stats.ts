@@ -366,8 +366,7 @@ export async function getNeedsAttentionItems(
     // 7. Exclude test messages in client_support category (these are misclassified test messages)
     // Test messages from the user's own email in client_support should be filtered
     // These are typically test messages like "Hi Aiva!", "Test Auto Send", "Does this work?"
-    const senderLower = (msg.sender_email || '').toLowerCase();
-    const subjectLower = (msg.subject || '').toLowerCase();
+    // Note: senderLower and subjectLower are already declared above
     
     // Check if this is a test message in client_support category
     // Test messages often have short subjects, test-related keywords, or are from the user themselves
@@ -393,8 +392,8 @@ export async function getNeedsAttentionItems(
     
     // 8. Exclude non-actionable client_support messages (feedback requests, promotional)
     // Some client_support messages are just feedback requests or promotional and don't need urgent attention
+    // Note: subjectLower is already declared above
     if (msg.category === 'client_support') {
-      const subjectLower = (msg.subject || '').toLowerCase();
       // Feedback requests (e.g., "Tell us how we did!")
       if (subjectLower.includes('tell us how we did') || 
           subjectLower.includes('how did we do') ||
@@ -411,8 +410,8 @@ export async function getNeedsAttentionItems(
     }
     
     // 9. Exclude welcome/onboarding messages in other categories
+    // Note: subjectLower is already declared above
     if (msg.category === 'other' || msg.category === 'client_support') {
-      const subjectLower = (msg.subject || '').toLowerCase();
       if (subjectLower.includes('welcome to') || 
           subjectLower.includes('confirm your email and launch')) {
         return true; // Welcome/onboarding messages don't need urgent attention
