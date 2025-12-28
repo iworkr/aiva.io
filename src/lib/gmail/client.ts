@@ -53,7 +53,20 @@ export async function refreshGmailToken(
   });
 
   if (!response.ok) {
-    throw new Error('Failed to refresh Gmail token');
+    const errorText = await response.text();
+    let errorMessage = 'Failed to refresh Gmail token';
+    try {
+      const errorData = JSON.parse(errorText);
+      if (errorData.error === 'invalid_grant') {
+        errorMessage = 'Gmail refresh token expired or revoked. Please reconnect your Gmail account.';
+      } else {
+        errorMessage = `Failed to refresh Gmail token: ${errorData.error || errorText}`;
+      }
+    } catch {
+      errorMessage = `Failed to refresh Gmail token: ${errorText}`;
+    }
+    console.error('[Gmail Token Refresh] Error:', errorMessage);
+    throw new Error(errorMessage);
   }
 
   const data = await response.json();

@@ -564,7 +564,9 @@ export async function POST(request: NextRequest) {
 
       if (store) {
         try {
-          console.log(`[Test] Triggering full Shopify sync for store ${store.id}`);
+          console.log(`[Shopify Manual Sync] Triggering full Shopify sync for store ${store.id} (${store.shop_domain})`);
+          console.log(`[Shopify Manual Sync] Workspace: ${finalWorkspaceId}`);
+          console.log(`[Shopify Manual Sync] Options: maxRecords=250, fullSync=true`);
           
           // Sync all data: orders, products, customers
           const fullSyncResult = await syncAllShopifyData(store.id, finalWorkspaceId, {
@@ -583,9 +585,34 @@ export async function POST(request: NextRequest) {
               ...(fullSyncResult.products.errors || []),
               ...(fullSyncResult.customers.errors || []),
             ],
+            orderDetails: {
+              success: fullSyncResult.orders.success,
+              created: fullSyncResult.orders.recordsCreated || 0,
+              updated: fullSyncResult.orders.recordsUpdated || 0,
+              errors: fullSyncResult.orders.errors || [],
+            },
+            productDetails: {
+              success: fullSyncResult.products.success,
+              created: fullSyncResult.products.recordsCreated || 0,
+              updated: fullSyncResult.products.recordsUpdated || 0,
+              errors: fullSyncResult.products.errors || [],
+            },
+            customerDetails: {
+              success: fullSyncResult.customers.success,
+              created: fullSyncResult.customers.recordsCreated || 0,
+              updated: fullSyncResult.customers.recordsUpdated || 0,
+              errors: fullSyncResult.customers.errors || [],
+            },
           };
           
-          console.log(`[Test] Sync completed:`, syncResult);
+          console.log(`[Shopify Manual Sync] Sync completed:`, {
+            success: syncResult.success,
+            ordersSynced: syncResult.ordersSynced,
+            productsSynced: syncResult.productsSynced,
+            customersSynced: syncResult.customersSynced,
+            totalRecordsSynced: syncResult.totalRecordsSynced,
+            errorCount: syncResult.errors.length,
+          });
         } catch (syncError) {
           console.error('[Test] Sync error:', syncError);
           syncResult = {
