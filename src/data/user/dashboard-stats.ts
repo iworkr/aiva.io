@@ -193,6 +193,7 @@ export async function getNeedsAttentionItems(
   // IMPORTANT: Include ALL messages requiring human review, regardless of handled status
   // The only filter is that they haven't been reviewed yet (reviewed_at IS NULL)
   // This ensures users see all messages that need their attention, even if they were auto-handled
+  // EXCLUDE test messages - they should be auto-handled, not require review
   const { data: reviewItems, error: reviewItemsError } = await supabase
     .from('messages')
     .select(`
@@ -209,6 +210,7 @@ export async function getNeedsAttentionItems(
       has_draft_reply,
       handled_by_aiva,
       handle_action,
+      raw_data,
       channel_connection:channel_connections(provider),
       message_drafts(
         id,
@@ -225,6 +227,8 @@ export async function getNeedsAttentionItems(
     .eq('workspace_id', workspaceId)
     .eq('requires_human_review', true)
     .is('reviewed_at', null)
+    // Exclude test messages - they should be auto-handled
+    .or('raw_data->test.is.null,raw_data->test.neq.true')
     // REMOVED: .or('handled_by_aiva.eq.false,handle_action.eq.auto_replied')
     // All messages requiring human review should appear, regardless of handled status
     // The only requirement is that they haven't been reviewed yet (reviewed_at IS NULL)
