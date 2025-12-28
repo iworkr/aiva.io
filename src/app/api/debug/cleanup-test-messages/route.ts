@@ -91,8 +91,8 @@ export async function GET(request: NextRequest) {
       .or('raw_data->test.eq.true,subject.ilike.%test:%')
       .or('handled_by_aiva.is.null,handled_by_aiva.eq.false');
 
-    if (updateError) {
-      console.error('[Cleanup] Failed to update test messages:', updateError);
+    if (directUpdateError) {
+      console.error('[Cleanup] Failed to directly update test messages:', directUpdateError);
     }
 
     // Return HTML response for easy browser viewing
