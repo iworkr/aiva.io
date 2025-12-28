@@ -581,6 +581,38 @@ export function BriefingSection({ items, workspaceId, userId }: BriefingSectionP
         {/* Show remaining items when expanded */}
         {isExpanded && remainingItems.map(renderItem)}
       </div>
+
+      {/* Dismiss Confirmation Dialog */}
+      <AlertDialog open={dismissConfirmOpen} onOpenChange={setDismissConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive this email?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will archive the email and mark it as handled. It will be removed from "What needs your attention" and archived in your email provider (Gmail/Outlook).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDismissItem}>Archive</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Clear All Confirmation Dialog */}
+      <AlertDialog open={clearAllConfirmOpen} onOpenChange={setClearAllConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive all emails?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will archive all {visibleItems.filter(item => item.type === 'message').length} email{visibleItems.filter(item => item.type === 'message').length !== 1 ? 's' : ''} and mark them as handled. They will be removed from "What needs your attention" and archived in your email provider (Gmail/Outlook).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmClearAll}>Archive All</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
