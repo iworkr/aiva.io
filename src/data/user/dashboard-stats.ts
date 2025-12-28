@@ -347,25 +347,18 @@ export async function getNeedsAttentionItems(
       }
     }
     
-    // 2. Exclude truly non-actionable categories (promotional/junk)
-    // BUT: If a message is actionable (request/question/scheduling_intent), it might need attention
-    // even if in these categories (e.g., "Action needed on your Facebook account" in notification category)
+    // 2. ALWAYS exclude promotional categories (marketing, junk_email, newsletter)
+    // These are automated emails (surveys, feedback requests, promotions) that should NEVER require human attention
+    // Even if they're "actionable" (asking for feedback), they're automated marketing and should be auto-handled
     const promotionalCategories = ['marketing', 'junk_email', 'newsletter'];
     if (msg.category && promotionalCategories.includes(msg.category.toLowerCase())) {
-      // Only exclude if it's NOT actionable - if it's actionable, it might need human attention
-      const isActionable = msg.actionability && ['request', 'question', 'scheduling_intent'].includes(msg.actionability);
-      if (!isActionable) {
-        return true;
-      }
+      return true; // Always exclude - marketing emails are automated and don't need human review
     }
     
-    // 3. Exclude messages with 'noise' priority (these are typically marketing/junk)
-    // BUT: If actionable, still show it (might be misclassified)
+    // 3. ALWAYS exclude messages with 'noise' priority (these are marketing/junk)
+    // Noise priority means it's promotional/automated and should never require human attention
     if (msg.priority === 'noise') {
-      const isActionable = msg.actionability && ['request', 'question', 'scheduling_intent'].includes(msg.actionability);
-      if (!isActionable) {
-        return true;
-      }
+      return true; // Always exclude - noise priority = automated marketing/junk
     }
     
     // 4. Exclude messages that have been reviewed but not handled

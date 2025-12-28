@@ -224,7 +224,7 @@ SECURITY/AUTH:
 - security_alert: Login notifications, password changes, suspicious activity alerts
 
 PROMOTIONAL/UPDATES:
-- marketing: Sales promotions, discounts, product launches
+- marketing: Sales promotions, discounts, product launches, feedback requests, surveys, automated follow-ups
 - junk_email: Obvious spam, phishing attempts, unwanted mass emails
 - newsletter: Regular newsletters, blog digests, periodic updates
 
@@ -471,6 +471,20 @@ Be consistent: similar messages should get similar classifications.`,
       } catch (handleError) {
         // Don't fail classification if handling fails
         console.error('[Classifier] Failed to auto-handle test message:', handleError);
+      }
+    }
+    
+    // Auto-handle marketing/newsletter/junk emails immediately (they're automated, don't need human review)
+    // These should be auto-handled regardless of actionability (even if they ask for feedback/surveys)
+    const promotionalCategories = ['marketing', 'newsletter', 'junk_email'];
+    if (result.category && promotionalCategories.includes(result.category) && !needsReview) {
+      try {
+        const { handleNoActionNeeded } = await import('@/lib/inbox-zero/handler');
+        await handleNoActionNeeded(messageId, workspaceId);
+        console.log(`[Classifier] Auto-handled promotional email (${result.category}): ${messageId}`);
+      } catch (handleError) {
+        // Don't fail classification if handling fails
+        console.error('[Classifier] Failed to auto-handle promotional email:', handleError);
       }
     }
     
