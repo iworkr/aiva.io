@@ -15,7 +15,7 @@ import { createSupabaseUserRouteHandlerClient } from '@/supabase-clients/user/cr
 import { NextRequest, NextResponse } from 'next/server';
 import { getCustomerOrderHistory, formatCustomerHistoryForAI } from '@/lib/shopify/context';
 import { createMessageAction } from '@/data/user/messages';
-import { syncShopifyOrders } from '@/lib/shopify/sync';
+import { syncShopifyOrders, syncShopifyProducts, syncShopifyCustomers, syncAllShopifyData } from '@/lib/shopify/sync';
 import { getActiveConnectionByProvider } from '@/data/user/channels';
 import { getSoloWorkspace } from '@/data/user/workspaces';
 
@@ -202,6 +202,10 @@ function generateHTML(data: any): string {
           <li>Shopify sync is enabled for your store</li>
           <li>Run a manual sync if needed</li>
         </ul>
+        <button class="button" onclick="triggerSync()" style="margin-top: 10px;">🔄 Trigger Manual Sync</button>
+      ` : shopifyStore ? `
+        <p>Store is connected. You can trigger a manual sync to fetch orders and products.</p>
+        <button class="button" onclick="triggerSync()">🔄 Trigger Manual Sync</button>
       ` : ''}
     </div>
 
@@ -548,10 +552,11 @@ export async function POST(request: NextRequest) {
     finalWorkspaceId = workspaceIdFromHelper;
 
     // Optionally trigger Shopify sync
+    let syncResult: any = null;
     if (triggerSync) {
       const { data: store } = await supabaseAdminClient
         .from('shopify_stores')
-        .select('id')
+        .select('id, shop_domain')
         .eq('workspace_id', finalWorkspaceId)
         .eq('is_active', true)
         .limit(1)
@@ -559,15 +564,40 @@ export async function POST(request: NextRequest) {
 
       if (store) {
         try {
-          console.log(`[Test] Triggering Shopify sync for store ${store.id}`);
-          await syncShopifyOrders(store.id, finalWorkspaceId, {
-            maxRecords: 100,
-            fullSync: false,
+          console.log(`[Test] Triggering full Shopify sync for store ${store.id}`);
+          
+          // Sync all data: orders, products, customers
+          const fullSyncResult = await syncAllShopifyData(store.id, finalWorkspaceId, {
+            maxRecords: 250,
+            fullSync: true, // Full sync to get all data
           });
+          
+          syncResult = {
+            ordersSynced: fullSyncResult.orders.recordsSynced || 0,
+            productsSynced: fullSyncResult.products.recordsSynced || 0,
+            customersSynced: fullSyncResult.customers.recordsSynced || 0,
+            totalRecordsSynced: fullSyncResult.totalRecordsSynced,
+            success: fullSyncResult.orders.success && fullSyncResult.products.success && fullSyncResult.customers.success,
+            errors: [
+              ...(fullSyncResult.orders.errors || []),
+              ...(fullSyncResult.products.errors || []),
+              ...(fullSyncResult.customers.errors || []),
+            ],
+          };
+          
+          console.log(`[Test] Sync completed:`, syncResult);
         } catch (syncError) {
           console.error('[Test] Sync error:', syncError);
-          // Continue anyway - we'll create the test message
+          syncResult = {
+            error: syncError instanceof Error ? syncError.message : 'Unknown sync error',
+            success: false,
+          };
         }
+      } else {
+        syncResult = {
+          error: 'Store not found for workspace',
+          success: false,
+        };
       }
     }
 
@@ -625,20 +655,25 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Test message created successfully',
-      testMessage: {
+      message: triggerSync ? 'Sync triggered successfully' : 'Test message created successfully',
+      testMessage: triggerSync ? null : {
         id: messageId,
         subject,
         senderEmail: email,
         created: true,
       },
+      syncResult,
       shopifyContext: {
         orderCount: customerHistory?.orderCount || 0,
         totalSpent: customerHistory?.totalSpent || 0,
         formattedContext: formattedContext || '(no orders found)',
         willBeIncluded: (customerHistory?.orderCount || 0) > 0,
       },
-      nextSteps: [
+      nextSteps: triggerSync ? [
+        '1. Refresh this page to see updated order/product counts',
+        '2. Check if orders now appear for the test email',
+        '3. If orders still don\'t appear, check Vercel logs for sync errors',
+      ] : [
         '1. Go to your inbox and find the test message',
         '2. Click "Generate Reply" to see if AI includes order context',
         '3. Check the AI draft - it should reference the customer\'s order history if orders exist',
