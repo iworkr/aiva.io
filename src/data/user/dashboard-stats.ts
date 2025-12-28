@@ -737,6 +737,10 @@ export async function getNeedsAttentionItems(
     }
   }
 
+  // Log the final count for debugging
+  console.log(`[Dashboard] Final attention items count: ${finalItems.length} (requested limit: ${limit})`);
+  console.log(`[Dashboard] Breakdown: ${finalItems.filter(i => i.type === 'review').length} review items, ${finalItems.filter(i => i.type === 'unhandled').length} unhandled items`);
+  
   return finalItems;
 }
 
