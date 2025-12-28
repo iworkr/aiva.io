@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseUserRouteHandlerClient } from '@/supabase-clients/user/createSupabaseUserRouteHandlerClient';
+import { getNeedsAttentionItems } from '@/data/user/dashboard-stats';
 
 export async function GET(request: NextRequest) {
   try {
@@ -137,6 +138,37 @@ export async function GET(request: NextRequest) {
         .filter(Boolean)
     );
 
+    // Get actionable items count (what actually shows in dashboard with Zero Inbox)
+    // This uses the same filtering logic as getNeedsAttentionItems
+    let actionableItemsCount = 0;
+    let actionableConversationsCount = 0;
+    if (isZeroInboxEnabled && user) {
+      try {
+        const attentionItems = await getNeedsAttentionItems(workspaceId, user.id, 100);
+        actionableItemsCount = attentionItems.length;
+        
+        // Count unique threads from actionable items
+        if (attentionItems.length > 0) {
+          const messageIds = attentionItems.map(item => item.messageId);
+          const { data: actionableThreads } = await supabase
+            .from('messages')
+            .select('provider_thread_id')
+            .eq('workspace_id', workspaceId)
+            .in('id', messageIds)
+            .not('provider_thread_id', 'is', null);
+          
+          const uniqueActionableThreads = new Set(
+            (actionableThreads || [])
+              .map((msg: any) => msg.provider_thread_id)
+              .filter(Boolean)
+          );
+          actionableConversationsCount = uniqueActionableThreads.size;
+        }
+      } catch (error) {
+        console.error('Error getting actionable items:', error);
+      }
+    }
+
     return NextResponse.json({
       workspaceId,
       zeroInboxSettings: {
@@ -149,19 +181,22 @@ export async function GET(request: NextRequest) {
         handled: handledCount || 0,
         unhandled: unhandledCount || 0,
         unreadAll: unreadAllCount || 0,
-        unreadUnhandled: unreadUnhandledCount || 0, // This is what should show in MorningBrief
+        unreadUnhandled: unreadUnhandledCount || 0, // Raw count of unread unhandled
         requiresReview: requiresReviewCount || 0,
         requiresReviewUnhandled: requiresReviewUnhandledCount || 0,
+        actionableItems: actionableItemsCount, // What actually shows in dashboard (with filtering)
       },
       activeConversations: {
-        uniqueThreadsWithUnhandled: uniqueThreads.size,
+        uniqueThreadsWithUnhandled: uniqueThreads.size, // Raw count
+        actionableConversations: actionableConversationsCount, // What actually shows (with filtering)
       },
       handleActionBreakdown: actionCounts,
       sampleUnreadUnhandled: sampleUnreadUnhandled || [],
       analysis: {
         expectedMorningBriefCount: isZeroInboxEnabled
-          ? unreadUnhandledCount || 0
+          ? actionableItemsCount // Use actionable items count, not raw unread unhandled
           : unreadAllCount || 0,
+        rawUnreadUnhandledCount: unreadUnhandledCount || 0, // Raw count for reference
         messagesThatShouldBeHandled: unreadUnhandledCount || 0,
         messagesRequiringReview: requiresReviewUnhandledCount || 0,
       },
