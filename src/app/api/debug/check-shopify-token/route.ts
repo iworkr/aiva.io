@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
             '3. Reinstall it (this triggers OAuth and gets a fresh token)',
             '4. Check Vercel logs for /api/shopify/auth/callback to see the new token',
             '',
-            `Current token was installed: ${new Date(store.installed_at).toLocaleString()}`,
+            `Current token was installed: ${store.installed_at ? new Date(store.installed_at).toLocaleString() : 'Unknown'}`,
             verificationResult.error ? `Error: ${verificationResult.error}` : '',
           ]
         : ['Token is valid and working!'],
