@@ -79,6 +79,11 @@ export async function GET(request: NextRequest) {
       } catch (error) {
         verificationResult.valid = false;
         verificationResult.error = error instanceof Error ? error.message : String(error);
+        verificationResult.errorDetails = error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack?.split('\n').slice(0, 5), // First 5 lines of stack
+        } : String(error);
       }
     }
 
@@ -102,11 +107,18 @@ export async function GET(request: NextRequest) {
         ? ['Token is too short. Shopify tokens are typically 40+ characters. Token may be truncated.']
         : !verificationResult.valid
         ? [
-            'Token verification failed. Possible causes:',
-            '1. Token was revoked in Shopify',
-            '2. App was uninstalled',
-            '3. Token is corrupted or truncated',
-            '4. Check OAuth callback logs to see what token Shopify returned',
+            'Token verification failed. The token exists but is invalid.',
+            '',
+            '⚠️ IMPORTANT: "Relinking" in the UI does NOT refresh the token!',
+            '',
+            'To get a fresh token, you must:',
+            '1. Go to Shopify Admin → Apps → Installed apps',
+            '2. Uninstall the Aiva app',
+            '3. Reinstall it (this triggers OAuth and gets a fresh token)',
+            '4. Check Vercel logs for /api/shopify/auth/callback to see the new token',
+            '',
+            `Current token was installed: ${new Date(store.installed_at).toLocaleString()}`,
+            verificationResult.error ? `Error: ${verificationResult.error}` : '',
           ]
         : ['Token is valid and working!'],
     });

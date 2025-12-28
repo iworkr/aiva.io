@@ -239,7 +239,13 @@ export async function verifyShopAccess(
     await getShopInfo(shopDomain, accessToken);
     return true;
   } catch (error) {
-    console.error('Shop access verification failed:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Shop access verification failed:', {
+      shopDomain,
+      tokenLength: accessToken.length,
+      tokenPreview: `${accessToken.substring(0, 20)}...`,
+      error: errorMessage,
+    });
     return false;
   }
 }
