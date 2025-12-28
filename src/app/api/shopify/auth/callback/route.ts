@@ -72,7 +72,14 @@ export async function GET(request: NextRequest) {
     const state = searchParams.get('state');
     const hmac = searchParams.get('hmac');
 
-    console.log('🟢 Shopify callback received:', { shop, hasCode: !!code, hasState: !!state });
+    console.log('🟢 [OAuth Callback] Callback received:', { 
+      shop, 
+      hasCode: !!code, 
+      hasState: !!state,
+      hasHmac: !!hmac,
+      url: request.url,
+      timestamp: new Date().toISOString(),
+    });
 
     // Validate required parameters
     if (!code || !shop || !state) {
@@ -267,7 +274,9 @@ export async function GET(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error('Shopify OAuth callback error:', error);
+    console.error('❌ [OAuth Callback] Error:', error);
+    console.error('❌ [OAuth Callback] Error stack:', error instanceof Error ? error.stack : 'No stack');
+    console.error('❌ [OAuth Callback] Request URL:', request.url);
     return NextResponse.redirect(
       new URL('/en/integrations?error=callback_failed', request.url)
     );
