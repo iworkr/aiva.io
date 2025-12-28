@@ -38,6 +38,16 @@ import { rejectReviewItemAction, bulkDismissReviewItemsAction } from '@/data/use
 import { useAction } from 'next-safe-action/hooks';
 import { Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface BriefingItem {
   id: string;
@@ -65,6 +75,9 @@ export function BriefingSection({ items, workspaceId, userId }: BriefingSectionP
   const [isSendingReply, setIsSendingReply] = useState(false);
   const [completedItems, setCompletedItems] = useState<Set<string>>(new Set());
   const [dismissedItems, setDismissedItems] = useState<Set<string>>(new Set()); // Optimistic dismissals
+  const [dismissConfirmOpen, setDismissConfirmOpen] = useState(false);
+  const [itemToDismiss, setItemToDismiss] = useState<BriefingItem | null>(null);
+  const [clearAllConfirmOpen, setClearAllConfirmOpen] = useState(false);
   const router = useRouter();
   
   // Filter out dismissed items for instant UI update
@@ -101,15 +114,10 @@ export function BriefingSection({ items, workspaceId, userId }: BriefingSectionP
     e.preventDefault();
     e.stopPropagation();
     
-    // Optimistic update - remove from UI immediately
-    setDismissedItems(prev => new Set(prev).add(item.id));
-    
     if (item.type === 'message' && item.messageId && workspaceId) {
-      dismissItem({
-        workspaceId,
-        messageId: item.messageId,
-        action: 'rejected',
-      });
+      // Show confirmation dialog for messages
+      setItemToDismiss(item);
+      setDismissConfirmOpen(true);
     } else {
       // For non-message items, just mark as completed locally
       setCompletedItems(prev => new Set(prev).add(item.id));
@@ -117,8 +125,40 @@ export function BriefingSection({ items, workspaceId, userId }: BriefingSectionP
     }
   };
 
+  const confirmDismissItem = () => {
+    if (!itemToDismiss) return;
+    
+    // Optimistic update - remove from UI immediately
+    setDismissedItems(prev => new Set(prev).add(itemToDismiss.id));
+    
+    if (itemToDismiss.type === 'message' && itemToDismiss.messageId && workspaceId) {
+      dismissItem({
+        workspaceId,
+        messageId: itemToDismiss.messageId,
+        action: 'rejected',
+      });
+    }
+    
+    setDismissConfirmOpen(false);
+    setItemToDismiss(null);
+  };
+
   const handleClearAll = () => {
     if (visibleItems.length === 0) return;
+    const messageItems = visibleItems.filter(item => item.type === 'message' && item.messageId);
+    
+    if (messageItems.length > 0) {
+      // Show confirmation dialog if there are messages
+      setClearAllConfirmOpen(true);
+    } else {
+      // If no message items, just mark all as completed locally
+      const allIds = new Set(visibleItems.map(item => item.id));
+      setCompletedItems(allIds);
+      toast.success('All items dismissed');
+    }
+  };
+
+  const confirmClearAll = () => {
     const messageItems = visibleItems.filter(item => item.type === 'message' && item.messageId);
     
     // Optimistic update - remove all from UI immediately
@@ -132,11 +172,9 @@ export function BriefingSection({ items, workspaceId, userId }: BriefingSectionP
         messageIds,
         action: 'rejected',
       });
-    } else {
-      // If no message items, just mark all as completed locally
-      setCompletedItems(allIds);
-      toast.success('All items dismissed');
     }
+    
+    setClearAllConfirmOpen(false);
   };
 
   // Always render something, even if no items

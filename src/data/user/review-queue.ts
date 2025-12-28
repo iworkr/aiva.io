@@ -326,6 +326,7 @@ export const approveReviewItemAction = authActionClient
 
 /**
  * Reject a review item - dismiss without sending
+ * This will archive the message and mark it as handled
  */
 export const rejectReviewItemAction = authActionClient
   .schema(markReviewedSchema)
@@ -359,6 +360,27 @@ export const rejectReviewItemAction = authActionClient
       .eq('message_id', messageId)
       .eq('status', 'pending');
 
+    // Archive the message (mark as handled) - this ensures it doesn't reappear after refresh
+    const { markMessageHandled } = await import('@/lib/inbox-zero/handler');
+    await markMessageHandled(messageId, workspaceId, {
+      action: 'manually_dismissed',
+      userId,
+      markRead: true,
+      archive: true, // Archive in provider (Gmail/Outlook)
+      applyLabel: true, // Apply "Handled by Aiva" label
+    });
+
+    // Also update status to archived for backward compatibility
+    await supabase
+      .from('messages')
+      .update({
+        status: 'archived',
+        is_read: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', messageId)
+      .eq('workspace_id', workspaceId);
+
     // Log the review action
     await supabase.from('auto_send_log').insert({
       workspace_id: workspaceId,
@@ -371,11 +393,13 @@ export const rejectReviewItemAction = authActionClient
     });
 
     revalidatePath('/inbox');
+    revalidatePath('/'); // Revalidate dashboard to update attention items
     return { success: true };
   });
 
 /**
  * Bulk dismiss multiple review items
+ * This will archive all messages and mark them as handled
  */
 export const bulkDismissReviewItemsAction = authActionClient
   .schema(bulkDismissSchema)
@@ -414,6 +438,27 @@ export const bulkDismissReviewItemsAction = authActionClient
       .update({ status: 'cancelled' })
       .in('message_id', messageIds)
       .eq('status', 'pending');
+
+    // Archive all messages (mark as handled) - this ensures they don't reappear after refresh
+    const { batchMarkMessagesHandled } = await import('@/lib/inbox-zero/handler');
+    await batchMarkMessagesHandled(messageIds, workspaceId, {
+      action: 'manually_dismissed',
+      userId,
+      markRead: true,
+      archive: true, // Archive in provider (Gmail/Outlook)
+      applyLabel: true, // Apply "Handled by Aiva" label
+    });
+
+    // Also update status to archived for backward compatibility
+    await supabase
+      .from('messages')
+      .update({
+        status: 'archived',
+        is_read: true,
+        updated_at: now,
+      })
+      .in('id', messageIds)
+      .eq('workspace_id', workspaceId);
 
     // Log the bulk review action
     await supabase.from('auto_send_log').insert(
