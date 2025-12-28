@@ -398,10 +398,19 @@ Be consistent: similar messages should get similar classifications.`,
     }
 
     // Check if this is a test message - test messages should be auto-handled, not require review
+    // Detect test messages by:
+    // 1. raw_data.test flag (explicitly marked as test)
+    // 2. Subject contains "test:" prefix or is just "test"
+    // 3. Body is just "test" or "test 2" or "test 3" (common test patterns)
+    // 4. From example.com domain
+    const bodyTrimmed = lowerBody.trim();
     const isTestMessage = (message.raw_data as any)?.test === true || 
                           (message.raw_data as any)?.testType !== undefined ||
-                          message.subject?.toLowerCase().includes('test:') ||
-                          (message.body?.toLowerCase().includes('test') && message.sender_email?.includes('example.com'));
+                          lowerSubject.includes('test:') ||
+                          lowerSubject === 'test' ||
+                          bodyTrimmed === 'test' ||
+                          /^test\s*\d*$/i.test(bodyTrimmed) || // "test", "test 2", "test 3", etc.
+                          (lowerBody.includes('test') && message.sender_email?.includes('example.com'));
     
     // Determine if human review is needed (either AI detected or low confidence)
     // BUT: Test messages should not require review - they should be auto-handled

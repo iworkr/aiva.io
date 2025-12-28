@@ -327,14 +327,21 @@ export async function getNeedsAttentionItems(
     handled_by_aiva?: boolean | null;
     actionability?: string | null;
     subject?: string | null;
+    snippet?: string | null;
     sender_email?: string | null;
     raw_data?: any;
   }): boolean => {
     // 0. Exclude test messages - they should be auto-handled, not shown in attention items
+    // Detect test messages by: raw_data.test flag, "test:" prefix, or snippet is just "test"/"test 2"/"test 3"
+    const msgSubjectLower = (msg.subject || "").toLowerCase();
+    const msgSnippetLower = (msg.snippet || "").toLowerCase().trim();
     const isTestMessage = msg.raw_data?.test === true || 
                           msg.raw_data?.testType !== undefined ||
-                          msg.subject?.toLowerCase().includes('test:') ||
-                          (msg.subject?.toLowerCase().includes('test') && msg.sender_email?.includes('example.com'));
+                          msgSubjectLower.includes('test:') ||
+                          msgSubjectLower === 'test' ||
+                          msgSnippetLower === 'test' ||
+                          /^test\s*\d*$/i.test(msgSnippetLower) || // "test", "test 2", "test 3", etc.
+                          (msgSubjectLower.includes('test') && msg.sender_email?.includes('example.com'));
     if (isTestMessage) {
       return true; // Test messages should not appear in attention items
     }
@@ -572,10 +579,12 @@ export async function getNeedsAttentionItems(
       continue;
     }
     
-    // Skip if already queued for auto-send
-    if (queuedMessageIds.has(msg.id)) {
-      console.log(`[Dashboard] Skipping actionable message ${msg.id} - already in auto-send queue`);
-      continue;
+    // If queued for auto-send, show it so user knows it's pending (will be sent soon)
+    // Don't skip - user should see messages that are queued for auto-send
+    const isQueuedForAutoSend = queuedMessageIds.has(msg.id);
+    if (isQueuedForAutoSend) {
+      console.log(`[Dashboard] Message ${msg.id} is queued for auto-send - showing in attention items`);
+      // Continue to show it - don't skip
     }
     
     // Now check if message should be excluded (categories, priority, age, etc.)
@@ -594,7 +603,8 @@ export async function getNeedsAttentionItems(
     
     // Show the message if:
     // - It has no draft at all (AI hasn't generated a response yet - needs human attention) - always show
-    // Don't show if it has an auto-sendable draft (will be handled by auto-send cron)
+    // - It's queued for auto-send (user should see pending messages)
+    // Don't show if it has an auto-sendable draft AND not queued (will be handled by auto-send cron)
     // Don't show if it was already auto-replied (already handled, no need for review)
     if (!hasAutoSendableDraft) {
       // No auto-sendable draft - needs human attention
@@ -602,8 +612,12 @@ export async function getNeedsAttentionItems(
     } else if (autoSentDraft) {
       // Was already auto-replied - don't show (already handled, regardless of age)
       console.log(`[Dashboard] Skipping actionable message ${msg.id} - was already auto-replied (handled)`);
+    } else if (isQueuedForAutoSend) {
+      // Queued for auto-send - show it so user knows it's pending
+      addMessageToItems(msg, 'unhandled');
+      console.log(`[Dashboard] Showing actionable message ${msg.id} - queued for auto-send (pending)`);
     } else {
-      // Has auto-sendable draft - will be handled by auto-send cron
+      // Has auto-sendable draft but not queued - will be handled by auto-send cron
       console.log(`[Dashboard] Skipping actionable message ${msg.id} - has auto-sendable draft (will be handled by auto-send cron)`);
     }
   }
