@@ -57,9 +57,12 @@ const updateAutoSendSettingsSchema = z.object({
   autoSendDelayType: z.enum(['exact', 'random']).optional(),
   autoSendDelayMin: z.number().min(1).max(120).optional(),
   autoSendDelayMax: z.number().min(1).max(120).optional(),
-  autoSendConfidenceThreshold: z.number().min(0.50).max(0.95).optional(), // Lowered to 50%
+  autoSendConfidenceThreshold: z.number().min(0.50).max(0.95).optional(), // Unified threshold (50-95%)
   autoSendTimeStart: z.string().optional(), // "HH:MM" format
   autoSendTimeEnd: z.string().optional(),   // "HH:MM" format
+  humanReviewForScheduling: z.boolean().optional(),
+  humanReviewForCommitments: z.boolean().optional(),
+  humanReviewForSensitive: z.boolean().optional(),
 });
 
 const pauseAutoSendSchema = z.object({

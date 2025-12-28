@@ -178,12 +178,10 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   const [senderCooldownMinutes, setSenderCooldownMinutes] = useState(60);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
-  // Human review settings state
-  const [humanReviewEnabled, setHumanReviewEnabled] = useState(true);
+  // Human review settings state (review triggers only, threshold is now unified)
   const [humanReviewForScheduling, setHumanReviewForScheduling] = useState(true);
   const [humanReviewForCommitments, setHumanReviewForCommitments] = useState(true);
   const [humanReviewForSensitive, setHumanReviewForSensitive] = useState(true);
-  const [humanReviewConfidenceThreshold, setHumanReviewConfidenceThreshold] = useState(0.60);
   
   // Inbox Zero settings state
   const [inboxZeroEnabled, setInboxZeroEnabled] = useState(true);
@@ -885,6 +883,28 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
     triggerFilterSave({ senderCooldownMinutes: value });
   };
 
+  // Human review trigger settings handlers
+  const handleHumanReviewForSchedulingChange = (value: boolean) => {
+    setHumanReviewForScheduling(value);
+    triggerAutoSendSave({ 
+      humanReviewForScheduling: value 
+    } as any);
+  };
+
+  const handleHumanReviewForCommitmentsChange = (value: boolean) => {
+    setHumanReviewForCommitments(value);
+    triggerAutoSendSave({ 
+      humanReviewForCommitments: value 
+    } as any);
+  };
+
+  const handleHumanReviewForSensitiveChange = (value: boolean) => {
+    setHumanReviewForSensitive(value);
+    triggerAutoSendSave({ 
+      humanReviewForSensitive: value 
+    } as any);
+  };
+
   // Mark as initialized after first data load
   useEffect(() => {
     if (settingsInitialized && !hasInitializedRef.current) {
@@ -1334,6 +1354,15 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                       </div>
                     </div>
 
+                    {!autoSendEnabled && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-3">
+                        <p className="text-sm text-amber-700 dark:text-amber-300">
+                          <AlertTriangle className="inline h-4 w-4 mr-1" />
+                          Auto-reply is disabled. All AI-drafted responses will require your review before sending.
+                        </p>
+                      </div>
+                    )}
+
                     {autoSendEnabled && (
                       <>
                         <Separator />
@@ -1372,13 +1401,13 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
 
                         <Separator />
 
-                        {/* Confidence Threshold */}
+                        {/* Unified Confidence Threshold */}
                         <div className="space-y-4">
                           <div className="flex items-center justify-between">
                             <div className="space-y-0.5">
                               <Label>Confidence Threshold</Label>
                               <p className="text-sm text-muted-foreground">
-                                Only auto-send when AI confidence is above this level
+                                Only auto-send when AI confidence is above this level. Below this level, drafts will be created and require your review.
                               </p>
                             </div>
                             <span className="text-lg font-bold text-primary">
@@ -1396,6 +1425,67 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                           <div className="flex justify-between text-xs text-muted-foreground">
                             <span>50% (more auto-sends)</span>
                             <span>95% (only very confident)</span>
+                          </div>
+                        </div>
+
+                        <Separator />
+
+                        {/* Review Triggers - Advanced Settings */}
+                        <div className="space-y-3">
+                          <div className="space-y-0.5">
+                            <Label>Hold for Review When:</Label>
+                            <p className="text-sm text-muted-foreground">
+                              Additional scenarios that always require review, regardless of confidence level
+                            </p>
+                          </div>
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                              <div className="flex items-center gap-3">
+                                <Calendar className="h-4 w-4 text-blue-500" />
+                                <div>
+                                  <p className="text-sm font-medium">Scheduling Confirmations</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    "Are we still on for lunch?" - Verifies calendar first
+                                  </p>
+                                </div>
+                              </div>
+                              <Switch
+                                checked={humanReviewForScheduling}
+                                onCheckedChange={handleHumanReviewForSchedulingChange}
+                              />
+                            </div>
+
+                            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                              <div className="flex items-center gap-3">
+                                <Check className="h-4 w-4 text-purple-500" />
+                                <div>
+                                  <p className="text-sm font-medium">Commitment Requests</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Deadlines, prices, deliverables AI cannot verify
+                                  </p>
+                                </div>
+                              </div>
+                              <Switch
+                                checked={humanReviewForCommitments}
+                                onCheckedChange={handleHumanReviewForCommitmentsChange}
+                              />
+                            </div>
+
+                            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                              <div className="flex items-center gap-3">
+                                <Shield className="h-4 w-4 text-red-500" />
+                                <div>
+                                  <p className="text-sm font-medium">Sensitive Topics</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Legal, HR, complaints requiring escalation
+                                  </p>
+                                </div>
+                              </div>
+                              <Switch
+                                checked={humanReviewForSensitive}
+                                onCheckedChange={handleHumanReviewForSensitiveChange}
+                              />
+                            </div>
                           </div>
                         </div>
 
@@ -1692,133 +1782,6 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
               </Card>
             )}
 
-            {/* Human Review Settings Card - Only show when auto-reply is enabled */}
-            {hasPro && autoSendEnabled && (
-              <Card className="border-amber-500/20">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-xl font-bold flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-amber-500" />
-                    Human Review Required
-                  </CardTitle>
-                  <CardDescription className="text-base">
-                    The AI will pause and ask for your approval when it detects uncertainty
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Master Toggle */}
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="human-review-enabled">Enable Smart Review</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Hold auto-replies when AI is uncertain and needs human verification
-                      </p>
-                    </div>
-                    <Switch
-                      id="human-review-enabled"
-                      checked={humanReviewEnabled}
-                      onCheckedChange={setHumanReviewEnabled}
-                    />
-                  </div>
-
-                  {humanReviewEnabled && (
-                    <>
-                      <Separator />
-
-                      {/* Review Triggers */}
-                      <div className="space-y-3">
-                        <Label>Hold for Review When:</Label>
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                            <div className="flex items-center gap-3">
-                              <Calendar className="h-4 w-4 text-blue-500" />
-                              <div>
-                                <p className="text-sm font-medium">Scheduling Confirmations</p>
-                                <p className="text-xs text-muted-foreground">
-                                  "Are we still on for lunch?" - Verifies calendar first
-                                </p>
-                              </div>
-                            </div>
-                            <Switch
-                              checked={humanReviewForScheduling}
-                              onCheckedChange={setHumanReviewForScheduling}
-                            />
-                          </div>
-
-                          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                            <div className="flex items-center gap-3">
-                              <Check className="h-4 w-4 text-purple-500" />
-                              <div>
-                                <p className="text-sm font-medium">Commitment Requests</p>
-                                <p className="text-xs text-muted-foreground">
-                                  Deadlines, prices, deliverables AI cannot verify
-                                </p>
-                              </div>
-                            </div>
-                            <Switch
-                              checked={humanReviewForCommitments}
-                              onCheckedChange={setHumanReviewForCommitments}
-                            />
-                          </div>
-
-                          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                            <div className="flex items-center gap-3">
-                              <Shield className="h-4 w-4 text-red-500" />
-                              <div>
-                                <p className="text-sm font-medium">Sensitive Topics</p>
-                                <p className="text-xs text-muted-foreground">
-                                  Legal, HR, complaints requiring escalation
-                                </p>
-                              </div>
-                            </div>
-                            <Switch
-                              checked={humanReviewForSensitive}
-                              onCheckedChange={setHumanReviewForSensitive}
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <Separator />
-
-                      {/* Confidence Threshold for Review */}
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-0.5">
-                            <Label>Review Confidence Threshold</Label>
-                            <p className="text-sm text-muted-foreground">
-                              Hold for review when AI confidence is below this level
-                            </p>
-                          </div>
-                          <span className="text-lg font-bold text-amber-500">
-                            {Math.round(humanReviewConfidenceThreshold * 100)}%
-                          </span>
-                        </div>
-                        <Slider
-                          value={[humanReviewConfidenceThreshold * 100]}
-                          onValueChange={(v) => setHumanReviewConfidenceThreshold(v[0] / 100)}
-                          min={40}
-                          max={80}
-                          step={5}
-                          className="w-full"
-                        />
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>40% (fewer holds)</span>
-                          <span>80% (more holds)</span>
-                        </div>
-                      </div>
-
-                      <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-3">
-                        <p className="text-sm text-amber-700 dark:text-amber-300">
-                          <AlertTriangle className="inline h-4 w-4 mr-1" />
-                          Messages held for review will appear in your inbox with a review badge.
-                          You can approve, edit, or dismiss them before they&apos;re sent.
-                        </p>
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            )}
 
             {/* Inbox Zero Settings Card */}
             {hasPro && (

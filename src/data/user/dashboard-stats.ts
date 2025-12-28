@@ -254,16 +254,8 @@ export async function getNeedsAttentionItems(
     console.log(`[Dashboard] Found ${reviewItems?.length || 0} messages requiring review`);
   }
 
-  // Get workspace settings to check Zero Inbox
-  const { data: workspaceSettingsForZeroInbox } = await supabase
-    .from('workspace_settings')
-    .select('inbox_zero_enabled')
-    .eq('workspace_id', workspaceId)
-    .single();
-  
-  const isZeroInboxEnabled = workspaceSettingsForZeroInbox?.inbox_zero_enabled ?? true;
-
   // Also get actionable messages (request, question, scheduling_intent) that are unhandled
+  // Note: isZeroInboxEnabled is already declared above (line 198)
   // These should appear in "What needs your attention" if:
   // 1. They're not in excluded categories
   // 2. They're unhandled (CRITICAL: With Zero Inbox, handled messages should NOT appear)
