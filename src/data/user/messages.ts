@@ -47,6 +47,15 @@ export const getMessagesAction = authActionClient
 
     const supabase = await createSupabaseUserServerActionClient();
 
+    // Check if Zero Inbox is enabled - if so, exclude handled messages from inbox
+    const { data: workspaceSettings } = await supabase
+      .from('workspace_settings')
+      .select('inbox_zero_enabled')
+      .eq('workspace_id', workspaceId)
+      .single();
+    
+    const isZeroInboxEnabled = workspaceSettings?.inbox_zero_enabled ?? true;
+
     // Get list of unsubscribed contact emails to filter out
     const { data: unsubscribedContacts } = await supabase
       .from('contacts')
@@ -78,6 +87,12 @@ export const getMessagesAction = authActionClient
         { count: 'exact' }
       )
       .eq('workspace_id', workspaceId);
+    
+    // CRITICAL: With Zero Inbox enabled, exclude handled messages from inbox
+    // Handled messages should not appear in the inbox list
+    if (isZeroInboxEnabled) {
+      query = query.eq('handled_by_aiva', false);
+    }
 
     // Filter out messages from unsubscribed contacts
     if (unsubscribedEmails.length > 0) {
@@ -843,8 +858,9 @@ export const archiveMessageAction = authActionClient
       throw new Error(`Failed to archive message: ${error.message}`);
     }
 
-    revalidatePath(`/inbox`);
-    revalidatePath(`/en/dashboard`); // Also revalidate dashboard to update attention items
+    // Don't revalidate - let optimistic updates handle UI, and client-side refetch will update
+    // Revalidation causes slow full-page refreshes
+    // The client will refetch messages which will exclude handled messages when Zero Inbox is enabled
 
     return {
       success: true,

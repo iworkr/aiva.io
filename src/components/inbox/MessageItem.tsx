@@ -63,6 +63,7 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
   const router = useRouter();
   const [isStarred, setIsStarred] = useState(message.is_starred || false);
   const [isQuickReplyExpanded, setIsQuickReplyExpanded] = useState(false);
+  const [isArchived, setIsArchived] = useState(false); // Optimistic archive state
 
   // Mark as read action with optimistic update
   const { execute: markAsRead } = useAction(markMessageAsReadAction, {
@@ -98,27 +99,35 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
     },
   });
 
-  // Archive action
-  const { execute: archive } = useAction(archiveMessageAction, {
+  // Archive action with optimistic update
+  const { execute: archive, status: archiveStatus } = useAction(archiveMessageAction, {
     onSuccess: () => {
       // Show toast with undo option
       toast.success('Conversation archived', {
         action: {
           label: 'Undo',
           onClick: () => {
+            setIsArchived(false); // Revert optimistic state
             unarchive({ id: message.id, workspaceId });
           },
         },
       });
+      // onUpdate will be called to refresh the list
       onUpdate();
     },
     onError: ({ error }) => {
+      setIsArchived(false); // Revert optimistic update on error
       toast.error(error.serverError || 'Failed to archive conversation');
+      onUpdate();
     },
   });
-
+  
   // Unarchive action used by toast "Undo"
   const { execute: unarchive } = useAction(unarchiveMessageAction, {
+    onSuccess: () => {
+      setIsArchived(false); // Revert optimistic state
+      onUpdate();
+    },
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to undo archive');
     },
@@ -152,6 +161,7 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
 
   const handleArchive = (e: React.MouseEvent) => {
     e.stopPropagation();
+    setIsArchived(true); // Hide immediately (optimistic update)
     archive({ id: message.id, workspaceId });
   };
 
@@ -286,6 +296,11 @@ export const MessageItem = memo(function MessageItem({ message, workspaceId, onU
   const cleanedSnippet = stripHtml(rawSnippet).substring(0, 200);
   const { masked: safeSnippet, hasMaskedContent } = maskSensitiveContent(cleanedSnippet);
   const displaySnippet = safeSnippet || 'No preview available';
+
+  // Hide message immediately when archived (optimistic update)
+  if (isArchived) {
+    return null;
+  }
 
   return (
     <div
