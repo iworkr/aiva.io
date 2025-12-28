@@ -18,6 +18,7 @@ import { createMessageAction } from '@/data/user/messages';
 import { syncShopifyOrders, syncShopifyProducts, syncShopifyCustomers, syncAllShopifyData } from '@/lib/shopify/sync';
 import { getActiveConnectionByProvider } from '@/data/user/channels';
 import { getSoloWorkspace } from '@/data/user/workspaces';
+import { verifyShopAccess } from '@/lib/shopify/client';
 
 async function getWorkspaceAndConnection(userId: string, workspaceId?: string | null) {
   // If workspaceId not provided, get user's solo workspace
@@ -284,6 +285,43 @@ function generateHTML(data: any): string {
           const sync = data.syncResult;
           const hasErrors = sync.errors && sync.errors.length > 0;
           
+          // Handle invalid token case
+          if (sync.tokenInvalid) {
+            resultDiv.innerHTML = \`
+              <div style="background: #fff3cd; padding: 20px; border-radius: 8px; margin-top: 20px; border-left: 4px solid #ffc107;">
+                <h3>🔐 Shopify Access Token Invalid</h3>
+                <p style="margin: 15px 0; font-size: 16px;">
+                  <strong>The Shopify access token for your store has expired or been revoked.</strong>
+                </p>
+                <p style="margin: 15px 0;">
+                  This usually happens when:
+                </p>
+                <ul style="margin: 15px 0; padding-left: 20px;">
+                  <li>The Shopify app was uninstalled from your store</li>
+                  <li>The access token was revoked in Shopify settings</li>
+                  <li>The store owner changed their password (sometimes)</li>
+                </ul>
+                <div style="margin-top: 20px; padding: 15px; background: white; border-radius: 4px;">
+                  <p style="margin: 0 0 10px 0;"><strong>To fix this:</strong></p>
+                  <ol style="margin: 0; padding-left: 20px;">
+                    <li>Go to your Shopify admin</li>
+                    <li>Re-install the Aiva app, or</li>
+                    <li>Re-authenticate your store connection</li>
+                  </ol>
+                </div>
+                \${sync.reauthUrl ? \`
+                  <div style="margin-top: 15px;">
+                    <a href="\${sync.reauthUrl}" class="button" style="text-decoration: none;">🔗 Re-authenticate Shopify Store</a>
+                  </div>
+                \` : ''}
+                <div style="margin-top: 15px;">
+                  <button class="button" onclick="window.location.reload()">🔄 Refresh Page</button>
+                </div>
+              </div>
+            \`;
+            return;
+          }
+          
           resultDiv.innerHTML = \`
             <div style="background: \${sync.success ? '#d4edda' : '#fff3cd'}; padding: 15px; border-radius: 8px; margin-top: 20px;">
               <h3>\${sync.success ? '✅ Sync Completed' : '⚠️ Sync Completed with Errors'}</h3>
@@ -334,8 +372,15 @@ function generateHTML(data: any): string {
               \${hasErrors ? \`
                 <div style="margin-top: 15px; padding: 10px; background: #f8d7da; border-radius: 4px;">
                   <h4>❌ Errors (\${sync.errors.length})</h4>
+                  \${sync.errors.some(err => typeof err === 'string' && (err.includes('401') || err.includes('Invalid API key') || err.includes('access token'))) ? \`
+                    <div style="margin-bottom: 15px; padding: 10px; background: #fff3cd; border-radius: 4px; border-left: 4px solid #ffc107;">
+                      <p style="margin: 0 0 10px 0;"><strong>⚠️ Authentication Error Detected</strong></p>
+                      <p style="margin: 0 0 10px 0;">Your Shopify access token appears to be invalid. Please re-authenticate your store.</p>
+                      <a href="/en/integrations" class="button" style="text-decoration: none; display: inline-block;">🔗 Go to Integrations</a>
+                    </div>
+                  \` : ''}
                   <ul style="list-style: none; padding: 0;">
-                    \${sync.errors.slice(0, 5).map(err => '<li style="margin: 4px 0;">' + (typeof err === 'string' ? err : JSON.stringify(err)) + '</li>').join('')}
+                    \${sync.errors.slice(0, 5).map(err => '<li style="margin: 4px 0; font-size: 13px;">' + (typeof err === 'string' ? err : JSON.stringify(err)) + '</li>').join('')}
                     \${sync.errors.length > 5 ? '<li><em>... and ' + (sync.errors.length - 5) + ' more errors</em></li>' : ''}
                   </ul>
                 </div>
@@ -707,55 +752,79 @@ export async function POST(request: NextRequest) {
 
       if (store) {
         try {
-          console.log(`[Shopify Manual Sync] Triggering full Shopify sync for store ${store.id} (${store.shop_domain})`);
-          console.log(`[Shopify Manual Sync] Workspace: ${finalWorkspaceId}`);
-          console.log(`[Shopify Manual Sync] Options: maxRecords=250, fullSync=true`);
+          // First, verify the access token is still valid
+          console.log(`[Shopify Manual Sync] Verifying access token for store ${store.id} (${store.shop_domain})`);
+          const { data: storeWithToken } = await supabaseAdminClient
+            .from('shopify_stores')
+            .select('access_token, shop_domain')
+            .eq('id', store.id)
+            .single();
           
-          // Sync all data: orders, products, customers
-          const fullSyncResult = await syncAllShopifyData(store.id, finalWorkspaceId, {
-            maxRecords: 250,
-            fullSync: true, // Full sync to get all data
-          });
+          if (!storeWithToken?.access_token) {
+            throw new Error('Access token not found for store');
+          }
           
-          syncResult = {
-            ordersSynced: fullSyncResult.orders.recordsSynced || 0,
-            productsSynced: fullSyncResult.products.recordsSynced || 0,
-            customersSynced: fullSyncResult.customers.recordsSynced || 0,
-            totalRecordsSynced: fullSyncResult.totalRecordsSynced,
-            success: fullSyncResult.orders.success && fullSyncResult.products.success && fullSyncResult.customers.success,
-            errors: [
-              ...(fullSyncResult.orders.errors || []),
-              ...(fullSyncResult.products.errors || []),
-              ...(fullSyncResult.customers.errors || []),
-            ],
-            orderDetails: {
-              success: fullSyncResult.orders.success,
-              created: fullSyncResult.orders.recordsCreated || 0,
-              updated: fullSyncResult.orders.recordsUpdated || 0,
-              errors: fullSyncResult.orders.errors || [],
-            },
-            productDetails: {
-              success: fullSyncResult.products.success,
-              created: fullSyncResult.products.recordsCreated || 0,
-              updated: fullSyncResult.products.recordsUpdated || 0,
-              errors: fullSyncResult.products.errors || [],
-            },
-            customerDetails: {
-              success: fullSyncResult.customers.success,
-              created: fullSyncResult.customers.recordsCreated || 0,
-              updated: fullSyncResult.customers.recordsUpdated || 0,
-              errors: fullSyncResult.customers.errors || [],
-            },
-          };
+          const isTokenValid = await verifyShopAccess(storeWithToken.shop_domain, storeWithToken.access_token);
           
-          console.log(`[Shopify Manual Sync] Sync completed:`, {
-            success: syncResult.success,
-            ordersSynced: syncResult.ordersSynced,
-            productsSynced: syncResult.productsSynced,
-            customersSynced: syncResult.customersSynced,
-            totalRecordsSynced: syncResult.totalRecordsSynced,
-            errorCount: syncResult.errors.length,
-          });
+          if (!isTokenValid) {
+            console.error(`[Shopify Manual Sync] Access token is invalid for store ${store.id}`);
+            syncResult = {
+              error: 'Shopify access token is invalid or expired. Please re-authenticate your Shopify store.',
+              success: false,
+              tokenInvalid: true,
+              reauthUrl: `/en/integrations?shop=${storeWithToken.shop_domain}`,
+            };
+          } else {
+            console.log(`[Shopify Manual Sync] Access token verified. Triggering full Shopify sync for store ${store.id} (${store.shop_domain})`);
+            console.log(`[Shopify Manual Sync] Workspace: ${finalWorkspaceId}`);
+            console.log(`[Shopify Manual Sync] Options: maxRecords=250, fullSync=true`);
+            
+            // Sync all data: orders, products, customers
+            const fullSyncResult = await syncAllShopifyData(store.id, finalWorkspaceId, {
+              maxRecords: 250,
+              fullSync: true, // Full sync to get all data
+            });
+          
+            syncResult = {
+              ordersSynced: fullSyncResult.orders.recordsSynced || 0,
+              productsSynced: fullSyncResult.products.recordsSynced || 0,
+              customersSynced: fullSyncResult.customers.recordsSynced || 0,
+              totalRecordsSynced: fullSyncResult.totalRecordsSynced,
+              success: fullSyncResult.orders.success && fullSyncResult.products.success && fullSyncResult.customers.success,
+              errors: [
+                ...(fullSyncResult.orders.errors || []),
+                ...(fullSyncResult.products.errors || []),
+                ...(fullSyncResult.customers.errors || []),
+              ],
+              orderDetails: {
+                success: fullSyncResult.orders.success,
+                created: fullSyncResult.orders.recordsCreated || 0,
+                updated: fullSyncResult.orders.recordsUpdated || 0,
+                errors: fullSyncResult.orders.errors || [],
+              },
+              productDetails: {
+                success: fullSyncResult.products.success,
+                created: fullSyncResult.products.recordsCreated || 0,
+                updated: fullSyncResult.products.recordsUpdated || 0,
+                errors: fullSyncResult.products.errors || [],
+              },
+              customerDetails: {
+                success: fullSyncResult.customers.success,
+                created: fullSyncResult.customers.recordsCreated || 0,
+                updated: fullSyncResult.customers.recordsUpdated || 0,
+                errors: fullSyncResult.customers.errors || [],
+              },
+            };
+            
+            console.log(`[Shopify Manual Sync] Sync completed:`, {
+              success: syncResult.success,
+              ordersSynced: syncResult.ordersSynced,
+              productsSynced: syncResult.productsSynced,
+              customersSynced: syncResult.customersSynced,
+              totalRecordsSynced: syncResult.totalRecordsSynced,
+              errorCount: syncResult.errors.length,
+            });
+          }
         } catch (syncError) {
           console.error('[Test Shopify Context] Sync error:', syncError);
           console.error('[Test Shopify Context] Sync error stack:', syncError instanceof Error ? syncError.stack : 'No stack');
