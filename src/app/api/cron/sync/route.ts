@@ -212,7 +212,7 @@ export async function GET(request: NextRequest) {
           domainBlacklist: Array.isArray(wsSettings?.auto_send_domain_blacklist)
             ? wsSettings.auto_send_domain_blacklist
             : [],
-          maxRepliesPerThread: wsSettings?.auto_send_max_replies_per_thread ?? 1,
+          maxRepliesPerThread: wsSettings?.auto_send_max_replies_per_thread ?? 5, // Allow up to 5 replies per thread for ongoing conversations
           senderCooldownMinutes: wsSettings?.auto_send_sender_cooldown_minutes ?? 60,
         };
 

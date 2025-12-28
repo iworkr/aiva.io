@@ -38,7 +38,7 @@ COMMENT ON COLUMN workspace_settings.auto_send_domain_blacklist IS 'Never auto-r
 
 -- Add max replies per thread limit
 ALTER TABLE workspace_settings
-ADD COLUMN IF NOT EXISTS auto_send_max_replies_per_thread INTEGER DEFAULT 1;
+ADD COLUMN IF NOT EXISTS auto_send_max_replies_per_thread INTEGER DEFAULT 5;
 
 COMMENT ON COLUMN workspace_settings.auto_send_max_replies_per_thread IS 'Maximum number of auto-replies per conversation thread';
 

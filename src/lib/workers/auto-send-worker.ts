@@ -319,7 +319,7 @@ export async function checkAutoReplyEligibility(
     excludedCategories = DEFAULT_EXCLUDED_CATEGORIES,
     domainWhitelist = [],
     domainBlacklist = [],
-    maxRepliesPerThread = 1,
+    maxRepliesPerThread = 5, // Allow up to 5 replies per thread for ongoing conversations
     senderCooldownMinutes = 60,
   } = settings;
 
