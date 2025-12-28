@@ -710,6 +710,15 @@ export const updateAutoSendSettingsAction = authActionClient
     if (settings.autoSendTimeEnd !== undefined) {
       updateData.auto_send_time_end = settings.autoSendTimeEnd;
     }
+    if (settings.humanReviewForScheduling !== undefined) {
+      updateData.human_review_for_scheduling = settings.humanReviewForScheduling;
+    }
+    if (settings.humanReviewForCommitments !== undefined) {
+      updateData.human_review_for_commitments = settings.humanReviewForCommitments;
+    }
+    if (settings.humanReviewForSensitive !== undefined) {
+      updateData.human_review_for_sensitive = settings.humanReviewForSensitive;
+    }
 
     // If enabling, ensure paused is false
     if (settings.autoSendEnabled === true) {
@@ -1012,7 +1021,10 @@ export async function getAutoSendSettings(workspaceId: string, userId: string) {
       auto_send_time_start,
       auto_send_time_end,
       auto_send_paused,
-      auto_send_paused_at
+      auto_send_paused_at,
+      human_review_for_scheduling,
+      human_review_for_commitments,
+      human_review_for_sensitive
     `)
     .eq('workspace_id', workspaceId)
     .single();
@@ -1032,6 +1044,9 @@ export async function getAutoSendSettings(workspaceId: string, userId: string) {
     autoSendTimeEnd: data?.auto_send_time_end ?? '21:00',
     autoSendPaused: data?.auto_send_paused ?? false,
     autoSendPausedAt: data?.auto_send_paused_at,
+    humanReviewForScheduling: data?.human_review_for_scheduling ?? true,
+    humanReviewForCommitments: data?.human_review_for_commitments ?? true,
+    humanReviewForSensitive: data?.human_review_for_sensitive ?? true,
   };
 }
 

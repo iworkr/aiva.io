@@ -181,13 +181,14 @@ export async function GET(request: NextRequest) {
         reasons.push('Message has SENT label (outgoing message)');
       }
 
-      // Check 8: Draft confidence threshold
+      // Check 8: Draft confidence threshold (unified threshold for auto-send and review)
       if (messageDrafts.length > 0) {
         const latestDraft = messageDrafts[0];
-        const meetsThreshold = (latestDraft.confidence_score || 0) >= (workspaceSettings?.auto_send_confidence_threshold || 0.7);
+        const unifiedThreshold = workspaceSettings?.auto_send_confidence_threshold || 0.85;
+        const meetsThreshold = (latestDraft.confidence_score || 0) >= unifiedThreshold;
         checks.meetsConfidenceThreshold = meetsThreshold;
         if (!meetsThreshold) {
-          reasons.push(`Draft confidence (${latestDraft.confidence_score}) below threshold (${workspaceSettings?.auto_send_confidence_threshold || 0.7})`);
+          reasons.push(`Draft confidence (${latestDraft.confidence_score}) below unified threshold (${unifiedThreshold})`);
         }
         if (!queueItem) {
           reasons.push('Draft exists but not queued for auto-send');
@@ -215,7 +216,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       workspaceId,
       autoSendEnabled: workspaceSettings?.auto_send_enabled || false,
-      confidenceThreshold: workspaceSettings?.auto_send_confidence_threshold || 0.7,
+      confidenceThreshold: workspaceSettings?.auto_send_confidence_threshold || 0.85, // Unified threshold
       excludedCategories,
       excludedSenders,
       messages: analyzed,

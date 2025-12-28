@@ -66,7 +66,7 @@ async function checkGmailStatus() {
     console.log('⚙️  Auto-Send Settings:');
     console.log(`   Enabled: ${settings.auto_send_enabled ?? false}`);
     console.log(`   Paused: ${settings.auto_send_paused ?? false}`);
-    console.log(`   Confidence Threshold: ${(settings.auto_send_confidence_threshold ?? 0.7) * 100}%\n`);
+    console.log(`   Unified Confidence Threshold: ${(settings.auto_send_confidence_threshold ?? 0.85) * 100}% (controls both auto-send and review)\n`);
   }
 
   // Check recent messages

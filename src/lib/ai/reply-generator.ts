@@ -567,46 +567,74 @@ REMEMBER: Missing information handling:
     // (unless it was already auto-sent, which is handled separately)
     const shouldRequireReviewIfNotAutoSendable = !result.isAutoSendable;
     
+    // Get workspace settings to check unified confidence threshold
+    // This determines both auto-send eligibility and review requirements
+    const { data: wsSettings } = await supabase
+      .from('workspace_settings')
+      .select('auto_send_enabled, auto_send_confidence_threshold, human_review_for_scheduling, human_review_for_commitments, human_review_for_sensitive')
+      .eq('workspace_id', workspaceId)
+      .single();
+
+    const autoSendEnabled = wsSettings?.auto_send_enabled ?? false;
+    const unifiedThreshold = wsSettings?.auto_send_confidence_threshold ?? 0.85;
+    const reviewForScheduling = wsSettings?.human_review_for_scheduling ?? true;
+    const reviewForCommitments = wsSettings?.human_review_for_commitments ?? true;
+    const reviewForSensitive = wsSettings?.human_review_for_sensitive ?? true;
+
+    // Check if confidence is below unified threshold (always hold for review if below)
+    const confidenceBelowThreshold = result.confidenceScore < unifiedThreshold;
+
+    // Check review triggers based on workspace settings
+    const shouldReviewForScheduling = reviewForScheduling && (needsHumanReview || calendarContext?.hasMismatch);
+    const shouldReviewForCommitments = reviewForCommitments && isCriticalMissingInfo;
+    const shouldReviewForSensitive = reviewForSensitive && (isComplaint || isAlwaysReviewCategory);
+
     // Determine if draft should be held for human review
     // Hold if: 
-    // 1. Message explicitly flagged for review
-    // 2. Calendar mismatch detected
-    // 3. Low confidence (< 0.55)
-    // 4. Critical missing information (pricing, commitments, etc.)
-    // 5. Missing info AND AI says not auto-sendable AND confidence is below threshold
-    // 6. Message is a complaint (customer_complaint category)
+    // 1. Auto-send is disabled (always require review when disabled)
+    // 2. Confidence is below unified threshold
+    // 3. Message explicitly flagged for review
+    // 4. Calendar mismatch detected (if review for scheduling enabled)
+    // 5. Critical missing information (pricing, commitments, etc.) (if review for commitments enabled)
+    // 6. Message is a complaint or sensitive category (if review for sensitive enabled)
     // 7. Message is in a category that always requires review (sales_lead, bill, invoice)
     // 8. Message has high/urgent priority
     // 9. AI marked as not auto-sendable (should always require review)
     // Note: Routine missing info (policy, shipping) with good confidence can still auto-send
-    const shouldHoldForReview = needsHumanReview || 
-      result.confidenceScore < 0.55 || 
-      isCriticalMissingInfo ||
-      isComplaint ||
+    const shouldHoldForReview = !autoSendEnabled || // Always review if auto-send disabled
+      confidenceBelowThreshold || // Always review if below unified threshold
+      needsHumanReview || 
+      shouldReviewForScheduling ||
+      shouldReviewForCommitments ||
+      shouldReviewForSensitive ||
       isAlwaysReviewCategory ||
       isHighPriority ||
       shouldRequireReviewIfNotAutoSendable ||
       (hasMissingInfo && !result.isAutoSendable && result.confidenceScore < 0.70);
     
     const finalReviewReason = reviewReason || 
-      (isComplaint ? 'customer_complaint' :
+      (!autoSendEnabled ? 'auto_send_disabled' :
+       confidenceBelowThreshold ? `low_confidence_below_threshold_${Math.round(unifiedThreshold * 100)}%` :
+       shouldReviewForScheduling ? 'scheduling_review_required' :
+       shouldReviewForCommitments ? `missing_information_${missingInfoType}` :
+       shouldReviewForSensitive ? (isComplaint ? 'customer_complaint' : `${message.category}_requires_review`) :
        isAlwaysReviewCategory ? `${message.category}_requires_review` :
        isHighPriority ? `high_priority_${message.priority}` :
        shouldRequireReviewIfNotAutoSendable ? 'not_auto_sendable' :
-       isCriticalMissingInfo ? `missing_information_${missingInfoType}` : 
        hasMissingInfo && !result.isAutoSendable ? `missing_information_${missingInfoType}` :
-       result.confidenceScore < 0.55 ? 'low_confidence' : undefined);
+       undefined);
     
     const finalUncertaintyNotes = aiUncertaintyNotes || 
-      (isComplaint ? 'Customer complaint requires human review' :
+      (!autoSendEnabled ? 'Auto-send is disabled - all drafts require review' :
+       confidenceBelowThreshold ? `AI confidence is ${Math.round(result.confidenceScore * 100)}% - below threshold of ${Math.round(unifiedThreshold * 100)}%` :
+       shouldReviewForScheduling ? 'Scheduling confirmation requires calendar verification' :
+       shouldReviewForCommitments ? `AI is missing critical information (${missingInfoType}) - human follow-up required` :
+       shouldReviewForSensitive ? (isComplaint ? 'Customer complaint requires human review' : `${message.category} messages require human review for proper handling`) :
        isAlwaysReviewCategory ? `${message.category} messages require human review for proper handling` :
        isHighPriority ? `High priority message (${message.priority}) requires human attention` :
        shouldRequireReviewIfNotAutoSendable ? 'AI marked this message as not suitable for auto-send - human review required' :
-       isCriticalMissingInfo ? `AI is missing critical information (${missingInfoType}) - human follow-up required` :
        hasMissingInfo && !result.isAutoSendable ? `AI is missing information (${missingInfoType}) and marked as not auto-sendable` :
-       result.confidenceScore < 0.55 
-        ? `AI confidence is ${Math.round(result.confidenceScore * 100)}% - below threshold for auto-send`
-        : undefined);
+       undefined);
 
     console.log('[AI Reply] Human review check:', {
       needsHumanReview,
@@ -752,35 +780,26 @@ REMEMBER: Missing information handling:
     });
 
     // Check if draft is auto-sendable and queue for auto-send
-    // We now check auto-send even if isAutoSendable is false, using confidence threshold as the main gate
+    // Use unified threshold: if confidence >= threshold and not held for review, queue for auto-send
     if (draft) {
       try {
-        // Get workspace auto-send threshold (default 0.70 if not set)
-        const { data: wsSettings } = await supabase
-          .from('workspace_settings')
-          .select('auto_send_enabled, auto_send_confidence_threshold')
-          .eq('workspace_id', workspaceId)
-          .single();
-
-        const autoSendEnabled = wsSettings?.auto_send_enabled ?? false;
-        const threshold = wsSettings?.auto_send_confidence_threshold ?? 0.70;
-        
         console.log('[AI Reply] Auto-send check:', {
           enabled: autoSendEnabled,
-          threshold,
+          threshold: unifiedThreshold,
           confidenceScore: result.confidenceScore,
           isAutoSendable: result.isAutoSendable,
-          meetsThreshold: result.confidenceScore >= threshold,
+          meetsThreshold: result.confidenceScore >= unifiedThreshold,
+          shouldHoldForReview,
         });
 
         // Queue for auto-send if:
         // 1. Auto-send is enabled for workspace
         // 2. NOT held for human review
-        // 3. Confidence meets threshold (primary gate)
+        // 3. Confidence meets unified threshold (primary gate)
         // 4. AI marked it as auto-sendable OR confidence is very high (>= 0.80)
         const shouldQueue = autoSendEnabled && 
           !shouldHoldForReview &&
-          result.confidenceScore >= threshold && 
+          result.confidenceScore >= unifiedThreshold && 
           (result.isAutoSendable || result.confidenceScore >= 0.80);
 
         if (shouldHoldForReview) {
@@ -801,9 +820,9 @@ REMEMBER: Missing information handling:
             console.log('[AI Reply] Auto-send not queued:', queueResult.reason);
           }
         } else if (!autoSendEnabled) {
-          console.log('[AI Reply] Auto-send disabled for workspace');
-        } else if (result.confidenceScore < threshold) {
-          console.log('[AI Reply] Confidence below threshold:', result.confidenceScore, '<', threshold);
+          console.log('[AI Reply] Auto-send disabled for workspace - draft requires review');
+        } else if (result.confidenceScore < unifiedThreshold) {
+          console.log('[AI Reply] Confidence below unified threshold:', result.confidenceScore, '<', unifiedThreshold);
         } else {
           console.log('[AI Reply] AI marked as not auto-sendable and confidence < 0.80');
         }

@@ -297,6 +297,9 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
           autoSendTimeStart?: string;
           autoSendTimeEnd?: string;
           autoSendPaused?: boolean;
+          humanReviewForScheduling?: boolean;
+          humanReviewForCommitments?: boolean;
+          humanReviewForSensitive?: boolean;
         };
         if (autoSend) {
           setAutoSendEnabled(autoSend.autoSendEnabled ?? false);
@@ -307,6 +310,9 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
           setAutoSendTimeStart(autoSend.autoSendTimeStart ?? '09:00');
           setAutoSendTimeEnd(autoSend.autoSendTimeEnd ?? '21:00');
           setAutoSendPaused(autoSend.autoSendPaused ?? false);
+          setHumanReviewForScheduling(autoSend.humanReviewForScheduling ?? true);
+          setHumanReviewForCommitments(autoSend.humanReviewForCommitments ?? true);
+          setHumanReviewForSensitive(autoSend.humanReviewForSensitive ?? true);
         }
 
         // Set auto-send filter settings
@@ -759,6 +765,9 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
     autoSendConfidenceThreshold: number;
     autoSendTimeStart: string;
     autoSendTimeEnd: string;
+    humanReviewForScheduling: boolean;
+    humanReviewForCommitments: boolean;
+    humanReviewForSensitive: boolean;
   }>) => {
     if (!hasInitializedRef.current) return;
     
@@ -888,21 +897,21 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
     setHumanReviewForScheduling(value);
     triggerAutoSendSave({ 
       humanReviewForScheduling: value 
-    } as any);
+    });
   };
 
   const handleHumanReviewForCommitmentsChange = (value: boolean) => {
     setHumanReviewForCommitments(value);
     triggerAutoSendSave({ 
       humanReviewForCommitments: value 
-    } as any);
+    });
   };
 
   const handleHumanReviewForSensitiveChange = (value: boolean) => {
     setHumanReviewForSensitive(value);
     triggerAutoSendSave({ 
       humanReviewForSensitive: value 
-    } as any);
+    });
   };
 
   // Mark as initialized after first data load

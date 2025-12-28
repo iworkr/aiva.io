@@ -28,10 +28,13 @@ The Auto-Reply system has been fully implemented and integrated into Aiva.io. Th
 - `auto_send_enabled` (boolean) - Master toggle
 - `auto_send_delay_type` ('exact' | 'random') - Delay mode
 - `auto_send_delay_min/max` (integer) - Delay timing in minutes
-- `auto_send_confidence_threshold` (decimal) - Minimum AI confidence (0.70-0.95)
+- `auto_send_confidence_threshold` (decimal) - **Unified confidence threshold (0.50-0.95)** - Controls both auto-sending (when enabled) and review requirements (when disabled or below threshold)
 - `auto_send_time_start/end` (time) - Allowed sending window
 - `auto_send_paused` (boolean) - Emergency kill switch
 - `auto_send_paused_at` (timestamptz) - When paused
+- `human_review_for_scheduling` (boolean) - Always require review for scheduling confirmations
+- `human_review_for_commitments` (boolean) - Always require review for commitment requests
+- `human_review_for_sensitive` (boolean) - Always require review for sensitive topics
 
 **Status**: ✅ Migrated and deployed to Supabase
 
@@ -119,11 +122,12 @@ The Auto-Reply system has been fully implemented and integrated into Aiva.io. Th
 **File**: `src/components/settings/SettingsView.tsx`
 
 **Features Added**:
-- Auto-Reply settings card in "AI Features" tab
+- Auto-Reply settings card in "AI Features" tab (merged with Human Review settings)
 - Toggle switch for enable/disable (Pro feature gated)
+- Unified confidence threshold slider (0.50-0.95) - controls both auto-sending and review requirements
+- Review trigger toggles (scheduling, commitments, sensitive topics)
 - Select for delay type (Exact vs Random)
 - Number inputs for delay min/max
-- Slider for confidence threshold (0.70-0.95)
 - Time pickers for sending window
 - Kill switch button for emergency pause
 - Pending queue display (via `getAutoSendQueueAction`)
@@ -140,8 +144,10 @@ The Auto-Reply system has been fully implemented and integrated into Aiva.io. Th
 **Modification**: Added auto-send queueing after draft creation
 
 **Logic**:
-- After draft is saved, checks if `isAutoSendable: true` and `confidenceScore >= 0.85`
-- If eligible, calls `queueAutoSend()` to schedule the send
+- After draft is saved, checks unified confidence threshold from workspace settings
+- If auto-send enabled AND confidence >= threshold AND not held for review → calls `queueAutoSend()` to schedule the send
+- If auto-send disabled OR confidence < threshold → draft is held for human review
+- Respects review triggers (scheduling, commitments, sensitive topics) based on workspace settings
 - Non-blocking (errors don't fail draft generation)
 
 **Status**: ✅ Integrated
@@ -231,9 +237,13 @@ The Auto-Reply system has been fully implemented and integrated into Aiva.io. Th
 2. **AI Generates Draft**:
    - User opens message, AI generates reply draft
    - Draft saved with `is_auto_sendable` and `confidence_score`
-   - If eligible (`isAutoSendable: true` AND `confidence >= threshold`):
+   - Checks unified confidence threshold and review triggers
+   - If auto-send enabled AND confidence >= threshold AND not held for review:
      - `queueAutoSend()` calculates scheduled send time
      - Item inserted into `auto_send_queue` with `status: 'pending'`
+   - If auto-send disabled OR confidence < threshold OR review triggers match:
+     - Draft is held for human review (`hold_for_review: true`)
+     - Message marked as `requires_human_review: true`
 
 3. **Cron Job Processes Queue**:
    - Runs every minute via Vercel Cron
@@ -256,7 +266,7 @@ The Auto-Reply system has been fully implemented and integrated into Aiva.io. Th
 
 ## Safety Features Implemented
 
-1. ✅ **Confidence Threshold** - Only auto-send above user-defined threshold (default 0.85)
+1. ✅ **Unified Confidence Threshold** - Single threshold (0.50-0.95, default 0.85) controls both auto-sending (when enabled) and review requirements (when disabled or below threshold)
 2. ✅ **Time Window** - No auto-sending outside business hours (default 09:00-21:00)
 3. ✅ **Kill Switch** - Instant pause of all auto-sends via `pauseAutoSendAction`
 4. ✅ **Audit Log** - Every action logged to `auto_send_log` table

@@ -125,7 +125,7 @@ async function checkMessage() {
     console.log('\n   ⚙️  Workspace Settings:');
     console.log(`      Auto-send Enabled: ${settings?.auto_send_enabled || false}`);
     console.log(`      Auto-send Paused: ${settings?.auto_send_paused || false}`);
-    console.log(`      Confidence Threshold: ${settings?.auto_send_confidence_threshold || 0.7}`);
+    console.log(`      Unified Confidence Threshold: ${settings?.auto_send_confidence_threshold || 0.85} (controls both auto-send and review)`);
 
     // Analyze why it might not have gotten a reply
     console.log('\n   🔍 Analysis:');
@@ -153,11 +153,11 @@ async function checkMessage() {
 
     if (drafts && drafts.length > 0) {
       const latestDraft = drafts[0];
-      const threshold = settings?.auto_send_confidence_threshold || 0.7;
-      if ((latestDraft.confidence_score || 0) < threshold) {
-        reasons.push(`❌ Draft confidence (${latestDraft.confidence_score}) below threshold (${threshold})`);
+      const unifiedThreshold = settings?.auto_send_confidence_threshold || 0.85;
+      if ((latestDraft.confidence_score || 0) < unifiedThreshold) {
+        reasons.push(`❌ Draft confidence (${latestDraft.confidence_score}) below unified threshold (${unifiedThreshold})`);
       } else {
-        console.log(`   ✅ Draft confidence (${latestDraft.confidence_score}) meets threshold (${threshold})`);
+        console.log(`   ✅ Draft confidence (${latestDraft.confidence_score}) meets unified threshold (${unifiedThreshold})`);
       }
 
       if (!queueItems || queueItems.length === 0) {

@@ -56,7 +56,7 @@ async function main() {
       console.log(`\n⚙️  Auto-Send Settings:`);
       console.log(`   Enabled: ${settings.auto_send_enabled ?? false}`);
       console.log(`   Paused: ${settings.auto_send_paused ?? false}`);
-      console.log(`   Confidence Threshold: ${((settings.auto_send_confidence_threshold ?? 0.7) * 100).toFixed(0)}%`);
+      console.log(`   Unified Confidence Threshold: ${((settings.auto_send_confidence_threshold ?? 0.85) * 100).toFixed(0)}% (controls both auto-send and review)`);
     }
 
     // Check recent messages count
