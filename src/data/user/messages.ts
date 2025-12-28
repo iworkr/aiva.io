@@ -809,8 +809,24 @@ export const archiveMessageAction = authActionClient
       throw new Error('You are not a member of this workspace');
     }
 
+    // Mark message as handled (for Zero Inbox) - this will also archive in provider if enabled
+    const { markMessageHandled } = await import('@/lib/inbox-zero/handler');
+    const handleResult = await markMessageHandled(id, workspaceId, {
+      action: 'manually_dismissed',
+      userId,
+      markRead: true,
+      archive: true, // Archive in provider (Gmail/Outlook)
+      applyLabel: true, // Apply "Handled by Aiva" label
+    });
+
+    if (!handleResult.success) {
+      console.error('[Archive] Failed to mark as handled:', handleResult.error);
+      // Continue anyway - we'll still update status
+    }
+
     const supabase = await createSupabaseUserServerActionClient();
 
+    // Also update status to archived for backward compatibility
     const { data, error } = await supabase
       .from('messages')
       .update({
@@ -828,10 +844,12 @@ export const archiveMessageAction = authActionClient
     }
 
     revalidatePath(`/inbox`);
+    revalidatePath(`/en/dashboard`); // Also revalidate dashboard to update attention items
 
     return {
       success: true,
       data,
+      handled: handleResult.success,
     };
   });
 
@@ -850,12 +868,23 @@ export const unarchiveMessageAction = authActionClient
       throw new Error('You are not a member of this workspace');
     }
 
+    // Restore message (undo handling) - this will unarchive in provider if applicable
+    const { restoreMessage } = await import('@/lib/inbox-zero/handler');
+    const restoreResult = await restoreMessage(id, userId);
+
+    if (!restoreResult.success) {
+      console.error('[Unarchive] Failed to restore message:', restoreResult.error);
+      // Continue anyway - we'll still update status
+    }
+
     const supabase = await createSupabaseUserServerActionClient();
 
+    // Also update status to unread for backward compatibility
     const { data, error } = await supabase
       .from('messages')
       .update({
-        status: 'read',
+        status: 'unread',
+        is_read: false,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
@@ -868,10 +897,12 @@ export const unarchiveMessageAction = authActionClient
     }
 
     revalidatePath(`/inbox`);
+    revalidatePath(`/en/dashboard`); // Also revalidate dashboard to update attention items
 
     return {
       success: true,
       data,
+      restored: restoreResult.success,
     };
   });
 
