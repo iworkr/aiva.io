@@ -734,47 +734,133 @@ export async function POST(request: NextRequest) {
     if (triggerSync) {
       console.log('[Test Shopify Context] Trigger sync requested');
       console.log('[Test Shopify Context] Looking for store with workspace_id:', finalWorkspaceId);
+      console.log('[Test Shopify Context] User ID:', user.id);
       
-      const { data: store, error: storeQueryError } = await supabaseAdminClient
+      // Query store with token in one go - try workspace_id first, then linked_user_id
+      let store: any = null;
+      let storeQueryError: any = null;
+      
+      // Try by workspace_id first
+      const { data: storeByWorkspace, error: workspaceError } = await supabaseAdminClient
         .from('shopify_stores')
-        .select('id, shop_domain')
+        .select('id, shop_domain, access_token, workspace_id, linked_user_id, is_active')
         .eq('workspace_id', finalWorkspaceId)
         .eq('is_active', true)
         .limit(1)
         .single();
-
-      console.log('[Test Shopify Context] Store query result:', { 
-        found: !!store, 
-        storeId: store?.id, 
-        domain: store?.shop_domain,
-        error: storeQueryError?.message 
-      });
+      
+      if (storeByWorkspace) {
+        store = storeByWorkspace;
+        console.log('[Test Shopify Context] Found store by workspace_id:', { 
+          storeId: store.id, 
+          domain: store.shop_domain,
+          hasToken: !!store.access_token,
+          tokenLength: store.access_token?.length || 0,
+        });
+      } else {
+        // Fallback: try by linked_user_id
+        console.log('[Test Shopify Context] Store not found by workspace_id, trying linked_user_id');
+        const { data: storeByUser, error: userError } = await supabaseAdminClient
+          .from('shopify_stores')
+          .select('id, shop_domain, access_token, workspace_id, linked_user_id, is_active')
+          .eq('linked_user_id', user.id)
+          .eq('is_active', true)
+          .limit(1)
+          .single();
+        
+        if (storeByUser) {
+          store = storeByUser;
+          console.log('[Test Shopify Context] Found store by linked_user_id:', { 
+            storeId: store.id, 
+            domain: store.shop_domain,
+            hasToken: !!store.access_token,
+            tokenLength: store.access_token?.length || 0,
+            workspaceId: store.workspace_id,
+          });
+          
+          // If store found by user but not linked to workspace, link it
+          if (!store.workspace_id) {
+            console.log(`[Test Shopify Context] Linking store ${store.shop_domain} to workspace ${finalWorkspaceId}`);
+            await supabaseAdminClient
+              .from('shopify_stores')
+              .update({ workspace_id: finalWorkspaceId })
+              .eq('id', store.id);
+            store.workspace_id = finalWorkspaceId;
+          }
+        } else {
+          storeQueryError = userError || workspaceError;
+          console.error('[Test Shopify Context] Store not found:', storeQueryError?.message);
+        }
+      }
 
       if (store) {
         try {
-          // First, verify the access token is still valid
-          console.log(`[Shopify Manual Sync] Verifying access token for store ${store.id} (${store.shop_domain})`);
-          const { data: storeWithToken } = await supabaseAdminClient
-            .from('shopify_stores')
-            .select('access_token, shop_domain')
-            .eq('id', store.id)
-            .single();
-          
-          if (!storeWithToken?.access_token) {
+          // Verify the access token is still valid
+          if (!store.access_token) {
             throw new Error('Access token not found for store');
           }
           
-          const isTokenValid = await verifyShopAccess(storeWithToken.shop_domain, storeWithToken.access_token);
+          console.log(`[Shopify Manual Sync] Verifying access token for store ${store.id} (${store.shop_domain})`);
+          console.log(`[Shopify Manual Sync] Token preview: ${store.access_token.substring(0, 20)}...`);
+          console.log(`[Shopify Manual Sync] Token length: ${store.access_token.length}`);
+          console.log(`[Shopify Manual Sync] Store updated_at: ${store.updated_at || 'N/A'}`);
+          
+          const isTokenValid = await verifyShopAccess(store.shop_domain, store.access_token);
+          console.log(`[Shopify Manual Sync] Token verification result: ${isTokenValid}`);
           
           if (!isTokenValid) {
-            console.error(`[Shopify Manual Sync] Access token is invalid for store ${store.id}`);
-            syncResult = {
-              error: 'Shopify access token is invalid or expired. Please re-authenticate your Shopify store.',
-              success: false,
-              tokenInvalid: true,
-              reauthUrl: `/en/integrations?shop=${storeWithToken.shop_domain}`,
-            };
-          } else {
+            console.error(`[Shopify Manual Sync] Access token verification failed for store ${store.id}`);
+            console.error(`[Shopify Manual Sync] Store domain: ${store.shop_domain}`);
+            console.error(`[Shopify Manual Sync] Token exists: ${!!store.access_token}`);
+            
+            // Double-check: try to fetch the latest token from DB
+            const { data: latestStore } = await supabaseAdminClient
+              .from('shopify_stores')
+              .select('access_token, shop_domain, updated_at')
+              .eq('id', store.id)
+              .single();
+            
+            if (latestStore?.access_token && latestStore.access_token !== store.access_token) {
+              console.log('[Shopify Manual Sync] Found newer token, retrying verification...');
+              const retryValid = await verifyShopAccess(latestStore.shop_domain, latestStore.access_token);
+              if (retryValid) {
+                console.log('[Shopify Manual Sync] Newer token is valid, proceeding with sync');
+                // Use the newer token
+                store.access_token = latestStore.access_token;
+                store.shop_domain = latestStore.shop_domain;
+                // Continue to sync below
+              } else {
+                syncResult = {
+                  error: 'Shopify access token is invalid or expired. Please re-authenticate your Shopify store.',
+                  success: false,
+                  tokenInvalid: true,
+                  reauthUrl: `/en/integrations?shop=${store.shop_domain}`,
+                  debugInfo: {
+                    storeId: store.id,
+                    shopDomain: store.shop_domain,
+                    tokenUpdatedAt: latestStore.updated_at,
+                    tokenLength: latestStore.access_token?.length || 0,
+                  },
+                };
+              }
+            } else {
+              syncResult = {
+                error: 'Shopify access token is invalid or expired. Please re-authenticate your Shopify store.',
+                success: false,
+                tokenInvalid: true,
+                reauthUrl: `/en/integrations?shop=${store.shop_domain}`,
+                debugInfo: {
+                  storeId: store.id,
+                  shopDomain: store.shop_domain,
+                  tokenExists: !!store.access_token,
+                  tokenLength: store.access_token?.length || 0,
+                },
+              };
+            }
+          }
+          
+          // Only proceed with sync if token is valid
+          if (!syncResult || syncResult.tokenInvalid !== true) {
             console.log(`[Shopify Manual Sync] Access token verified. Triggering full Shopify sync for store ${store.id} (${store.shop_domain})`);
             console.log(`[Shopify Manual Sync] Workspace: ${finalWorkspaceId}`);
             console.log(`[Shopify Manual Sync] Options: maxRecords=250, fullSync=true`);
@@ -836,10 +922,13 @@ export async function POST(request: NextRequest) {
         }
       } else {
         console.error('[Test Shopify Context] No store found for workspace:', finalWorkspaceId);
+        console.error('[Test Shopify Context] Store query error:', storeQueryError?.message);
         syncResult = {
-          error: 'Store not found for workspace',
+          error: 'Store not found for workspace. Make sure your Shopify store is linked to your account.',
           success: false,
           workspaceId: finalWorkspaceId,
+          userId: user.id,
+          suggestion: 'Visit /en/integrations to link your Shopify store',
         };
       }
     } else {
