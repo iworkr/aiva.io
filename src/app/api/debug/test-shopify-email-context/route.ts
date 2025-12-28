@@ -241,11 +241,11 @@ function generateHTML(data: any): string {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createSupabaseUserRouteHandlerClient();
+    const userSupabase = await createSupabaseUserRouteHandlerClient();
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser();
+    } = await userSupabase.auth.getUser();
 
     if (authError || !user) {
       return new NextResponse(generateHTML({ error: 'Unauthorized. Please log in first.' }), {
@@ -270,15 +270,6 @@ export async function GET(request: NextRequest) {
     }
 
     const supabase = supabaseAdminClient;
-
-    // 1. Check if Shopify store is connected
-    const { data: store, error: storeError } = await supabase
-      .from('shopify_stores')
-      .select('id, shop_domain, shop_name, is_active, sync_enabled')
-      .eq('workspace_id', workspaceId)
-      .eq('is_active', true)
-      .limit(1)
-      .single();
 
     // 1. Check if Shopify store is connected
     const { data: store, error: storeError } = await supabase
@@ -475,26 +466,6 @@ export async function POST(request: NextRequest) {
       finalWorkspaceId
     );
     finalWorkspaceId = workspaceIdFromHelper;
-
-    if (!workspaceMember) {
-      return NextResponse.json({ error: 'Not a workspace member' }, { status: 403 });
-    }
-
-    // Get Gmail or Outlook connection
-    const { data: emailConnection, error: connError } = await supabase
-      .from('channel_connections')
-      .select('id, provider, provider_account_id, provider_account_name')
-      .eq('workspace_id', workspaceId)
-      .in('provider', ['gmail', 'outlook'])
-      .eq('status', 'active')
-      .limit(1)
-      .single();
-
-    if (connError || !emailConnection) {
-      return NextResponse.json({
-        error: 'No active email connection found. Please connect Gmail or Outlook first.',
-      }, { status: 404 });
-    }
 
     // Optionally trigger Shopify sync
     if (triggerSync) {
