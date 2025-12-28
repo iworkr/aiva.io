@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
 import { generateLinkToken } from '@/lib/shopify/tokens';
+import { verifyShopAccess } from '@/lib/shopify/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,18 +77,30 @@ export async function GET(request: NextRequest) {
     console.error('Error fetching shop data:', error);
   }
   
-  // If shop is linked to a user, show dashboard opener
-  if (shopData?.linked_user_id && shopData?.access_token) {
-    const token = generateLinkToken(shop, shopData.access_token);
-    const autoLoginUrl = new URL('/api/shopify/auto-login', appUrl);
-    autoLoginUrl.searchParams.set('token', token);
-    autoLoginUrl.searchParams.set('host', host);
-    
-    return renderDashboardPage(shop, host, apiKey, autoLoginUrl.toString());
-  }
-  
-  // If shop exists but not linked, show linking page
+  // If shop exists, verify the token is still valid
   if (shopData?.access_token) {
+    console.log(`[Shopify App] Verifying token for shop ${shop}`);
+    const isTokenValid = await verifyShopAccess(shop, shopData.access_token);
+    
+    if (!isTokenValid) {
+      console.log(`[Shopify App] Token invalid for shop ${shop}, redirecting to OAuth`);
+      // Token is invalid - redirect to OAuth to get a fresh token
+      const authUrl = `${appUrl}/api/shopify/auth?shop=${shop}`;
+      return NextResponse.redirect(authUrl);
+    }
+    
+    // Token is valid - proceed with normal flow
+    // If shop is linked to a user, show dashboard opener
+    if (shopData.linked_user_id) {
+      const token = generateLinkToken(shop, shopData.access_token);
+      const autoLoginUrl = new URL('/api/shopify/auto-login', appUrl);
+      autoLoginUrl.searchParams.set('token', token);
+      autoLoginUrl.searchParams.set('host', host);
+      
+      return renderDashboardPage(shop, host, apiKey, autoLoginUrl.toString());
+    }
+    
+    // Shop exists with valid token but not linked - show linking page
     const token = generateLinkToken(shop, shopData.access_token);
     const linkUrl = new URL('/en/shopify/link', appUrl);
     linkUrl.searchParams.set('token', token);
