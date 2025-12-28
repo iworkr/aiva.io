@@ -65,6 +65,17 @@ function verifyHmac(query: URLSearchParams, secret: string): boolean {
 }
 
 export async function GET(request: NextRequest) {
+  // Log immediately - even before try/catch to catch all requests
+  console.log('🔵 [OAuth Callback] REQUEST RECEIVED:', {
+    url: request.url,
+    method: request.method,
+    timestamp: new Date().toISOString(),
+    headers: {
+      'user-agent': request.headers.get('user-agent'),
+      'referer': request.headers.get('referer'),
+    },
+  });
+  
   try {
     const searchParams = request.nextUrl.searchParams;
     const code = searchParams.get('code');

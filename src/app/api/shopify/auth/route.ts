@@ -68,10 +68,13 @@ export async function GET(request: NextRequest) {
     authUrl.searchParams.append('redirect_uri', redirectUri);
     authUrl.searchParams.append('state', nonce);
 
-    console.log('🟢 Shopify OAuth initiation:', {
+    console.log('🟢 [OAuth Init] Shopify OAuth initiation:', {
       shop,
       redirectUri,
       scopes: SHOPIFY_SCOPES,
+      appUrl,
+      apiKey: apiKey ? `${apiKey.substring(0, 10)}...` : 'MISSING',
+      timestamp: new Date().toISOString(),
     });
 
     // Create response with redirect
