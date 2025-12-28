@@ -176,6 +176,15 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    // Also call getNeedsAttentionItems to see what it actually returns
+    const { getNeedsAttentionItems } = await import('@/data/user/dashboard-stats');
+    let actualAttentionItems: any[] = [];
+    try {
+      actualAttentionItems = await getNeedsAttentionItems(workspaceId, user.id, 20);
+    } catch (error) {
+      console.error('[Message Counts Debug] Failed to call getNeedsAttentionItems:', error);
+    }
+
     return NextResponse.json({
       workspaceId,
       isZeroInboxEnabled,
@@ -188,6 +197,7 @@ export async function GET(request: NextRequest) {
         activeConversations: uniqueThreads.size,
         attentionItemsFiltered: filteredAttentionItems.length,
         attentionItemsRaw: allReviewItems?.length || 0,
+        actualAttentionItemsCount: actualAttentionItems.length, // What getNeedsAttentionItems actually returns
       },
       breakdown: {
         byCategory: categoryCounts,
