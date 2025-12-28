@@ -222,7 +222,7 @@ export async function GET(request: NextRequest) {
         console.log(`   📧 Fetching original message ${item.message_id?.substring(0, 8)}...`);
         const { data: message, error: messageError } = await supabase
           .from('messages')
-          .select('provider_message_id, provider_thread_id, sender_email, subject, raw_data, requires_human_review, review_reason')
+          .select('provider_message_id, provider_thread_id, sender_email, subject, raw_data, requires_human_review, review_reason, thread_id')
           .eq('id', item.message_id)
           .single();
 
@@ -261,7 +261,7 @@ export async function GET(request: NextRequest) {
         console.log(`   🔗 Fetching connection ${item.connection_id?.substring(0, 8)}...`);
         const { data: connection, error: connError } = await supabase
           .from('channel_connections')
-          .select('provider, provider_account_name')
+          .select('provider, provider_account_name, provider_account_id')
           .eq('id', item.connection_id)
           .single();
 
@@ -326,6 +326,49 @@ export async function GET(request: NextRequest) {
             .from('message_drafts')
             .update({ auto_sent: true, auto_sent_at: new Date().toISOString() })
             .eq('id', item.draft_id);
+
+          // Create outbound message record so it appears in the thread immediately
+          // This matches the behavior of manual sends (sendReplyAction)
+          console.log(`   📝 Creating outbound message record for thread...`);
+          try {
+            if (!item.workspace_id || !item.connection_id || !sendResult.messageId) {
+              console.warn(`   ⚠️ Missing required fields for outbound message record`);
+            } else {
+              const senderEmail = (connection.provider_account_id || connection.provider_account_name || message.sender_email || '') as string;
+              const { error: insertError } = await supabase
+                .from('messages')
+                .insert({
+                  workspace_id: item.workspace_id,
+                  channel_connection_id: item.connection_id,
+                  provider_message_id: sendResult.messageId,
+                  provider_thread_id: message.provider_thread_id || null, // Replies are in the same thread
+                  subject: replySubject,
+                  body: draft.body?.trim() || '',
+                  snippet: (draft.body?.trim() || '').substring(0, 200),
+                  sender_email: senderEmail,
+                  sender_name: connection.provider_account_name || undefined,
+                  recipients: JSON.stringify([{ email: message.sender_email, type: 'to' }]),
+                  timestamp: new Date().toISOString(),
+                  is_read: true, // Sent messages are automatically "read"
+                  thread_id: message.thread_id || null, // Link to same thread
+                  raw_data: {
+                    auto_sent: true,
+                    draft_id: item.draft_id,
+                    original_message_id: item.message_id,
+                  },
+                });
+              
+              if (insertError) {
+                // If insert fails (e.g., duplicate), that's okay - provider sync will pick it up
+                console.warn(`   ⚠️ Could not create outbound message record: ${insertError.message}`);
+              } else {
+                console.log(`   ✅ Outbound message record created - will appear in thread`);
+              }
+            }
+          } catch (insertError) {
+            console.warn(`   ⚠️ Error creating outbound message record:`, insertError);
+            // Don't fail the send if record creation fails
+          }
 
           // Check if this auto-sent reply was just an acknowledgement that still needs human follow-up
           // If the draft has missing information, mark message as requiring human review
