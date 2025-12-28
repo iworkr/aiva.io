@@ -13,6 +13,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
 import { generateLinkToken } from '@/lib/shopify/tokens';
+import { getSoloWorkspace } from '@/data/user/workspaces';
+import { syncAllShopifyData } from '@/lib/shopify/sync';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,22 +92,54 @@ export async function POST(request: NextRequest) {
         });
     }
 
-    // Link the Shopify store to this user
-    const { error: linkError } = await supabaseAdminClient
+    // Get user's workspace
+    let workspaceId: string | null = null;
+    try {
+      const soloWorkspace = await getSoloWorkspace();
+      workspaceId = soloWorkspace.id;
+      console.log(`[Shopify Create Account] Found workspace ${workspaceId} for user ${userId}`);
+    } catch (error) {
+      console.warn(`[Shopify Create Account] Could not get workspace for user ${userId}:`, error);
+      // Continue without workspace_id - it can be set later
+    }
+    
+    // Link the Shopify store to this user and workspace
+    const { data: updatedShop, error: linkError } = await supabaseAdminClient
       .from('shopify_stores')
       .update({
         linked_user_id: userId,
+        workspace_id: workspaceId,
         link_method: 'shopify',
+        sync_enabled: true, // Enable sync by default
         updated_at: new Date().toISOString(),
       })
-      .eq('id', shop.id);
+      .eq('id', shop.id)
+      .select('id')
+      .single();
 
-    if (linkError) {
+    if (linkError || !updatedShop) {
       console.error('Failed to link shop:', linkError);
       return NextResponse.json(
         { error: 'Failed to link Shopify store' },
         { status: 500 }
       );
+    }
+    
+    // Trigger initial sync if workspace is set
+    if (workspaceId) {
+      try {
+        console.log(`[Shopify Create Account] Triggering initial sync for store ${updatedShop.id}`);
+        // Run sync in background - don't wait for it
+        syncAllShopifyData(updatedShop.id, workspaceId, {
+          maxRecords: 250,
+          fullSync: true,
+        }).catch((syncError) => {
+          console.error('[Shopify Create Account] Initial sync error (non-blocking):', syncError);
+        });
+      } catch (syncError) {
+        console.error('[Shopify Create Account] Failed to trigger initial sync:', syncError);
+        // Don't fail the account creation if sync fails
+      }
     }
 
     // Generate a secure token for server-side session creation

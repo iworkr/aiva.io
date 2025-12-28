@@ -11,6 +11,7 @@
 import { redirect } from 'next/navigation';
 import { createSupabaseUserServerComponentClient } from '@/supabase-clients/user/createSupabaseUserServerComponentClient';
 import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
+import { getSoloWorkspace } from '@/data/user/workspaces';
 
 interface PageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -45,19 +46,50 @@ export default async function ShopifyLinkCompletePage({ searchParams }: PageProp
     redirect('/en/dashboard?error=shop_not_found');
   }
 
-  // Link the shop to the current user
-  const { error: linkError } = await supabaseAdminClient
+  // Get user's workspace
+  let workspaceId: string | null = null;
+  try {
+    const soloWorkspace = await getSoloWorkspace();
+    workspaceId = soloWorkspace.id;
+    console.log(`[Shopify Link Complete] Found workspace ${workspaceId} for user ${user.id}`);
+  } catch (error) {
+    console.warn(`[Shopify Link Complete] Could not get workspace for user ${user.id}:`, error);
+  }
+  
+  // Link the shop to the current user and workspace
+  const { data: updatedShop, error: linkError } = await supabaseAdminClient
     .from('shopify_stores')
     .update({
       linked_user_id: user.id,
+      workspace_id: workspaceId,
       link_method: 'existing_account',
+      sync_enabled: true, // Enable sync by default
       updated_at: new Date().toISOString(),
     })
-    .eq('id', shop.id);
+    .eq('id', shop.id)
+    .select('id')
+    .single();
 
-  if (linkError) {
+  if (linkError || !updatedShop) {
     console.error('Failed to link shop:', linkError);
     redirect('/en/dashboard?error=link_failed');
+  }
+  
+  // Trigger initial sync if workspace is set
+  if (workspaceId) {
+    try {
+      console.log(`[Shopify Link Complete] Triggering initial sync for store ${updatedShop.id}`);
+      const { syncAllShopifyData } = await import('@/lib/shopify/sync');
+      // Run sync in background - don't wait for it
+      syncAllShopifyData(updatedShop.id, workspaceId, {
+        maxRecords: 250,
+        fullSync: true,
+      }).catch((syncError) => {
+        console.error('[Shopify Link Complete] Initial sync error (non-blocking):', syncError);
+      });
+    } catch (syncError) {
+      console.error('[Shopify Link Complete] Failed to trigger initial sync:', syncError);
+    }
   }
 
   // Success - redirect to dashboard

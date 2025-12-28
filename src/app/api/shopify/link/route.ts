@@ -4,6 +4,8 @@ import { verifyLinkToken } from '@/lib/shopify/tokens';
 import { getShopOwnerEmail } from '@/lib/shopify/client';
 import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
 import { createSupabaseUserRouteHandlerClient } from '@/supabase-clients/user/createSupabaseUserRouteHandlerClient';
+import { getSoloWorkspace } from '@/data/user/workspaces';
+import { syncAllShopifyData } from '@/lib/shopify/sync';
 
 export const dynamic = 'force-dynamic';
 
@@ -137,17 +139,32 @@ export async function POST(request: NextRequest) {
       userId = user.id;
     }
     
-    // Link the shop to the user
-    const { error: updateError } = await supabaseAdminClient
+    // Get user's workspace
+    let workspaceId: string | null = null;
+    try {
+      const soloWorkspace = await getSoloWorkspace();
+      workspaceId = soloWorkspace.id;
+      console.log(`[Shopify Link] Found workspace ${workspaceId} for user ${userId}`);
+    } catch (error) {
+      console.warn(`[Shopify Link] Could not get workspace for user ${userId}:`, error);
+      // Continue without workspace_id - it can be set later
+    }
+    
+    // Link the shop to the user and workspace
+    const { data: updatedShop, error: updateError } = await supabaseAdminClient
       .from('shopify_stores')
       .update({
         linked_user_id: userId,
+        workspace_id: workspaceId,
         link_method: linkMethod,
+        sync_enabled: true, // Enable sync by default
         updated_at: new Date().toISOString(),
       })
-      .eq('shop_domain', shop);
+      .eq('shop_domain', shop)
+      .select('id')
+      .single();
     
-    if (updateError) {
+    if (updateError || !updatedShop) {
       console.error('Failed to link shop:', updateError);
       return NextResponse.json(
         { error: 'Failed to link Shopify store' },
@@ -155,11 +172,30 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Trigger initial sync if workspace is set
+    if (workspaceId) {
+      try {
+        console.log(`[Shopify Link] Triggering initial sync for store ${updatedShop.id}`);
+        // Run sync in background - don't wait for it
+        syncAllShopifyData(updatedShop.id, workspaceId, {
+          maxRecords: 250,
+          fullSync: true,
+        }).catch((syncError) => {
+          console.error('[Shopify Link] Initial sync error (non-blocking):', syncError);
+        });
+      } catch (syncError) {
+        console.error('[Shopify Link] Failed to trigger initial sync:', syncError);
+        // Don't fail the link if sync fails
+      }
+    }
+    
     return NextResponse.json({
       success: true,
       message: 'Shopify store linked successfully',
       shop,
       userId,
+      workspaceId,
+      syncTriggered: !!workspaceId,
     });
   } catch (error) {
     console.error('Shopify link error:', error);
@@ -199,19 +235,49 @@ export async function GET(request: NextRequest) {
   
   const { shop } = tokenData;
   
-  // Link the shop to current user
-  const { error: updateError } = await supabaseAdminClient
+  // Get user's workspace
+  let workspaceId: string | null = null;
+  try {
+    const soloWorkspace = await getSoloWorkspace();
+    workspaceId = soloWorkspace.id;
+    console.log(`[Shopify Link GET] Found workspace ${workspaceId} for user ${user.id}`);
+  } catch (error) {
+    console.warn(`[Shopify Link GET] Could not get workspace for user ${user.id}:`, error);
+  }
+  
+  // Link the shop to current user and workspace
+  const { data: updatedShop, error: updateError } = await supabaseAdminClient
     .from('shopify_stores')
     .update({
       linked_user_id: user.id,
+      workspace_id: workspaceId,
       link_method: 'existing_account',
+      sync_enabled: true, // Enable sync by default
       updated_at: new Date().toISOString(),
     })
-    .eq('shop_domain', shop);
+    .eq('shop_domain', shop)
+    .select('id')
+    .single();
   
-  if (updateError) {
+  if (updateError || !updatedShop) {
     console.error('Failed to link shop:', updateError);
     return NextResponse.redirect(new URL('/dashboard?error=link_failed', request.url));
+  }
+  
+  // Trigger initial sync if workspace is set
+  if (workspaceId) {
+    try {
+      console.log(`[Shopify Link GET] Triggering initial sync for store ${updatedShop.id}`);
+      // Run sync in background - don't wait for it
+      syncAllShopifyData(updatedShop.id, workspaceId, {
+        maxRecords: 250,
+        fullSync: true,
+      }).catch((syncError) => {
+        console.error('[Shopify Link GET] Initial sync error (non-blocking):', syncError);
+      });
+    } catch (syncError) {
+      console.error('[Shopify Link GET] Failed to trigger initial sync:', syncError);
+    }
   }
   
   return NextResponse.redirect(new URL('/dashboard?from=shopify&linked=true', request.url));
