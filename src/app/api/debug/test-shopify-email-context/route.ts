@@ -262,6 +262,121 @@ function generateHTML(data: any): string {
         \`;
       }
     }
+
+    async function triggerSync() {
+      const resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = '<p>🔄 Triggering Shopify sync... This may take a minute. Check Vercel logs for detailed progress.</p>';
+      
+      try {
+        const response = await fetch('/api/debug/test-shopify-email-context', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            workspaceId: '${workspaceId}',
+            email: '${email}',
+            triggerSync: true,
+          }),
+        });
+        
+        const data = await response.json();
+        
+        if (data.success && data.syncResult) {
+          const sync = data.syncResult;
+          const hasErrors = sync.errors && sync.errors.length > 0;
+          
+          resultDiv.innerHTML = \`
+            <div style="background: \${sync.success ? '#d4edda' : '#fff3cd'}; padding: 15px; border-radius: 8px; margin-top: 20px;">
+              <h3>\${sync.success ? '✅ Sync Completed' : '⚠️ Sync Completed with Errors'}</h3>
+              
+              <div style="margin-top: 15px;">
+                <h4>📊 Sync Summary</h4>
+                <ul style="list-style: none; padding: 0;">
+                  <li style="margin: 8px 0;"><strong>Orders:</strong> \${sync.ordersSynced || 0} synced</li>
+                  <li style="margin: 8px 0;"><strong>Products:</strong> \${sync.productsSynced || 0} synced</li>
+                  <li style="margin: 8px 0;"><strong>Customers:</strong> \${sync.customersSynced || 0} synced</li>
+                  <li style="margin: 8px 0;"><strong>Total Records:</strong> \${sync.totalRecordsSynced || 0}</li>
+                </ul>
+              </div>
+              
+              \${sync.orderDetails ? \`
+                <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 4px;">
+                  <h4>📦 Order Details</h4>
+                  <ul style="list-style: none; padding: 0;">
+                    <li><strong>Created:</strong> \${sync.orderDetails.created || 0}</li>
+                    <li><strong>Updated:</strong> \${sync.orderDetails.updated || 0}</li>
+                    <li><strong>Success:</strong> \${sync.orderDetails.success ? 'Yes' : 'No'}</li>
+                  </ul>
+                </div>
+              \` : ''}
+              
+              \${sync.productDetails ? \`
+                <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 4px;">
+                  <h4>🛍️ Product Details</h4>
+                  <ul style="list-style: none; padding: 0;">
+                    <li><strong>Created:</strong> \${sync.productDetails.created || 0}</li>
+                    <li><strong>Updated:</strong> \${sync.productDetails.updated || 0}</li>
+                    <li><strong>Success:</strong> \${sync.productDetails.success ? 'Yes' : 'No'}</li>
+                  </ul>
+                </div>
+              \` : ''}
+              
+              \${sync.customerDetails ? \`
+                <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 4px;">
+                  <h4>👤 Customer Details</h4>
+                  <ul style="list-style: none; padding: 0;">
+                    <li><strong>Created:</strong> \${sync.customerDetails.created || 0}</li>
+                    <li><strong>Updated:</strong> \${sync.customerDetails.updated || 0}</li>
+                    <li><strong>Success:</strong> \${sync.customerDetails.success ? 'Yes' : 'No'}</li>
+                  </ul>
+                </div>
+              \` : ''}
+              
+              \${hasErrors ? \`
+                <div style="margin-top: 15px; padding: 10px; background: #f8d7da; border-radius: 4px;">
+                  <h4>❌ Errors (\${sync.errors.length})</h4>
+                  <ul style="list-style: none; padding: 0;">
+                    \${sync.errors.slice(0, 5).map(err => '<li style="margin: 4px 0;">' + (typeof err === 'string' ? err : JSON.stringify(err)) + '</li>').join('')}
+                    \${sync.errors.length > 5 ? '<li><em>... and ' + (sync.errors.length - 5) + ' more errors</em></li>' : ''}
+                  </ul>
+                </div>
+              \` : ''}
+              
+              \${sync.error ? \`
+                <div style="margin-top: 15px; padding: 10px; background: #f8d7da; border-radius: 4px;">
+                  <h4>❌ Sync Error</h4>
+                  <p>\${sync.error}</p>
+                </div>
+              \` : ''}
+              
+              <div style="margin-top: 15px;">
+                <p><strong>Next Steps:</strong></p>
+                <ol>
+                  \${data.nextSteps ? data.nextSteps.map(step => '<li>' + step + '</li>').join('') : '<li>Refresh this page to see updated data</li>'}
+                </ol>
+                <button class="button" onclick="window.location.reload()" style="margin-top: 10px;">🔄 Refresh Page</button>
+              </div>
+            </div>
+          \`;
+        } else {
+          resultDiv.innerHTML = \`
+            <div style="background: #f8d7da; padding: 15px; border-radius: 8px; margin-top: 20px;">
+              <h3>❌ Sync Failed</h3>
+              <p>\${data.error || 'Failed to trigger sync'}</p>
+              \${data.details ? '<pre style="background: white; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 12px;">' + JSON.stringify(data.details, null, 2) + '</pre>' : ''}
+            </div>
+          \`;
+        }
+      } catch (error) {
+        resultDiv.innerHTML = \`
+          <div style="background: #f8d7da; padding: 15px; border-radius: 8px; margin-top: 20px;">
+            <h3>❌ Error</h3>
+            <p>\${error.message}</p>
+            <p style="margin-top: 10px; font-size: 14px; color: #666;">Check the browser console and Vercel logs for more details.</p>
+          </div>
+        \`;
+        console.error('Sync error:', error);
+      }
+    }
   </script>
 </body>
 </html>`;
@@ -511,8 +626,15 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('[Test Shopify Context] POST request received');
   try {
     const body = await request.json();
+    console.log('[Test Shopify Context] Request body:', { 
+      hasWorkspaceId: !!body.workspaceId, 
+      email: body.email, 
+      triggerSync: body.triggerSync 
+    });
+    
     const {
       workspaceId: providedWorkspaceId,
       email = 'Russel.winfield@example.com',
@@ -521,11 +643,22 @@ export async function POST(request: NextRequest) {
       triggerSync = false,
     } = body;
 
+    console.log('[Test Shopify Context] Parsed params:', { 
+      providedWorkspaceId, 
+      email, 
+      triggerSync 
+    });
+
     const supabase = await createSupabaseUserRouteHandlerClient();
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser();
+    
+    console.log('[Test Shopify Context] Auth check:', { 
+      hasUser: !!user, 
+      authError: authError?.message 
+    });
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -554,13 +687,23 @@ export async function POST(request: NextRequest) {
     // Optionally trigger Shopify sync
     let syncResult: any = null;
     if (triggerSync) {
-      const { data: store } = await supabaseAdminClient
+      console.log('[Test Shopify Context] Trigger sync requested');
+      console.log('[Test Shopify Context] Looking for store with workspace_id:', finalWorkspaceId);
+      
+      const { data: store, error: storeQueryError } = await supabaseAdminClient
         .from('shopify_stores')
         .select('id, shop_domain')
         .eq('workspace_id', finalWorkspaceId)
         .eq('is_active', true)
         .limit(1)
         .single();
+
+      console.log('[Test Shopify Context] Store query result:', { 
+        found: !!store, 
+        storeId: store?.id, 
+        domain: store?.shop_domain,
+        error: storeQueryError?.message 
+      });
 
       if (store) {
         try {
@@ -614,18 +757,24 @@ export async function POST(request: NextRequest) {
             errorCount: syncResult.errors.length,
           });
         } catch (syncError) {
-          console.error('[Test] Sync error:', syncError);
+          console.error('[Test Shopify Context] Sync error:', syncError);
+          console.error('[Test Shopify Context] Sync error stack:', syncError instanceof Error ? syncError.stack : 'No stack');
           syncResult = {
             error: syncError instanceof Error ? syncError.message : 'Unknown sync error',
             success: false,
+            errorDetails: syncError instanceof Error ? syncError.stack : String(syncError),
           };
         }
       } else {
+        console.error('[Test Shopify Context] No store found for workspace:', finalWorkspaceId);
         syncResult = {
           error: 'Store not found for workspace',
           success: false,
+          workspaceId: finalWorkspaceId,
         };
       }
+    } else {
+      console.log('[Test Shopify Context] Sync not requested (triggerSync=false)');
     }
 
     // Create test message
@@ -680,7 +829,7 @@ export async function POST(request: NextRequest) {
       console.error('Failed to get customer history:', contextError);
     }
 
-    return NextResponse.json({
+    const response = {
       success: true,
       message: triggerSync ? 'Sync triggered successfully' : 'Test message created successfully',
       testMessage: triggerSync ? null : {
@@ -706,9 +855,19 @@ export async function POST(request: NextRequest) {
         '3. Check the AI draft - it should reference the customer\'s order history if orders exist',
         '4. If no orders found, ensure Shopify sync is enabled and orders exist in Shopify for this email',
       ],
+    };
+    
+    console.log('[Test Shopify Context] Returning response:', {
+      success: response.success,
+      hasSyncResult: !!response.syncResult,
+      syncSuccess: response.syncResult?.success,
+      orderCount: response.shopifyContext.orderCount,
     });
+    
+    return NextResponse.json(response);
   } catch (error) {
-    console.error('Error creating test message:', error);
+    console.error('[Test Shopify Context] Error in POST handler:', error);
+    console.error('[Test Shopify Context] Error stack:', error instanceof Error ? error.stack : 'No stack');
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : 'Unknown error',
