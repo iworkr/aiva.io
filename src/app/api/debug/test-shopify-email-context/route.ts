@@ -1,15 +1,13 @@
 /**
  * Debug endpoint to test Shopify order context for a specific email
  * 
- * This endpoint helps test the full flow:
- * 1. Check if orders exist for Russel.winfield@example.com
- * 2. Create a test message from that email
- * 3. Verify AI can retrieve order context
- * 4. Optionally trigger Shopify sync
+ * Simply visit: /api/debug/test-shopify-email-context
  * 
- * Usage:
- * GET /api/debug/test-shopify-email-context?workspaceId=xxx&email=Russel.winfield@example.com
- * POST /api/debug/test-shopify-email-context (with body: { workspaceId, email, subject?, body?, triggerSync? })
+ * This endpoint:
+ * 1. Auto-detects your workspace and user
+ * 2. Checks if orders exist for Russel.winfield@example.com
+ * 3. Shows you the Shopify context that would be included in AI replies
+ * 4. Provides a button to create a test message
  */
 
 import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
@@ -45,14 +43,230 @@ async function getWorkspaceAndConnection(userId: string, workspaceId?: string | 
   return { workspaceId: finalWorkspaceId, connection: emailConnection };
 }
 
+function generateHTML(data: any): string {
+  const {
+    workspaceId,
+    email,
+    shopifyStore,
+    orders,
+    customer,
+    aiContext,
+    existingMessages,
+    recommendations,
+    error,
+  } = data;
+
+  if (error) {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Shopify Email Context Test - Error</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; }
+    .error { background: #fee; border: 1px solid #fcc; padding: 20px; border-radius: 8px; color: #c33; }
+  </style>
+</head>
+<body>
+  <h1>❌ Error</h1>
+  <div class="error">${error}</div>
+</body>
+</html>`;
+  }
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Shopify Email Context Test</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 1000px; margin: 40px auto; padding: 20px; background: #f5f5f5; }
+    .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    h1 { color: #333; margin-top: 0; }
+    h2 { color: #555; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 30px; }
+    .status { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 14px; font-weight: 600; }
+    .status.success { background: #d4edda; color: #155724; }
+    .status.warning { background: #fff3cd; color: #856404; }
+    .status.error { background: #f8d7da; color: #721c24; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+    .info-card { background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #007bff; }
+    .info-card h3 { margin: 0 0 10px 0; color: #333; }
+    .info-card p { margin: 5px 0; color: #666; }
+    .order-list { list-style: none; padding: 0; }
+    .order-item { background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #28a745; }
+    .order-item strong { color: #333; }
+    .context-box { background: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #dee2e6; margin: 20px 0; }
+    .context-box pre { background: white; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+    .button { display: inline-block; background: #007bff; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; margin: 10px 10px 10px 0; cursor: pointer; border: none; }
+    .button:hover { background: #0056b3; }
+    .button.success { background: #28a745; }
+    .button.success:hover { background: #218838; }
+    .recommendation { background: #e7f3ff; border-left: 4px solid #007bff; padding: 15px; margin: 20px 0; border-radius: 4px; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🧪 Shopify Email Context Test</h1>
+    <p><strong>Email:</strong> <code>${email}</code> | <strong>Workspace:</strong> <code>${workspaceId}</code></p>
+
+    <h2>📦 Shopify Store</h2>
+    ${shopifyStore ? `
+      <div class="info-grid">
+        <div class="info-card">
+          <h3>Store Info</h3>
+          <p><strong>Domain:</strong> ${shopifyStore.domain}</p>
+          <p><strong>Name:</strong> ${shopifyStore.name || 'N/A'}</p>
+          <p><strong>Status:</strong> <span class="status ${shopifyStore.isActive ? 'success' : 'error'}">${shopifyStore.isActive ? 'Active' : 'Inactive'}</span></p>
+          <p><strong>Sync Enabled:</strong> <span class="status ${shopifyStore.syncEnabled ? 'success' : 'warning'}">${shopifyStore.syncEnabled ? 'Yes' : 'No'}</span></p>
+        </div>
+      </div>
+    ` : '<p class="status error">No Shopify store found</p>'}
+
+    <h2>🛒 Orders Found</h2>
+    ${orders.count > 0 ? `
+      <p><span class="status success">${orders.count} order(s) found</span></p>
+      <ul class="order-list">
+        ${orders.orders.map((order: any) => `
+          <li class="order-item">
+            <strong>Order ${order.orderNumber}</strong> (${order.shopifyOrderId})<br>
+            Amount: ${order.currency} ${order.totalPrice}<br>
+            Status: ${order.financialStatus || 'N/A'} / ${order.fulfillmentStatus || 'N/A'}<br>
+            Date: ${new Date(order.createdAt).toLocaleDateString()}
+          </li>
+        `).join('')}
+      </ul>
+    ` : '<p class="status warning">No orders found for this email address</p>'}
+
+    <h2>👤 Customer Record</h2>
+    ${customer ? `
+      <div class="info-card">
+        <p><strong>Name:</strong> ${customer.firstName || ''} ${customer.lastName || ''}</p>
+        <p><strong>Email:</strong> ${customer.email}</p>
+        <p><strong>Total Orders:</strong> ${customer.ordersCount}</p>
+        <p><strong>Total Spent:</strong> ${customer.totalSpent || 0}</p>
+      </div>
+    ` : '<p class="status warning">No customer record found</p>'}
+
+    <h2>🤖 AI Context Preview</h2>
+    <div class="context-box">
+      <p><strong>Order Count:</strong> ${aiContext.orderCount} | <strong>Total Spent:</strong> ${aiContext.totalSpent || 0}</p>
+      <p><strong>This is what the AI will see when generating a reply:</strong></p>
+      <pre>${aiContext.formattedContext || '(No context - no orders found)'}</pre>
+    </div>
+
+    <h2>📧 Existing Messages</h2>
+    <p>${existingMessages.count} message(s) from this email address</p>
+    ${existingMessages.messages.length > 0 ? `
+      <ul>
+        ${existingMessages.messages.map((msg: any) => `
+          <li>${msg.subject || '(no subject)'} - ${new Date(msg.created_at).toLocaleString()}</li>
+        `).join('')}
+      </ul>
+    ` : ''}
+
+    <h2>✅ Recommendations</h2>
+    <div class="recommendation">
+      <p><strong>${recommendations.message}</strong></p>
+      ${recommendations.canTestAI ? `
+        <p>You can now create a test message to verify the AI includes order context in replies.</p>
+        <button class="button success" onclick="createTestMessage()">Create Test Message</button>
+      ` : recommendations.needsSync ? `
+        <p>You may need to sync Shopify orders. Make sure:</p>
+        <ul>
+          <li>Orders exist in Shopify with email: <code>${email}</code></li>
+          <li>Shopify sync is enabled for your store</li>
+          <li>Run a manual sync if needed</li>
+        </ul>
+      ` : ''}
+    </div>
+
+    <div id="result" style="margin-top: 20px;"></div>
+  </div>
+
+  <script>
+    async function createTestMessage() {
+      const resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = '<p>Creating test message...</p>';
+      
+      try {
+        const response = await fetch('/api/debug/test-shopify-email-context', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            workspaceId: '${workspaceId}',
+            email: '${email}',
+            subject: 'Test: Order Inquiry',
+            body: 'Hi, I wanted to check on my recent order. Can you provide an update?',
+          }),
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          resultDiv.innerHTML = \`
+            <div style="background: #d4edda; padding: 15px; border-radius: 8px; margin-top: 20px;">
+              <h3>✅ Test Message Created!</h3>
+              <p><strong>Message ID:</strong> <code>\${data.testMessage.id}</code></p>
+              <p><strong>Subject:</strong> \${data.testMessage.subject}</p>
+              <p><strong>Shopify Context:</strong> \${data.shopifyContext.orderCount} orders found</p>
+              <p><a href="/inbox" class="button">Go to Inbox</a></p>
+              <p><strong>Next Steps:</strong></p>
+              <ol>
+                \${data.nextSteps.map(step => '<li>' + step + '</li>').join('')}
+              </ol>
+            </div>
+          \`;
+        } else {
+          resultDiv.innerHTML = \`
+            <div style="background: #f8d7da; padding: 15px; border-radius: 8px; margin-top: 20px;">
+              <h3>❌ Error</h3>
+              <p>\${data.error || 'Failed to create test message'}</p>
+            </div>
+          \`;
+        }
+      } catch (error) {
+        resultDiv.innerHTML = \`
+          <div style="background: #f8d7da; padding: 15px; border-radius: 8px; margin-top: 20px;">
+            <h3>❌ Error</h3>
+            <p>\${error.message}</p>
+          </div>
+        \`;
+      }
+    }
+  </script>
+</body>
+</html>`;
+}
+
 export async function GET(request: NextRequest) {
   try {
+    const supabase = await createSupabaseUserRouteHandlerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return new NextResponse(generateHTML({ error: 'Unauthorized. Please log in first.' }), {
+        status: 401,
+        headers: { 'Content-Type': 'text/html' },
+      });
+    }
+
     const searchParams = request.nextUrl.searchParams;
-    const workspaceId = searchParams.get('workspaceId');
     const email = searchParams.get('email') || 'Russel.winfield@example.com';
 
-    if (!workspaceId) {
-      return NextResponse.json({ error: 'workspaceId is required' }, { status: 400 });
+    // Auto-detect workspace
+    let workspaceId: string;
+    try {
+      const soloWorkspace = await getSoloWorkspace();
+      workspaceId = soloWorkspace.id;
+    } catch (error) {
+      return new NextResponse(generateHTML({ error: 'No workspace found. Please create a workspace first.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'text/html' },
+      });
     }
 
     const supabase = supabaseAdminClient;
@@ -66,16 +280,46 @@ export async function GET(request: NextRequest) {
       .limit(1)
       .single();
 
+    // 1. Check if Shopify store is connected
+    const { data: store, error: storeError } = await supabase
+      .from('shopify_stores')
+      .select('id, shop_domain, shop_name, is_active, sync_enabled')
+      .eq('workspace_id', workspaceId)
+      .eq('is_active', true)
+      .limit(1)
+      .single();
+
+    let orders: any[] = [];
+    let customer: any = null;
+    let customerHistory: any = null;
+    let formattedContext = '';
+    let existingMessages: any[] = [];
+
     if (storeError || !store) {
-      return NextResponse.json({
-        error: 'No active Shopify store found for this workspace',
-        details: storeError?.message,
+      // No store found - return HTML with error
+      return new NextResponse(generateHTML({
         workspaceId,
-      }, { status: 404 });
+        email,
+        shopifyStore: null,
+        orders: { count: 0, orders: [] },
+        customer: null,
+        aiContext: { orderCount: 0, totalSpent: 0, formattedContext: '(No Shopify store connected)' },
+        existingMessages: { count: 0, messages: [] },
+        recommendations: {
+          hasOrders: false,
+          hasCustomer: false,
+          canTestAI: false,
+          needsSync: false,
+          message: 'No active Shopify store found. Please connect a Shopify store first.',
+        },
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'text/html' },
+      });
     }
 
     // 2. Check for orders with this email
-    const { data: orders, error: ordersError } = await supabase
+    const { data: ordersData, error: ordersError } = await supabase
       .from('shopify_orders')
       .select('*')
       .eq('workspace_id', workspaceId)
@@ -84,15 +328,12 @@ export async function GET(request: NextRequest) {
       .order('created_at_shopify', { ascending: false })
       .limit(10);
 
-    if (ordersError) {
-      return NextResponse.json({
-        error: 'Failed to query orders',
-        details: ordersError.message,
-      }, { status: 500 });
+    if (!ordersError && ordersData) {
+      orders = ordersData;
     }
 
     // 3. Check for customer record
-    const { data: customer, error: customerError } = await supabase
+    const { data: customerData } = await supabase
       .from('shopify_customers')
       .select('*')
       .eq('workspace_id', workspaceId)
@@ -101,9 +342,11 @@ export async function GET(request: NextRequest) {
       .limit(1)
       .single();
 
+    if (customerData) {
+      customer = customerData;
+    }
+
     // 4. Test the AI context retrieval function
-    let customerHistory = null;
-    let formattedContext = '';
     try {
       customerHistory = await getCustomerOrderHistory(
         workspaceId,
@@ -116,7 +359,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 5. Check for existing messages from this email
-    const { data: existingMessages, error: messagesError } = await supabase
+    const { data: messagesData } = await supabase
       .from('messages')
       .select('id, subject, timestamp, created_at')
       .eq('workspace_id', workspaceId)
@@ -124,7 +367,11 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(5);
 
-    return NextResponse.json({
+    if (messagesData) {
+      existingMessages = messagesData;
+    }
+
+    return new NextResponse(generateHTML({
       workspaceId,
       email,
       shopifyStore: {
@@ -135,8 +382,8 @@ export async function GET(request: NextRequest) {
         syncEnabled: store.sync_enabled,
       },
       orders: {
-        count: orders?.length || 0,
-        orders: (orders || []).map(order => ({
+        count: orders.length,
+        orders: orders.map(order => ({
           orderId: order.id,
           shopifyOrderId: order.shopify_order_id,
           orderNumber: order.order_number || order.name,
@@ -159,28 +406,32 @@ export async function GET(request: NextRequest) {
         orderCount: customerHistory?.orderCount || 0,
         totalSpent: customerHistory?.totalSpent || 0,
         formattedContext: formattedContext || '(no context - no orders found)',
-        rawHistory: customerHistory,
       },
       existingMessages: {
-        count: existingMessages?.length || 0,
-        messages: existingMessages || [],
+        count: existingMessages.length,
+        messages: existingMessages,
       },
       recommendations: {
-        hasOrders: (orders?.length || 0) > 0,
+        hasOrders: orders.length > 0,
         hasCustomer: !!customer,
-        canTestAI: (orders?.length || 0) > 0,
-        needsSync: (orders?.length || 0) === 0 && store.sync_enabled,
-        message: (orders?.length || 0) > 0
+        canTestAI: orders.length > 0,
+        needsSync: orders.length === 0 && store.sync_enabled,
+        message: orders.length > 0
           ? '✅ Orders found! You can create a test message to test AI context.'
           : '⚠️ No orders found. You may need to sync Shopify orders or create test orders in Shopify.',
       },
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'text/html' },
     });
   } catch (error) {
     console.error('Test Shopify email context error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    return new NextResponse(generateHTML({
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'text/html' },
+    });
   }
 }
 
@@ -188,16 +439,12 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
-      workspaceId,
+      workspaceId: providedWorkspaceId,
       email = 'Russel.winfield@example.com',
       subject = 'Test: Order Inquiry',
       body: emailBody = 'Hi, I wanted to check on my recent order. Can you provide an update?',
       triggerSync = false,
     } = body;
-
-    if (!workspaceId) {
-      return NextResponse.json({ error: 'workspaceId is required' }, { status: 400 });
-    }
 
     const supabase = await createSupabaseUserRouteHandlerClient();
     const {
@@ -209,11 +456,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Auto-detect workspace if not provided
+    let finalWorkspaceId: string;
+    if (providedWorkspaceId) {
+      finalWorkspaceId = providedWorkspaceId;
+    } else {
+      try {
+        const soloWorkspace = await getSoloWorkspace();
+        finalWorkspaceId = soloWorkspace.id;
+      } catch (error) {
+        return NextResponse.json({ error: 'No workspace found. Please create a workspace first.' }, { status: 400 });
+      }
+    }
+
     // Get workspace and email connection
-    const { workspaceId: finalWorkspaceId, connection: emailConnection } = await getWorkspaceAndConnection(
+    const { workspaceId: workspaceIdFromHelper, connection: emailConnection } = await getWorkspaceAndConnection(
       user.id,
-      workspaceId
+      finalWorkspaceId
     );
+    finalWorkspaceId = workspaceIdFromHelper;
 
     if (!workspaceMember) {
       return NextResponse.json({ error: 'Not a workspace member' }, { status: 403 });
