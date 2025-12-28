@@ -413,7 +413,7 @@ export async function checkAutoReplyEligibility(
 
 export interface AutoSendSettings {
   autoSendEnabled: boolean;
-  autoSendDelayType: 'exact' | 'random';
+  autoSendDelayType: 'exact' | 'random' | 'instant';
   autoSendDelayMin: number;
   autoSendDelayMax: number;
   autoSendConfidenceThreshold: number;
@@ -433,8 +433,13 @@ export interface QueueAutoSendResult {
  */
 function calculateScheduledTime(settings: AutoSendSettings): Date {
   const now = new Date();
+  
+  // Instant mode: send immediately (schedule for now)
+  if (settings.autoSendDelayType === 'instant') {
+    return now;
+  }
+  
   let delayMinutes: number;
-
   if (settings.autoSendDelayType === 'exact') {
     delayMinutes = settings.autoSendDelayMin;
   } else {
@@ -538,7 +543,7 @@ export async function getWorkspaceAutoSendSettings(workspaceId: string): Promise
 
   return {
     autoSendEnabled: data.auto_send_enabled ?? false,
-    autoSendDelayType: (data.auto_send_delay_type ?? 'random') as 'exact' | 'random',
+    autoSendDelayType: (data.auto_send_delay_type ?? 'random') as 'exact' | 'random' | 'instant',
     autoSendDelayMin: data.auto_send_delay_min ?? 10,
     autoSendDelayMax: data.auto_send_delay_max ?? 30,
     autoSendConfidenceThreshold: data.auto_send_confidence_threshold ?? 0.85,

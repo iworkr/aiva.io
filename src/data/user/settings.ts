@@ -54,7 +54,7 @@ const updateSyncSettingsSchema = z.object({
 const updateAutoSendSettingsSchema = z.object({
   workspaceId: z.string().uuid(),
   autoSendEnabled: z.boolean().optional(),
-  autoSendDelayType: z.enum(['exact', 'random']).optional(),
+  autoSendDelayType: z.enum(['exact', 'random', 'instant']).optional(),
   autoSendDelayMin: z.number().min(1).max(120).optional(),
   autoSendDelayMax: z.number().min(1).max(120).optional(),
   autoSendConfidenceThreshold: z.number().min(0.50).max(0.95).optional(), // Unified threshold (50-95%)

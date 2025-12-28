@@ -160,7 +160,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
 
   // Auto-send settings state
   const [autoSendEnabled, setAutoSendEnabled] = useState(false);
-  const [autoSendDelayType, setAutoSendDelayType] = useState<'exact' | 'random'>('random');
+  const [autoSendDelayType, setAutoSendDelayType] = useState<'exact' | 'random' | 'instant'>('random');
   const [autoSendDelayMin, setAutoSendDelayMin] = useState(10);
   const [autoSendDelayMax, setAutoSendDelayMax] = useState(30);
   const [autoSendConfidenceThreshold, setAutoSendConfidenceThreshold] = useState(0.85);
@@ -290,7 +290,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
         // Set auto-send settings
         const autoSend = data.autoSend as {
           autoSendEnabled?: boolean;
-          autoSendDelayType?: 'exact' | 'random';
+          autoSendDelayType?: 'exact' | 'random' | 'instant';
           autoSendDelayMin?: number;
           autoSendDelayMax?: number;
           autoSendConfidenceThreshold?: number;
@@ -759,7 +759,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   // Auto-send settings handlers with debounced save
   const triggerAutoSendSave = useCallback((updates: Partial<{
     autoSendEnabled: boolean;
-    autoSendDelayType: 'exact' | 'random';
+    autoSendDelayType: 'exact' | 'random' | 'instant';
     autoSendDelayMin: number;
     autoSendDelayMax: number;
     autoSendConfidenceThreshold: number;
@@ -788,7 +788,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
     triggerAutoSendSave({ autoSendEnabled: enabled });
   };
 
-  const handleAutoSendDelayTypeChange = (type: 'exact' | 'random') => {
+  const handleAutoSendDelayTypeChange = (type: 'exact' | 'random' | 'instant') => {
     setAutoSendDelayType(type);
     triggerAutoSendSave({ autoSendDelayType: type });
   };
@@ -1508,25 +1508,35 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                               <Label>Sending Delay</Label>
                             </div>
                             <p className="text-sm text-muted-foreground">
-                              Wait before sending to allow review time
+                              {autoSendDelayType === 'instant' 
+                                ? 'Send immediately when draft is generated (useful for testing)'
+                                : 'Wait before sending to allow review time'}
                             </p>
                           </div>
 
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <Label htmlFor="delay-type" className="text-sm">Delay Mode</Label>
-                              <Select value={autoSendDelayType} onValueChange={(v) => handleAutoSendDelayTypeChange(v as 'exact' | 'random')}>
+                              <Select value={autoSendDelayType} onValueChange={(v) => handleAutoSendDelayTypeChange(v as 'exact' | 'random' | 'instant')}>
                                 <SelectTrigger id="delay-type">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
+                                  <SelectItem value="instant">Instant</SelectItem>
                                   <SelectItem value="exact">Fixed delay</SelectItem>
                                   <SelectItem value="random">Random range</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
 
-                            {autoSendDelayType === 'exact' ? (
+                            {autoSendDelayType === 'instant' ? (
+                              <div className="space-y-2">
+                                <Label className="text-sm text-muted-foreground">Sends immediately</Label>
+                                <p className="text-xs text-muted-foreground">
+                                  Useful for testing - replies are sent as soon as they&apos;re generated
+                                </p>
+                              </div>
+                            ) : autoSendDelayType === 'exact' ? (
                               <div className="space-y-2">
                                 <Label htmlFor="delay-min" className="text-sm">Delay (minutes)</Label>
                                 <Select value={String(autoSendDelayMin)} onValueChange={(v) => handleAutoSendDelayMinChange(Number(v))}>

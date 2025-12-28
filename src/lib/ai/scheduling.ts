@@ -350,4 +350,3 @@ export async function createCalendarEventFromSentEmail(
     };
   }
 }
-
