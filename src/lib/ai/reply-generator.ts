@@ -233,6 +233,7 @@ export async function generateReplyDraft(
         if (!senderEmail || !senderEmail.includes('@')) {
           console.warn("[AI Reply] Invalid sender email, skipping Shopify context");
         } else {
+          console.log("[AI Reply] Fetching Shopify order history for sender:", senderEmail);
           const customerHistory = await getCustomerOrderHistory(
             workspaceId,
             senderEmail, // Always use sender's email - never accept email from message body
@@ -241,13 +242,22 @@ export async function generateReplyDraft(
           
           if (customerHistory.orderCount > 0) {
             shopifyCustomerContext = formatCustomerHistoryForAI(customerHistory);
-            console.log("[AI Reply] Found Shopify customer with", customerHistory.orderCount, "orders for", senderEmail);
+            console.log("[AI Reply] ✅ Found Shopify customer with", customerHistory.orderCount, "orders for", senderEmail);
+            console.log("[AI Reply] Order details:", JSON.stringify(customerHistory.orders.slice(0, 2).map(o => ({
+              orderNumber: o.orderNumber,
+              status: `${o.financialStatus}/${o.fulfillmentStatus}`,
+              total: o.totalPrice
+            }))));
+          } else {
+            console.log("[AI Reply] ⚠️ No orders found for sender:", senderEmail);
           }
         }
       } catch (shopifyError) {
-        console.warn("[AI Reply] Failed to fetch Shopify context:", shopifyError);
+        console.error("[AI Reply] ❌ Failed to fetch Shopify context:", shopifyError);
         // Don't block on Shopify errors, just continue without context
       }
+    } else {
+      console.log("[AI Reply] No sender email, skipping Shopify context");
     }
 
     if (message.provider_thread_id) {
@@ -298,7 +308,10 @@ Body:
 ${message.body}
 
 ${conversationContext ? `\n\nConversation Context:\n${conversationContext}` : ""}
-${shopifyCustomerContext ? `\n\n${shopifyCustomerContext}` : ""}
+${shopifyCustomerContext ? `\n\n🛒 CUSTOMER ORDER INFORMATION (USE THIS TO ANSWER ORDER QUESTIONS):
+${shopifyCustomerContext}
+
+⚠️ IMPORTANT: If the sender is asking about their order status, shipping, or delivery, you MUST use the order information above to provide a specific answer. Do NOT say "I'll check on that" if you have their order data - tell them the actual status, order number, and details from the information above.` : ""}
 ${context ? `\n\nAdditional Context: ${context}` : ""}
 ${workspaceAIContext ? `\n\nWORKSPACE CONTEXT (CRITICAL - Refer to this for understanding your role and the business):\n${workspaceAIContext}` : ""}
 ${workspaceAIRules ? `\n\nWORKSPACE RULES (CRITICAL - You MUST follow these strictly):\n${workspaceAIRules}` : ""}

@@ -417,7 +417,7 @@ export function formatCustomerHistoryForAI(history: CustomerOrderHistory): strin
   }
 
   const lines: string[] = [
-    `\n## Customer Order History`,
+    `## Customer Order History`,
   ];
 
   if (history.customer) {
@@ -427,24 +427,44 @@ export function formatCustomerHistoryForAI(history: CustomerOrderHistory): strin
     lines.push(
       `Customer: ${name || history.customer.email || "Unknown"}`,
       `Total Orders: ${history.customer.ordersCount}`,
-      `Total Spent: ${formatCurrency(history.customer.totalSpent, history.customer.currency)}`
+      `Total Spent: ${formatCurrency(history.customer.totalSpent, history.customer.currency)}`,
+      ``
     );
   }
 
   if (history.orders.length > 0) {
-    lines.push(``, `Recent Orders:`);
+    lines.push(`### Recent Orders (Most Recent First):`);
     for (const order of history.orders.slice(0, 5)) {
-      const status = [
-        order.financialStatus,
-        order.fulfillmentStatus,
-      ]
-        .filter(Boolean)
-        .join(", ");
+      const financialStatus = order.financialStatus || "unknown";
+      const fulfillmentStatus = order.fulfillmentStatus || "unfulfilled";
       const date = new Date(order.createdAt).toLocaleDateString();
+      
+      // Build status description
+      let statusDescription = "";
+      if (financialStatus === "paid" && fulfillmentStatus === "fulfilled") {
+        statusDescription = "✅ Paid & Shipped";
+      } else if (financialStatus === "paid" && fulfillmentStatus === "partial") {
+        statusDescription = "✅ Paid & Partially Shipped";
+      } else if (financialStatus === "paid" && fulfillmentStatus === "unfulfilled") {
+        statusDescription = "✅ Paid, Not Yet Shipped";
+      } else if (financialStatus === "pending") {
+        statusDescription = "⏳ Payment Pending";
+      } else if (financialStatus === "refunded") {
+        statusDescription = "↩️ Refunded";
+      } else {
+        statusDescription = `${financialStatus}/${fulfillmentStatus}`;
+      }
+      
       lines.push(
-        `- ${order.orderNumber} (${date}): ${formatCurrency(order.totalPrice, order.currency)} - ${status || "pending"} - ${order.lineItemsCount} item(s)`
+        `**Order ${order.orderNumber}** (${date})`,
+        `  - Amount: ${formatCurrency(order.totalPrice, order.currency)}`,
+        `  - Status: ${statusDescription}`,
+        `  - Items: ${order.lineItemsCount} item(s)`,
+        ``
       );
     }
+    
+    lines.push(`💡 When the customer asks about "my recent order" or "order status", refer to the most recent order above (Order ${history.orders[0].orderNumber}).`);
   }
 
   return lines.join("\n");
