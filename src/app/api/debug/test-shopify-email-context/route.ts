@@ -55,6 +55,8 @@ function generateHTML(data: any): string {
     existingMessages,
     recommendations,
     allUserStores = [],
+    allOrders = [],
+    allCustomers = [],
     error,
   } = data;
 
