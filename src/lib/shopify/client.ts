@@ -190,9 +190,23 @@ async function shopifyAdminRequest<T>(
   
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
+    const errorMessage = typeof errorData === 'object' && errorData.errors
+      ? (typeof errorData.errors === 'string' ? errorData.errors : JSON.stringify(errorData.errors))
+      : JSON.stringify(errorData);
+    
     console.error(`Shopify API error for ${endpoint}:`, response.status, errorData);
+    
+    // Provide helpful error messages for common issues
+    if (response.status === 403 && errorMessage.includes('protected customer data')) {
+      throw new Error(
+        `Shopify API error: 403 - This app needs approval for protected customer data access. ` +
+        `See https://shopify.dev/docs/apps/launch/protected-customer-data. ` +
+        `For development, you can test with products (which don't require approval).`
+      );
+    }
+    
     throw new Error(
-      `Shopify API error: ${response.status} - ${JSON.stringify(errorData)}`
+      `Shopify API error: ${response.status} - ${errorMessage}`
     );
   }
   
