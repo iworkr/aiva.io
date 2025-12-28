@@ -51,6 +51,17 @@ export async function GET(request: NextRequest) {
     // Auto-handle each test message
     for (const msg of testMessages || []) {
       try {
+        // First, update requires_human_review to false (so handleNoActionNeeded doesn't block)
+        await supabase
+          .from('messages')
+          .update({
+            requires_human_review: false,
+            review_reason: null,
+            review_context: null,
+          })
+          .eq('id', msg.id);
+        
+        // Then mark as handled
         await handleNoActionNeeded(msg.id, workspaceId);
         results.handled++;
         console.log(`[Cleanup] Auto-handled test message: ${msg.id} - ${msg.subject}`);
@@ -64,17 +75,21 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Also update requires_human_review to false for any remaining test messages
-    const { error: updateError } = await supabase
+    // Also directly mark test messages as handled if handleNoActionNeeded failed
+    // This ensures they're marked as handled even if the handler has issues
+    const { error: directUpdateError } = await supabase
       .from('messages')
       .update({
+        handled_by_aiva: true,
+        handled_at: new Date().toISOString(),
+        handle_action: 'classified_no_action',
         requires_human_review: false,
         review_reason: null,
         review_context: null,
       })
       .eq('workspace_id', workspaceId)
       .or('raw_data->test.eq.true,subject.ilike.%test:%')
-      .eq('requires_human_review', true);
+      .or('handled_by_aiva.is.null,handled_by_aiva.eq.false');
 
     if (updateError) {
       console.error('[Cleanup] Failed to update test messages:', updateError);

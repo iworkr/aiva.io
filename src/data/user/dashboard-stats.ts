@@ -188,13 +188,21 @@ export async function getNeedsAttentionItems(
   const excludedCategories = (workspaceSettings?.auto_send_excluded_categories as string[]) || [];
   console.log(`[Dashboard] Excluded categories from settings:`, excludedCategories);
 
+  // Get workspace settings to check Zero Inbox (need this early for filtering)
+  const { data: workspaceSettingsForZeroInbox } = await supabase
+    .from('workspace_settings')
+    .select('inbox_zero_enabled')
+    .eq('workspace_id', workspaceId)
+    .single();
+  
+  const isZeroInboxEnabled = workspaceSettingsForZeroInbox?.inbox_zero_enabled ?? true;
+
   // Get messages that require human review
   // These are messages where AI is uncertain or needs human verification
-  // IMPORTANT: Include ALL messages requiring human review, regardless of handled status
-  // The only filter is that they haven't been reviewed yet (reviewed_at IS NULL)
-  // This ensures users see all messages that need their attention, even if they were auto-handled
+  // IMPORTANT: With Zero Inbox enabled, ONLY show unhandled messages requiring review
+  // Handled messages should NOT appear - they've been processed
   // EXCLUDE test messages - they should be auto-handled, not require review
-  const { data: reviewItems, error: reviewItemsError } = await supabase
+  let reviewQuery = supabase
     .from('messages')
     .select(`
       id,
@@ -228,10 +236,15 @@ export async function getNeedsAttentionItems(
     .eq('requires_human_review', true)
     .is('reviewed_at', null)
     // Exclude test messages - they should be auto-handled
-    .or('raw_data->test.is.null,raw_data->test.neq.true')
-    // REMOVED: .or('handled_by_aiva.eq.false,handle_action.eq.auto_replied')
-    // All messages requiring human review should appear, regardless of handled status
-    // The only requirement is that they haven't been reviewed yet (reviewed_at IS NULL)
+    .or('raw_data->test.is.null,raw_data->test.neq.true');
+  
+  // CRITICAL: With Zero Inbox enabled, ONLY show unhandled messages
+  // Handled messages should NOT appear in attention items
+  if (isZeroInboxEnabled) {
+    reviewQuery = reviewQuery.eq('handled_by_aiva', false);
+  }
+  
+  const { data: reviewItems, error: reviewItemsError } = await reviewQuery
     .order('timestamp', { ascending: false })
     .limit(limit * 2); // Get more to filter after
 
@@ -241,15 +254,24 @@ export async function getNeedsAttentionItems(
     console.log(`[Dashboard] Found ${reviewItems?.length || 0} messages requiring review`);
   }
 
+  // Get workspace settings to check Zero Inbox
+  const { data: workspaceSettingsForZeroInbox } = await supabase
+    .from('workspace_settings')
+    .select('inbox_zero_enabled')
+    .eq('workspace_id', workspaceId)
+    .single();
+  
+  const isZeroInboxEnabled = workspaceSettingsForZeroInbox?.inbox_zero_enabled ?? true;
+
   // Also get actionable messages (request, question, scheduling_intent) that are unhandled
   // These should appear in "What needs your attention" if:
   // 1. They're not in excluded categories
-  // 2. They're unhandled
+  // 2. They're unhandled (CRITICAL: With Zero Inbox, handled messages should NOT appear)
   // 3. They don't have an auto-sendable draft (or the draft is held for review)
   // The idea is: if the AI can respond automatically, it will (via auto-send), so we only show
   // messages that need human intervention/attention
   // EXCLUDE test messages - they should be auto-handled
-  const { data: actionableItems, error: actionableItemsError } = await supabase
+  let actionableQuery = supabase
     .from('messages')
     .select(`
       id,
@@ -281,10 +303,20 @@ export async function getNeedsAttentionItems(
     `)
     .eq('workspace_id', workspaceId)
     .in('actionability', ['request', 'question', 'scheduling_intent'])
-    .eq('requires_human_review', false) // Only include if they don't require review (review items are handled above)
-    .or('handled_by_aiva.is.null,handled_by_aiva.eq.false') // Only unhandled messages
-    // Exclude test messages - they should be auto-handled
-    .or('raw_data->test.is.null,raw_data->test.neq.true')
+    .eq('requires_human_review', false); // Only include if they don't require review (review items are handled above)
+  
+  // CRITICAL: With Zero Inbox enabled, ONLY show unhandled messages
+  // Handled messages should NOT appear in attention items
+  if (isZeroInboxEnabled) {
+    actionableQuery = actionableQuery.eq('handled_by_aiva', false); // Only unhandled messages
+  } else {
+    actionableQuery = actionableQuery.or('handled_by_aiva.is.null,handled_by_aiva.eq.false'); // Legacy: include null or false
+  }
+  
+  // Exclude test messages - they should be auto-handled
+  actionableQuery = actionableQuery.or('raw_data->test.is.null,raw_data->test.neq.true');
+  
+  const { data: actionableItems, error: actionableItemsError } = await actionableQuery
     .order('timestamp', { ascending: false })
     .limit(limit * 3); // Get more to filter after (we'll filter out those with auto-sendable drafts)
 
@@ -568,6 +600,13 @@ export async function getNeedsAttentionItems(
       continue;
     }
     
+    // CRITICAL: With Zero Inbox enabled, don't show handled messages at all
+    // They should have been filtered out in the query, but double-check here
+    if (isZeroInboxEnabled && msg.handled_by_aiva) {
+      console.log(`[Dashboard] Skipping actionable message ${msg.id} - already handled (Zero Inbox enabled)`);
+      continue;
+    }
+    
     // Show the message if:
     // - It has no draft at all (AI hasn't generated a response yet - needs human attention) - always show
     // Don't show if it has an auto-sendable draft (will be handled by auto-send cron)
@@ -587,7 +626,8 @@ export async function getNeedsAttentionItems(
   // Also get messages with held drafts that might not have requires_human_review set yet
   // (for backward compatibility with older drafts or if message update failed)
   // Query drafts first, then get their messages - more reliable than filtering on joined columns
-  const { data: heldDrafts, error: heldDraftsError } = await supabase
+  // CRITICAL: With Zero Inbox enabled, exclude handled messages
+  let heldDraftsQuery = supabase
     .from('message_drafts')
     .select(`
       id,
@@ -615,7 +655,14 @@ export async function getNeedsAttentionItems(
       )
     `)
     .eq('workspace_id', workspaceId)
-    .eq('hold_for_review', true)
+    .eq('hold_for_review', true);
+  
+  // With Zero Inbox enabled, only show held drafts for unhandled messages
+  if (isZeroInboxEnabled) {
+    heldDraftsQuery = heldDraftsQuery.eq('message.handled_by_aiva', false);
+  }
+  
+  const { data: heldDrafts, error: heldDraftsError } = await heldDraftsQuery
     .order('created_at', { ascending: false })
     .limit(limit * 2);
 
