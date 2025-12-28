@@ -192,6 +192,43 @@ function generateHTML(data: any): string {
       </div>
     ` : ''}
 
+    ${allOrders && allOrders.length > 0 ? `
+      <h2>📦 All Synced Orders (Debug)</h2>
+      <p><span class="status success">${allOrders.length} order(s) synced total</span></p>
+      <p style="font-size: 14px; color: #666; margin-top: 10px;">
+        <strong>Note:</strong> These are ALL orders synced from Shopify. The email you're searching for (<code>${email}</code>) might not match any of these.
+      </p>
+      <ul class="order-list">
+        ${allOrders.map((order: any) => `
+          <li class="order-item">
+            <strong>Order ${order.order_number || order.name || 'N/A'}</strong><br>
+            Email: <code>${order.email || '(no email)'}</code><br>
+            Amount: ${order.currency || ''} ${order.total_price || 0}<br>
+            Date: ${order.created_at_shopify ? new Date(order.created_at_shopify).toLocaleDateString() : 'N/A'}
+            ${order.email && order.email.toLowerCase() === email.toLowerCase() ? '<br><span style="color: #28a745; font-weight: bold;">✅ This order matches your search email!</span>' : ''}
+          </li>
+        `).join('')}
+      </ul>
+    ` : ''}
+
+    ${allCustomers && allCustomers.length > 0 ? `
+      <h2>👤 All Synced Customers (Debug)</h2>
+      <p><span class="status success">${allCustomers.length} customer(s) synced total</span></p>
+      <p style="font-size: 14px; color: #666; margin-top: 10px;">
+        <strong>Note:</strong> These are ALL customers synced from Shopify. The email you're searching for (<code>${email}</code>) might not match any of these.
+      </p>
+      <ul class="order-list">
+        ${allCustomers.map((cust: any) => `
+          <li class="order-item">
+            <strong>${cust.first_name || ''} ${cust.last_name || ''}</strong><br>
+            Email: <code>${cust.email || '(no email)'}</code><br>
+            Orders: ${cust.orders_count || 0} | Total Spent: ${cust.total_spent || 0}
+            ${cust.email && cust.email.toLowerCase() === email.toLowerCase() ? '<br><span style="color: #28a745; font-weight: bold;">✅ This customer matches your search email!</span>' : ''}
+          </li>
+        `).join('')}
+      </ul>
+    ` : ''}
+
     <h2>✅ Recommendations</h2>
     <div class="recommendation">
       <p><strong>${recommendations.message}</strong></p>
