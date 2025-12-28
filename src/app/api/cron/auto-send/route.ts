@@ -370,34 +370,10 @@ export async function GET(request: NextRequest) {
             // Don't fail the send if record creation fails
           }
 
-          // Check if this auto-sent reply was just an acknowledgement that still needs human follow-up
-          // If the draft has missing information, mark message as requiring human review
-          // so it appears in "requires attention" for the user to follow up
-          const contextData = draft.context_data as any;
-          const hasMissingInfo = contextData?.hasMissingInformation === true;
-          const missingInfoType = contextData?.missingInformationType;
-          
-          if (hasMissingInfo) {
-            console.log(`   ⚠️ Auto-sent acknowledgement has missing information (${missingInfoType}) - marking for human follow-up`);
-            
-            // Mark message as requiring human review so it appears in "requires attention"
-            // This allows the user to see that Aiva sent an acknowledgement but still needs to follow up
-            await supabase
-              .from('messages')
-              .update({
-                requires_human_review: true,
-                review_reason: `auto_replied_acknowledgement_needs_followup_${missingInfoType || 'information'}`,
-                review_context: {
-                  autoSentAt: new Date().toISOString(),
-                  draftId: item.draft_id,
-                  missingInformationType: missingInfoType,
-                  note: 'Aiva auto-sent an acknowledgement but still needs human follow-up to provide complete answer',
-                },
-                // Keep handled_by_aiva = true (it was auto-sent) but requires_human_review = true (needs follow-up)
-                // This way it appears in "requires attention" (which I already fixed to include auto-replied messages)
-              })
-              .eq('id', item.message_id);
-          }
+          // NOTE: We no longer mark messages with missing info for review after auto-sending
+          // If the AI was confident enough to auto-send (>= threshold), it should be handled
+          // Users can still see auto-sent messages in attention items if they want to follow up
+          // But we don't force them to review every auto-sent message with missing info
 
           // Create calendar event if date/time information is available
           try {
