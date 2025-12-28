@@ -257,13 +257,37 @@ export async function getShopifyContextForWorkspace(
 }
 
 /**
+ * Extract order number from text (e.g., "order 1001", "#1001", "order number 1001")
+ */
+function extractOrderNumber(text: string): string | null {
+  if (!text) return null;
+  
+  // Patterns: "order 1001", "order #1001", "order number 1001", "#1001", "1001"
+  const patterns = [
+    /order\s*(?:number|#)?\s*(\d+)/i,
+    /#(\d+)/,
+    /\b(\d{3,})\b/, // 3+ digit number (likely order number)
+  ];
+  
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  
+  return null;
+}
+
+/**
  * Get order history for a specific customer email
+ * Also searches by order number if mentioned in the message
  * Used by AI to provide personalized responses
  */
 export async function getCustomerOrderHistory(
   workspaceId: string,
   email: string,
-  options: { useAdminClient?: boolean } = {}
+  options: { useAdminClient?: boolean; messageText?: string; orderNumber?: string } = {}
 ): Promise<CustomerOrderHistory> {
   const supabase = options.useAdminClient
     ? supabaseAdminClient
@@ -307,14 +331,34 @@ export async function getCustomerOrderHistory(
       .limit(1)
       .maybeSingle();
 
+    // Extract order number from message if provided
+    let extractedOrderNumber: string | undefined = options.orderNumber;
+    if (!extractedOrderNumber && options.messageText) {
+      const extracted = extractOrderNumber(options.messageText);
+      if (extracted) {
+        extractedOrderNumber = extracted;
+        console.log(`[Shopify Context] Extracted order number from message: ${extractedOrderNumber}`);
+      }
+    }
+    
     // Get orders for this email (even if no customer record exists)
-    // Use case-insensitive matching to handle existing mixed-case emails
-    const { data: ordersData } = await supabase
+    // Also search by order number if mentioned in the message
+    let ordersQuery = supabase
       .from("shopify_orders")
       .select("*")
       .eq("workspace_id", workspaceId)
-      .eq("shopify_store_id", store.id)
-      .ilike("email", normalizedEmail) // Use ilike for case-insensitive matching
+      .eq("shopify_store_id", store.id);
+    
+    // If order number is mentioned, search by order number (more specific)
+    // Otherwise, search by email
+    if (extractedOrderNumber) {
+      ordersQuery = ordersQuery.eq("order_number", extractedOrderNumber);
+      console.log(`[Shopify Context] Searching by order number: ${extractedOrderNumber}`);
+    } else {
+      ordersQuery = ordersQuery.ilike("email", normalizedEmail); // Use ilike for case-insensitive matching
+    }
+    
+    const { data: ordersData } = await ordersQuery
       .order("created_at_shopify", { ascending: false })
       .limit(20);
 

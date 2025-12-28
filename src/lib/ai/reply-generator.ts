@@ -234,10 +234,15 @@ export async function generateReplyDraft(
           console.warn("[AI Reply] Invalid sender email, skipping Shopify context");
         } else {
           console.log("[AI Reply] Fetching Shopify order history for sender:", senderEmail);
+          // Extract order number from message if mentioned
+          const messageText = `${message.subject || ''} ${message.body || ''}`;
           const customerHistory = await getCustomerOrderHistory(
             workspaceId,
             senderEmail, // Always use sender's email - never accept email from message body
-            { useAdminClient: options.useAdminClient }
+            { 
+              useAdminClient: options.useAdminClient,
+              messageText: messageText, // Pass message text to extract order number
+            }
           );
           
           if (customerHistory.orderCount > 0) {
@@ -600,8 +605,8 @@ REMEMBER: Missing information handling:
     // 5. Critical missing information (pricing, commitments, etc.) (if review for commitments enabled)
     // 6. Message is a complaint or sensitive category (if review for sensitive enabled)
     // 7. Message is in a category that always requires review (sales_lead, bill, invoice)
-    // 8. Message has high/urgent priority
-    // 9. AI marked as not auto-sendable (should always require review)
+    // 8. AI marked as not auto-sendable (should always require review)
+    // Note: High priority messages can still auto-send if confidence is above threshold and auto-sendable
     // Note: Routine missing info (policy, shipping) with good confidence can still auto-send
     const shouldHoldForReview = !autoSendEnabled || // Always review if auto-send disabled
       confidenceBelowThreshold || // Always review if below unified threshold
@@ -610,7 +615,7 @@ REMEMBER: Missing information handling:
       shouldReviewForCommitments ||
       shouldReviewForSensitive ||
       isAlwaysReviewCategory ||
-      isHighPriority ||
+      // REMOVED: isHighPriority - high priority messages can auto-send if confidence is good
       shouldRequireReviewIfNotAutoSendable ||
       (hasMissingInfo && !result.isAutoSendable && result.confidenceScore < 0.70);
     
@@ -621,7 +626,7 @@ REMEMBER: Missing information handling:
        shouldReviewForCommitments ? `missing_information_${missingInfoType}` :
        shouldReviewForSensitive ? (isComplaint ? 'customer_complaint' : `${message.category}_requires_review`) :
        isAlwaysReviewCategory ? `${message.category}_requires_review` :
-       isHighPriority ? `high_priority_${message.priority}` :
+       // REMOVED: isHighPriority - high priority messages can auto-send if confidence is good
        shouldRequireReviewIfNotAutoSendable ? 'not_auto_sendable' :
        hasMissingInfo && !result.isAutoSendable ? `missing_information_${missingInfoType}` :
        undefined);
@@ -633,7 +638,7 @@ REMEMBER: Missing information handling:
        shouldReviewForCommitments ? `AI is missing critical information (${missingInfoType}) - human follow-up required` :
        shouldReviewForSensitive ? (isComplaint ? 'Customer complaint requires human review' : `${message.category} messages require human review for proper handling`) :
        isAlwaysReviewCategory ? `${message.category} messages require human review for proper handling` :
-       isHighPriority ? `High priority message (${message.priority}) requires human attention` :
+       // REMOVED: isHighPriority - high priority messages can auto-send if confidence is good
        shouldRequireReviewIfNotAutoSendable ? 'AI marked this message as not suitable for auto-send - human review required' :
        hasMissingInfo && !result.isAutoSendable ? `AI is missing information (${missingInfoType}) and marked as not auto-sendable` :
        undefined);
