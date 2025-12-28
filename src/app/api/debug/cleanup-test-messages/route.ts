@@ -8,7 +8,7 @@ import { getSoloWorkspace } from '@/data/user/workspaces';
 import { NextRequest, NextResponse } from 'next/server';
 import { handleNoActionNeeded } from '@/lib/inbox-zero/handler';
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const userSupabase = await createSupabaseUserRouteHandlerClient();
     const { data: { user }, error: authError } = await userSupabase.auth.getUser();
@@ -80,11 +80,64 @@ export async function POST(request: NextRequest) {
       console.error('[Cleanup] Failed to update test messages:', updateError);
     }
 
-    return NextResponse.json({
-      success: true,
-      results,
-      message: `Found ${results.found} test messages, handled ${results.handled}, ${results.errors.length} errors`,
-    }, { status: 200 });
+    // Return HTML response for easy browser viewing
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Cleanup Test Messages</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; }
+    .success { background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 8px; margin: 20px 0; }
+    .error { background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 8px; margin: 20px 0; }
+    .info { background: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 8px; margin: 20px 0; }
+    pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; }
+    .button { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; margin-top: 10px; }
+    .button:hover { background: #0056b3; }
+  </style>
+</head>
+<body>
+  <h1>🧹 Test Messages Cleanup</h1>
+  
+  <div class="info">
+    <h2>Results</h2>
+    <p><strong>Found:</strong> ${results.found} test messages</p>
+    <p><strong>Handled:</strong> ${results.handled} messages</p>
+    <p><strong>Errors:</strong> ${results.errors.length}</p>
+  </div>
+
+  ${results.errors.length > 0 ? `
+    <div class="error">
+      <h3>Errors</h3>
+      <pre>${JSON.stringify(results.errors, null, 2)}</pre>
+    </div>
+  ` : ''}
+
+  ${results.handled > 0 ? `
+    <div class="success">
+      <h3>✅ Success!</h3>
+      <p>Successfully auto-handled ${results.handled} test message(s).</p>
+      <p>These messages will no longer appear in "What needs your attention".</p>
+    </div>
+  ` : results.found === 0 ? `
+    <div class="info">
+      <h3>ℹ️ No Test Messages Found</h3>
+      <p>All test messages have already been handled, or there are no test messages in your workspace.</p>
+    </div>
+  ` : ''}
+
+  <div style="margin-top: 30px;">
+    <a href="/api/debug/message-counts" class="button">📊 Check Message Counts</a>
+    <a href="/en/dashboard" class="button" style="background: #28a745;">🏠 Go to Dashboard</a>
+  </div>
+</body>
+</html>
+    `;
+
+    return new NextResponse(html, {
+      status: 200,
+      headers: { 'Content-Type': 'text/html' },
+    });
   } catch (error) {
     console.error('[Cleanup Test Messages] Error:', error);
     return NextResponse.json(
