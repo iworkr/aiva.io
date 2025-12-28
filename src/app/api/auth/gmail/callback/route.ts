@@ -200,6 +200,21 @@ export async function GET(request: NextRequest) {
     }
 
     const tokens: GoogleTokenResponse = await tokenResponse.json();
+    
+    // Log token response (without sensitive data)
+    console.log('🔵 Gmail token response:', {
+      hasAccessToken: !!tokens.access_token,
+      hasRefreshToken: !!tokens.refresh_token,
+      expiresIn: tokens.expires_in,
+      scope: tokens.scope,
+    });
+    
+    // CRITICAL: If Google doesn't return a refresh_token, we need to preserve the existing one
+    // Google only returns refresh_token on first authorization or when prompt=consent is used
+    // If user re-authorizes without prompt=consent, we won't get a new refresh_token
+    if (!tokens.refresh_token) {
+      console.warn('⚠️ Gmail OAuth: No refresh_token in response. Will preserve existing refresh_token if connection exists.');
+    }
 
     // Get user info from Google
     const userInfoResponse = await fetch(

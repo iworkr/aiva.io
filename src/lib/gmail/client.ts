@@ -55,17 +55,39 @@ export async function refreshGmailToken(
   if (!response.ok) {
     const errorText = await response.text();
     let errorMessage = 'Failed to refresh Gmail token';
+    let errorCode: string | undefined;
     try {
       const errorData = JSON.parse(errorText);
+      errorCode = errorData.error;
       if (errorData.error === 'invalid_grant') {
-        errorMessage = 'Gmail refresh token expired or revoked. Please reconnect your Gmail account.';
+        // invalid_grant can mean:
+        // 1. Refresh token was revoked by user
+        // 2. Refresh token expired (shouldn't happen unless unused for 6+ months)
+        // 3. User changed password
+        // 4. Account was disabled
+        errorMessage = 'Gmail refresh token expired or revoked. Please reconnect your Gmail account in Aiva settings.';
+        
+        // Mark connection as revoked so user knows to reconnect
+        await supabaseAdminClient
+          .from('channel_connections')
+          .update({
+            status: 'revoked',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', connectionId);
+          
+        console.error('[Gmail Token Refresh] Marked connection as revoked due to invalid_grant');
       } else {
         errorMessage = `Failed to refresh Gmail token: ${errorData.error || errorText}`;
       }
     } catch {
       errorMessage = `Failed to refresh Gmail token: ${errorText}`;
     }
-    console.error('[Gmail Token Refresh] Error:', errorMessage);
+    console.error('[Gmail Token Refresh] Error:', {
+      error: errorMessage,
+      errorCode,
+      connectionId,
+    });
     throw new Error(errorMessage);
   }
 

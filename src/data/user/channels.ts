@@ -56,18 +56,42 @@ export const createChannelConnectionAction = authActionClient
 
     if (existing) {
       // Update existing connection instead of creating duplicate
+      // CRITICAL: Preserve existing refresh_token if Google doesn't return a new one
+      // Google only returns refresh_token on first authorization, so we must keep the existing one
+      const { data: existingConnection } = await supabase
+        .from('channel_connections')
+        .select('refresh_token')
+        .eq('id', existing.id)
+        .single();
+      
+      // Only update refresh_token if a new one is provided
+      // This prevents overwriting the existing refresh_token with null/undefined
+      const updateData: any = {
+        access_token: accessToken,
+        token_expires_at: tokenExpiresAt,
+        scopes: scopes,
+        status: 'active',
+        provider_account_name: providerAccountName,
+        metadata: metadata,
+        updated_at: new Date().toISOString(),
+      };
+      
+      // Only update refresh_token if we got a new one from Google
+      // This is critical - Google doesn't always return refresh_token on re-authorization
+      if (refreshToken) {
+        updateData.refresh_token = refreshToken;
+        console.log(`[Channel Connection] Updating refresh_token for ${provider} connection ${existing.id}`);
+      } else if (existingConnection?.refresh_token) {
+        // Keep existing refresh_token - don't overwrite it
+        console.log(`[Channel Connection] Preserving existing refresh_token for ${provider} connection ${existing.id}`);
+        // Don't include refresh_token in update - keep existing value
+      } else {
+        console.warn(`[Channel Connection] No refresh_token available for ${provider} connection ${existing.id} - connection may expire`);
+      }
+      
       const { data, error } = await supabase
         .from('channel_connections')
-        .update({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-          token_expires_at: tokenExpiresAt,
-          scopes: scopes,
-          status: 'active',
-          provider_account_name: providerAccountName,
-          metadata: metadata,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', existing.id)
         .select()
         .single();
