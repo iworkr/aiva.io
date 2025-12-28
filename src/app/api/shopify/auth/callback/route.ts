@@ -274,6 +274,34 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Trigger initial sync if shop is linked to a workspace
+    // This happens automatically after OAuth completes
+    const { data: shopForSync } = await supabase
+      .from('shopify_stores')
+      .select('id, workspace_id, linked_user_id')
+      .eq('shop_domain', shop)
+      .eq('is_active', true)
+      .single();
+
+    if (shopForSync?.workspace_id) {
+      try {
+        console.log(`[OAuth Callback] Triggering initial sync for store ${shopForSync.id} after OAuth`);
+        const { syncAllShopifyData } = await import('@/lib/shopify/sync');
+        // Run sync in background - don't wait for it
+        syncAllShopifyData(shopForSync.id, shopForSync.workspace_id, {
+          maxRecords: 250,
+          fullSync: true,
+        }).catch((syncError) => {
+          console.error('[OAuth Callback] Initial sync error (non-blocking):', syncError);
+        });
+      } catch (syncError) {
+        console.error('[OAuth Callback] Failed to trigger initial sync:', syncError);
+        // Don't fail OAuth if sync fails
+      }
+    } else {
+      console.log(`[OAuth Callback] Store not linked to workspace yet, skipping initial sync. Sync will happen when store is linked.`);
+    }
+
     // Clear cookies and redirect to onboarding with shop info
     const onboardingUrl = new URL('/en/shopify/onboarding', request.url);
     onboardingUrl.searchParams.set('success', 'installed');

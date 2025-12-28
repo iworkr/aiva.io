@@ -605,6 +605,23 @@ export async function GET(request: NextRequest) {
       existingMessages = messagesData;
     }
 
+    // 6. Get ALL orders and customers (for debugging - to see what was actually synced)
+    const { data: allOrdersData } = await supabase
+      .from('shopify_orders')
+      .select('id, email, order_number, name, total_price, currency, created_at_shopify')
+      .eq('workspace_id', effectiveWorkspaceId)
+      .eq('shopify_store_id', store.id)
+      .order('created_at_shopify', { ascending: false })
+      .limit(20);
+
+    const { data: allCustomersData } = await supabase
+      .from('shopify_customers')
+      .select('id, email, first_name, last_name, orders_count, total_spent')
+      .eq('workspace_id', effectiveWorkspaceId)
+      .eq('shopify_store_id', store.id)
+      .order('created_at_shopify', { ascending: false })
+      .limit(20);
+
     return new NextResponse(generateHTML({
       workspaceId,
       email,
@@ -646,6 +663,8 @@ export async function GET(request: NextRequest) {
         messages: existingMessages,
       },
       allUserStores: allUserStores || [],
+      allOrders: allOrdersData || [],
+      allCustomers: allCustomersData || [],
       recommendations: {
         hasOrders: orders.length > 0,
         hasCustomer: !!customer,
@@ -653,6 +672,8 @@ export async function GET(request: NextRequest) {
         needsSync: orders.length === 0 && store.sync_enabled,
         message: orders.length > 0
           ? '✅ Orders found! You can create a test message to test AI context.'
+          : allOrdersData && allOrdersData.length > 0
+          ? `⚠️ No orders found for ${email}, but ${allOrdersData.length} order(s) were synced. Check the "All Synced Orders" section below to see what emails are in your orders.`
           : '⚠️ No orders found. You may need to sync Shopify orders or create test orders in Shopify.',
       },
     }), {
