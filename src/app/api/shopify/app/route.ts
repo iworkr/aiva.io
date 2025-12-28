@@ -85,7 +85,52 @@ export async function GET(request: NextRequest) {
     if (!isTokenValid) {
       console.log(`[Shopify App] Token invalid for shop ${shop}, redirecting to OAuth`);
       // Token is invalid - redirect to OAuth to get a fresh token
+      // Use App Bridge redirect if in iframe, otherwise regular redirect
       const authUrl = `${appUrl}/api/shopify/auth?shop=${shop}`;
+      
+      // If we have host parameter (Shopify App Bridge context), use App Bridge redirect
+      if (host) {
+        const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Redirecting...</title>
+  <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+</head>
+<body>
+  <script>
+    (function() {
+      try {
+        var AppBridge = window['app-bridge'];
+        if (AppBridge && AppBridge.createApp) {
+          var app = AppBridge.createApp({
+            apiKey: '${apiKey}',
+            host: '${host}',
+          });
+          var Redirect = AppBridge.actions.Redirect;
+          if (Redirect) {
+            var redirect = Redirect.create(app);
+            redirect.dispatch(Redirect.Action.REMOTE, '${authUrl}');
+            return;
+          }
+        }
+      } catch (e) {
+        console.log('App Bridge error:', e);
+      }
+      window.location.href = '${authUrl}';
+    })();
+  </script>
+</body>
+</html>`;
+        return new NextResponse(html, {
+          headers: {
+            'Content-Type': 'text/html',
+            'Content-Security-Policy': "frame-ancestors https://*.myshopify.com https://admin.shopify.com;",
+          },
+        });
+      }
+      
+      // Regular server-side redirect (for non-iframe contexts)
       return NextResponse.redirect(authUrl);
     }
     
