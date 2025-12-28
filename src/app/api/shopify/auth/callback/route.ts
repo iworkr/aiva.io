@@ -139,7 +139,12 @@ export async function GET(request: NextRequest) {
     }
 
     const tokens: ShopifyTokenResponse = await tokenResponse.json();
-    console.log('🟢 Shopify tokens received:', { scopes: tokens.scope });
+    console.log('🟢 Shopify tokens received:', { 
+      scopes: tokens.scope,
+      accessTokenLength: tokens.access_token?.length || 0,
+      accessTokenPreview: tokens.access_token ? `${tokens.access_token.substring(0, 20)}...` : 'MISSING',
+      accessTokenFull: tokens.access_token, // Log full token for debugging
+    });
 
     // Get shop info
     const shopInfoResponse = await fetch(`https://${shop}/admin/api/2024-01/shop.json`, {
@@ -164,6 +169,17 @@ export async function GET(request: NextRequest) {
       .eq('shop_domain', shop)
       .single();
 
+    // Validate access token before saving
+    if (!tokens.access_token || tokens.access_token.length < 20) {
+      console.error('❌ Invalid access token received from Shopify:', {
+        tokenLength: tokens.access_token?.length || 0,
+        tokenPreview: tokens.access_token ? `${tokens.access_token.substring(0, 20)}...` : 'MISSING',
+      });
+      return NextResponse.redirect(
+        new URL('/en/integrations?error=invalid_token', request.url)
+      );
+    }
+
     const shopData = {
       shop_domain: shop,
       access_token: tokens.access_token,
@@ -178,30 +194,66 @@ export async function GET(request: NextRequest) {
       installed_at: new Date().toISOString(),
       is_active: true,
     };
+    
+    console.log('🟢 Saving shop data:', {
+      shop_domain: shop,
+      accessTokenLength: shopData.access_token.length,
+      accessTokenPreview: `${shopData.access_token.substring(0, 20)}...`,
+    });
 
     if (existingShop) {
       // Update existing shop
-      const { error: updateError } = await supabase
+      const { data: updatedShop, error: updateError } = await supabase
         .from('shopify_stores')
         .update(shopData)
-        .eq('id', existingShop.id);
+        .eq('id', existingShop.id)
+        .select('access_token')
+        .single();
 
       if (updateError) {
         console.error('Failed to update Shopify store:', updateError);
         throw updateError;
       }
-      console.log('🟢 Updated existing Shopify store connection');
+      
+      // Verify token was saved correctly
+      if (updatedShop?.access_token) {
+        console.log('🟢 Updated existing Shopify store connection');
+        console.log('🟢 Verified saved token length:', updatedShop.access_token.length);
+        if (updatedShop.access_token.length !== shopData.access_token.length) {
+          console.error('❌ Token length mismatch!', {
+            original: shopData.access_token.length,
+            saved: updatedShop.access_token.length,
+          });
+        }
+      } else {
+        console.error('❌ Token not found after update!');
+      }
     } else {
       // Insert new shop
-      const { error: insertError } = await supabase
+      const { data: insertedShop, error: insertError } = await supabase
         .from('shopify_stores')
-        .insert(shopData);
+        .insert(shopData)
+        .select('access_token')
+        .single();
 
       if (insertError) {
         console.error('Failed to store Shopify connection:', insertError);
         throw insertError;
       }
-      console.log('🟢 Created new Shopify store connection');
+      
+      // Verify token was saved correctly
+      if (insertedShop?.access_token) {
+        console.log('🟢 Created new Shopify store connection');
+        console.log('🟢 Verified saved token length:', insertedShop.access_token.length);
+        if (insertedShop.access_token.length !== shopData.access_token.length) {
+          console.error('❌ Token length mismatch!', {
+            original: shopData.access_token.length,
+            saved: insertedShop.access_token.length,
+          });
+        }
+      } else {
+        console.error('❌ Token not found after insert!');
+      }
     }
 
     // Clear cookies and redirect to onboarding with shop info
