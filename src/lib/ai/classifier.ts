@@ -397,12 +397,19 @@ Be consistent: similar messages should get similar classifications.`,
       shortSummary = result.summary.substring(0, 177) + (result.summary.length > 177 ? '...' : '');
     }
 
+    // Check if this is a test message - test messages should be auto-handled, not require review
+    const isTestMessage = (message.raw_data as any)?.test === true || 
+                          (message.raw_data as any)?.testType !== undefined ||
+                          message.subject?.toLowerCase().includes('test:') ||
+                          (message.body?.toLowerCase().includes('test') && message.sender_email?.includes('example.com'));
+    
     // Determine if human review is needed (either AI detected or low confidence)
-    const needsReview = result.requiresHumanReview || result.confidenceScore < 0.6;
-    const reviewReason = result.reviewReason || (result.confidenceScore < 0.6 ? 'low_confidence' : null);
-    const reviewContext = result.reviewContext || (result.confidenceScore < 0.6 
+    // BUT: Test messages should not require review - they should be auto-handled
+    const needsReview = isTestMessage ? false : (result.requiresHumanReview || result.confidenceScore < 0.6);
+    const reviewReason = isTestMessage ? null : (result.reviewReason || (result.confidenceScore < 0.6 ? 'low_confidence' : null));
+    const reviewContext = isTestMessage ? null : (result.reviewContext || (result.confidenceScore < 0.6 
       ? `AI confidence is ${Math.round(result.confidenceScore * 100)}%, below threshold for auto-reply`
-      : null);
+      : null));
 
     // Update message with classification
     const { error: updateError } = await supabase
@@ -455,6 +462,18 @@ Be consistent: similar messages should get similar classifications.`,
       processing_time_ms: processingTime,
     });
 
+    // Auto-handle test messages immediately (they're just for testing, don't need human review)
+    if (isTestMessage) {
+      try {
+        const { handleNoActionNeeded } = await import('@/lib/inbox-zero/handler');
+        await handleNoActionNeeded(messageId, workspaceId);
+        console.log(`[Classifier] Auto-handled test message: ${messageId}`);
+      } catch (handleError) {
+        // Don't fail classification if handling fails
+        console.error('[Classifier] Failed to auto-handle test message:', handleError);
+      }
+    }
+    
     // Auto-handle messages that don't need a response (Inbox Zero)
     // This runs after classification for messages that are informational only
     // Both 'none' and 'fyi' mean "no response needed" - they should be auto-handled

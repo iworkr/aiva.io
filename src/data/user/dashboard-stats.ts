@@ -244,6 +244,7 @@ export async function getNeedsAttentionItems(
   // 3. They don't have an auto-sendable draft (or the draft is held for review)
   // The idea is: if the AI can respond automatically, it will (via auto-send), so we only show
   // messages that need human intervention/attention
+  // EXCLUDE test messages - they should be auto-handled
   const { data: actionableItems, error: actionableItemsError } = await supabase
     .from('messages')
     .select(`
@@ -260,6 +261,7 @@ export async function getNeedsAttentionItems(
       has_draft_reply,
       handled_by_aiva,
       handle_action,
+      raw_data,
       channel_connection:channel_connections(provider),
       message_drafts(
         id,
@@ -277,6 +279,8 @@ export async function getNeedsAttentionItems(
     .in('actionability', ['request', 'question', 'scheduling_intent'])
     .eq('requires_human_review', false) // Only include if they don't require review (review items are handled above)
     .or('handled_by_aiva.is.null,handled_by_aiva.eq.false') // Only unhandled messages
+    // Exclude test messages - they should be auto-handled
+    .or('raw_data->test.is.null,raw_data->test.neq.true')
     .order('timestamp', { ascending: false })
     .limit(limit * 3); // Get more to filter after (we'll filter out those with auto-sendable drafts)
 
@@ -296,7 +300,16 @@ export async function getNeedsAttentionItems(
     actionability?: string | null;
     subject?: string | null;
     sender_email?: string | null;
+    raw_data?: any;
   }): boolean => {
+    // 0. Exclude test messages - they should be auto-handled, not shown in attention items
+    const isTestMessage = msg.raw_data?.test === true || 
+                          msg.raw_data?.testType !== undefined ||
+                          msg.subject?.toLowerCase().includes('test:') ||
+                          (msg.subject?.toLowerCase().includes('test') && msg.sender_email?.includes('example.com'));
+    if (isTestMessage) {
+      return true; // Test messages should not appear in attention items
+    }
     // 1. Check excluded categories (user-configured)
     // If user explicitly excluded a category, respect that
     if (msg.category && excludedCategories.length > 0) {
