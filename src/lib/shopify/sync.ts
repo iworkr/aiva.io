@@ -269,7 +269,7 @@ function transformOrderForDatabase(
     shopify_order_id: order.id,
     order_number: String(order.order_number),
     name: order.name,
-    email: order.email,
+    email: order.email ? order.email.toLowerCase().trim() : null, // Normalize email to lowercase
     customer_name: customerName,
     total_price: parseFloat(order.total_price),
     subtotal_price: parseFloat(order.subtotal_price),
@@ -446,7 +446,7 @@ function transformCustomerForDatabase(
     workspace_id: workspaceId,
     shopify_store_id: storeId,
     shopify_customer_id: customer.id,
-    email: customer.email,
+    email: customer.email ? customer.email.toLowerCase().trim() : null, // Normalize email to lowercase
     first_name: customer.first_name,
     last_name: customer.last_name,
     phone: customer.phone,

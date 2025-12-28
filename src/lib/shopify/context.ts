@@ -294,23 +294,27 @@ export async function getCustomerOrderHistory(
       return emptyHistory;
     }
 
-    // Find customer by email
+    // Normalize email for query (handle case-insensitive matching)
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    // Find customer by email (use case-insensitive comparison to handle existing mixed-case data)
     const { data: customer } = await supabase
       .from("shopify_customers")
       .select("*")
       .eq("workspace_id", workspaceId)
       .eq("shopify_store_id", store.id)
-      .eq("email", email.toLowerCase())
+      .ilike("email", normalizedEmail) // Use ilike for case-insensitive matching
       .limit(1)
-      .single();
+      .maybeSingle();
 
     // Get orders for this email (even if no customer record exists)
+    // Use case-insensitive matching to handle existing mixed-case emails
     const { data: ordersData } = await supabase
       .from("shopify_orders")
       .select("*")
       .eq("workspace_id", workspaceId)
       .eq("shopify_store_id", store.id)
-      .eq("email", email.toLowerCase())
+      .ilike("email", normalizedEmail) // Use ilike for case-insensitive matching
       .order("created_at_shopify", { ascending: false })
       .limit(20);
 
