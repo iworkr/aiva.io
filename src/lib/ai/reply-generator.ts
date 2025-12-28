@@ -585,7 +585,9 @@ REMEMBER: Missing information handling:
     const confidenceBelowThreshold = result.confidenceScore < unifiedThreshold;
 
     // Check review triggers based on workspace settings
-    const shouldReviewForScheduling = reviewForScheduling && (needsHumanReview || calendarContext?.hasMismatch);
+    // Calendar mismatch = no matching event found OR low confidence match (suggestedAction is 'ask_human')
+    const hasCalendarMismatch = calendarContext && (!calendarContext.hasMatchingEvent || calendarContext.suggestedAction === 'ask_human');
+    const shouldReviewForScheduling = reviewForScheduling && (needsHumanReview || hasCalendarMismatch);
     const shouldReviewForCommitments = reviewForCommitments && isCriticalMissingInfo;
     const shouldReviewForSensitive = reviewForSensitive && (isComplaint || isAlwaysReviewCategory);
 
