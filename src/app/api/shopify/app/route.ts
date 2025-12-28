@@ -85,39 +85,71 @@ export async function GET(request: NextRequest) {
     if (!isTokenValid) {
       console.log(`[Shopify App] Token invalid for shop ${shop}, redirecting to OAuth`);
       // Token is invalid - redirect to OAuth to get a fresh token
-      // Use App Bridge redirect if in iframe, otherwise regular redirect
+      // OAuth MUST happen in a top-level window, not in iframe
       const authUrl = `${appUrl}/api/shopify/auth?shop=${shop}`;
       
-      // If we have host parameter (Shopify App Bridge context), use App Bridge redirect
+      // If we have host parameter (Shopify App Bridge context), open OAuth in new window
       if (host) {
         const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Redirecting...</title>
+  <title>Authorization Required</title>
   <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: #f1f5f9;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 32px;
+      max-width: 400px;
+      text-align: center;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    }
+    h1 { color: #0f172a; margin-bottom: 16px; font-size: 20px; }
+    p { color: #64748b; margin-bottom: 24px; font-size: 14px; }
+    .btn {
+      display: inline-block;
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #00d4ff 0%, #3b82f6 100%);
+      color: white;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+    }
+  </style>
 </head>
 <body>
+  <div class="card">
+    <h1>Authorization Required</h1>
+    <p>Your Shopify connection needs to be re-authorized. This will open in a new window.</p>
+    <button class="btn" id="authBtn">Authorize →</button>
+  </div>
   <script>
     (function() {
-      try {
-        var AppBridge = window['app-bridge'];
-        if (AppBridge && AppBridge.createApp) {
-          var app = AppBridge.createApp({
-            apiKey: '${apiKey}',
-            host: '${host}',
-          });
-          var Redirect = AppBridge.actions.Redirect;
-          if (Redirect) {
-            var redirect = Redirect.create(app);
-            redirect.dispatch(Redirect.Action.REMOTE, '${authUrl}');
-            return;
-          }
-        }
-      } catch (e) {
-        console.log('App Bridge error:', e);
-      }
-      window.location.href = '${authUrl}';
+      var authUrl = '${authUrl}';
+      var btn = document.getElementById('authBtn');
+      
+      btn.addEventListener('click', function() {
+        // Open OAuth in top-level window (not iframe)
+        // This is required because Shopify OAuth doesn't work in iframes
+        window.top.location.href = authUrl;
+      });
+      
+      // Auto-trigger after a short delay to make it seamless
+      setTimeout(function() {
+        window.top.location.href = authUrl;
+      }, 500);
     })();
   </script>
 </body>
