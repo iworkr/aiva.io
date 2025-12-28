@@ -53,6 +53,7 @@ function generateHTML(data: any): string {
     aiContext,
     existingMessages,
     recommendations,
+    allUserStores = [],
     error,
   } = data;
 
@@ -165,6 +166,29 @@ function generateHTML(data: any): string {
       </ul>
     ` : ''}
 
+    ${allUserStores && allUserStores.length > 0 ? `
+      <h2>🔍 Diagnostic: All Your Shopify Stores</h2>
+      <div class="info-card">
+        <p><strong>Found ${allUserStores.length} store(s) linked to your account:</strong></p>
+        <ul>
+          ${allUserStores.map((s: any) => `
+            <li>
+              <strong>${s.shop_domain}</strong> (${s.shop_name || 'N/A'})<br>
+              Workspace ID: ${s.workspace_id || '<span style="color: #dc3545;">NOT SET</span>'}<br>
+              Sync Enabled: ${s.sync_enabled ? 'Yes' : 'No'}<br>
+              ${!s.workspace_id ? '<span style="color: #dc3545;">⚠️ Store is not linked to a workspace. This may prevent orders from syncing.</span>' : ''}
+            </li>
+          `).join('')}
+        </ul>
+        ${allUserStores.some((s: any) => !s.workspace_id) ? `
+          <p style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 4px;">
+            <strong>⚠️ Action Required:</strong> Some stores are not linked to a workspace. 
+            The debug endpoint will attempt to auto-link them, but you may need to manually link stores to workspaces in the Aiva dashboard.
+          </p>
+        ` : ''}
+      </div>
+    ` : ''}
+
     <h2>✅ Recommendations</h2>
     <div class="recommendation">
       <p><strong>${recommendations.message}</strong></p>
@@ -272,13 +296,43 @@ export async function GET(request: NextRequest) {
     const supabase = supabaseAdminClient;
 
     // 1. Check if Shopify store is connected
-    const { data: store, error: storeError } = await supabase
+    // First try by workspace_id, then by linked_user_id (stores are linked to users, not always workspaces)
+    let store: any = null;
+    let storeError: any = null;
+    
+    // Try workspace_id first
+    const { data: storeByWorkspace, error: workspaceError } = await supabase
       .from('shopify_stores')
-      .select('id, shop_domain, shop_name, is_active, sync_enabled')
+      .select('id, shop_domain, shop_name, is_active, sync_enabled, workspace_id, linked_user_id')
       .eq('workspace_id', workspaceId)
       .eq('is_active', true)
       .limit(1)
       .single();
+    
+    if (storeByWorkspace) {
+      store = storeByWorkspace;
+    } else {
+      // If not found by workspace, try by linked_user_id
+      const { data: storeByUser, error: userError } = await supabase
+        .from('shopify_stores')
+        .select('id, shop_domain, shop_name, is_active, sync_enabled, workspace_id, linked_user_id')
+        .eq('linked_user_id', user.id)
+        .eq('is_active', true)
+        .limit(1)
+        .single();
+      
+      if (storeByUser) {
+        store = storeByUser;
+        storeError = null;
+        
+        // If store is linked to user but not workspace, we should link it
+        if (!store.workspace_id) {
+          console.log(`[Debug] Store ${store.shop_domain} is linked to user but not workspace. Consider linking it.`);
+        }
+      } else {
+        storeError = userError || workspaceError;
+      }
+    }
 
     let orders: any[] = [];
     let customer: any = null;
@@ -286,8 +340,15 @@ export async function GET(request: NextRequest) {
     let formattedContext = '';
     let existingMessages: any[] = [];
 
+    // Get all stores linked to this user for diagnostics
+    const { data: allUserStores } = await supabase
+      .from('shopify_stores')
+      .select('id, shop_domain, shop_name, is_active, workspace_id, linked_user_id, sync_enabled')
+      .eq('linked_user_id', user.id)
+      .eq('is_active', true);
+
     if (storeError || !store) {
-      // No store found - return HTML with error
+      // No store found - return HTML with diagnostic info
       return new NextResponse(generateHTML({
         workspaceId,
         email,
@@ -296,12 +357,15 @@ export async function GET(request: NextRequest) {
         customer: null,
         aiContext: { orderCount: 0, totalSpent: 0, formattedContext: '(No Shopify store connected)' },
         existingMessages: { count: 0, messages: [] },
+        allUserStores: allUserStores || [],
         recommendations: {
           hasOrders: false,
           hasCustomer: false,
           canTestAI: false,
           needsSync: false,
-          message: 'No active Shopify store found. Please connect a Shopify store first.',
+          message: allUserStores && allUserStores.length > 0
+            ? `Found ${allUserStores.length} store(s) linked to your account, but none are linked to this workspace. You may need to link the store to your workspace.`
+            : 'No active Shopify store found. Please connect a Shopify store first.',
         },
       }), {
         status: 200,
@@ -309,11 +373,26 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // If store exists but doesn't have workspace_id, we should still try to use it
+    // But we need to use the store's workspace_id if it exists, or the detected workspace
+    const effectiveWorkspaceId = store.workspace_id || workspaceId;
+    
+    // If store is not linked to workspace, we should link it
+    if (!store.workspace_id) {
+      console.log(`[Debug] Linking store ${store.shop_domain} to workspace ${workspaceId}`);
+      await supabase
+        .from('shopify_stores')
+        .update({ workspace_id: workspaceId })
+        .eq('id', store.id);
+      store.workspace_id = workspaceId;
+    }
+
     // 2. Check for orders with this email
+    // Use effective workspace_id (store's workspace or detected workspace)
     const { data: ordersData, error: ordersError } = await supabase
       .from('shopify_orders')
       .select('*')
-      .eq('workspace_id', workspaceId)
+      .eq('workspace_id', effectiveWorkspaceId)
       .eq('shopify_store_id', store.id)
       .eq('email', email.toLowerCase())
       .order('created_at_shopify', { ascending: false })
@@ -327,7 +406,7 @@ export async function GET(request: NextRequest) {
     const { data: customerData } = await supabase
       .from('shopify_customers')
       .select('*')
-      .eq('workspace_id', workspaceId)
+      .eq('workspace_id', effectiveWorkspaceId)
       .eq('shopify_store_id', store.id)
       .eq('email', email.toLowerCase())
       .limit(1)
@@ -340,7 +419,7 @@ export async function GET(request: NextRequest) {
     // 4. Test the AI context retrieval function
     try {
       customerHistory = await getCustomerOrderHistory(
-        workspaceId,
+        effectiveWorkspaceId,
         email,
         { useAdminClient: true }
       );
@@ -402,6 +481,7 @@ export async function GET(request: NextRequest) {
         count: existingMessages.length,
         messages: existingMessages,
       },
+      allUserStores: allUserStores || [],
       recommendations: {
         hasOrders: orders.length > 0,
         hasCustomer: !!customer,
