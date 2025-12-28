@@ -29,21 +29,36 @@ export async function GET(request: NextRequest) {
     const supabase = await createSupabaseUserRouteHandlerClient();
 
     // Find all test messages that haven't been handled
-    const { data: testMessages, error: testError } = await supabase
+    // Use improved detection: raw_data.test, subject "test:" or "test", or snippet is "test"/"test 2"/"test 3"
+    const { data: allMessages, error: fetchError } = await supabase
       .from('messages')
-      .select('id, subject, sender_email, requires_human_review, handled_by_aiva')
+      .select('id, subject, snippet, sender_email, requires_human_review, handled_by_aiva, raw_data')
       .eq('workspace_id', workspaceId)
-      .or('raw_data->test.eq.true,subject.ilike.%test:%')
       .or('handled_by_aiva.is.null,handled_by_aiva.eq.false')
       .order('timestamp', { ascending: false })
-      .limit(100);
-
-    if (testError) {
-      return NextResponse.json({ error: testError.message }, { status: 500 });
+      .limit(200); // Get more messages to filter client-side
+    
+    if (fetchError) {
+      return NextResponse.json({ error: fetchError.message }, { status: 500 });
     }
+    
+    // Filter to test messages using improved detection logic
+    const testMessages = (allMessages || []).filter((msg: any) => {
+      const subjectLower = (msg.subject || "").toLowerCase();
+      const snippetLower = (msg.snippet || "").toLowerCase().trim();
+      return (
+        msg.raw_data?.test === true ||
+        msg.raw_data?.testType !== undefined ||
+        subjectLower.includes('test:') ||
+        subjectLower === 'test' ||
+        snippetLower === 'test' ||
+        /^test\s*\d*$/i.test(snippetLower) || // "test", "test 2", "test 3", etc.
+        (subjectLower.includes('test') && msg.sender_email?.includes('example.com'))
+      );
+    });
 
     const results = {
-      found: testMessages?.length || 0,
+      found: testMessages.length,
       handled: 0,
       errors: [] as any[],
     };
@@ -88,7 +103,7 @@ export async function GET(request: NextRequest) {
         review_context: null,
       })
       .eq('workspace_id', workspaceId)
-      .or('raw_data->test.eq.true,subject.ilike.%test:%')
+      .in('id', testMessages.map((m: any) => m.id))
       .or('handled_by_aiva.is.null,handled_by_aiva.eq.false');
 
     if (directUpdateError) {
