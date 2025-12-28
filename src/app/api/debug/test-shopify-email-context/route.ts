@@ -606,16 +606,16 @@ export async function GET(request: NextRequest) {
     }
 
     // 3. Check for customer record
-    const { data: customerData } = await supabase
+    const { data: customerData, error: customerError } = await supabase
       .from('shopify_customers')
       .select('*')
       .eq('workspace_id', effectiveWorkspaceId)
       .eq('shopify_store_id', store.id)
       .eq('email', email.toLowerCase())
       .limit(1)
-      .single();
+      .maybeSingle(); // Use maybeSingle() instead of single() to avoid errors when no record found
 
-    if (customerData) {
+    if (customerData && !customerError) {
       customer = customerData;
     }
 

@@ -225,17 +225,24 @@ export async function generateReplyDraft(
     previousInteractionCount = interactionCount || 0;
 
     // Fetch Shopify customer order history if sender email exists
+    // SECURITY: Only fetch data for the sender's email - never for other customers
     if (message.sender_email) {
       try {
-        const customerHistory = await getCustomerOrderHistory(
-          workspaceId,
-          message.sender_email,
-          { useAdminClient: options.useAdminClient }
-        );
-        
-        if (customerHistory.orderCount > 0) {
-          shopifyCustomerContext = formatCustomerHistoryForAI(customerHistory);
-          console.log("[AI Reply] Found Shopify customer with", customerHistory.orderCount, "orders");
+        // Validate: Only use the sender's email for context retrieval
+        const senderEmail = message.sender_email.toLowerCase().trim();
+        if (!senderEmail || !senderEmail.includes('@')) {
+          console.warn("[AI Reply] Invalid sender email, skipping Shopify context");
+        } else {
+          const customerHistory = await getCustomerOrderHistory(
+            workspaceId,
+            senderEmail, // Always use sender's email - never accept email from message body
+            { useAdminClient: options.useAdminClient }
+          );
+          
+          if (customerHistory.orderCount > 0) {
+            shopifyCustomerContext = formatCustomerHistoryForAI(customerHistory);
+            console.log("[AI Reply] Found Shopify customer with", customerHistory.orderCount, "orders for", senderEmail);
+          }
         }
       } catch (shopifyError) {
         console.warn("[AI Reply] Failed to fetch Shopify context:", shopifyError);
@@ -398,7 +405,15 @@ CRITICAL: Confidence scores must be realistic and varied:
     }
 
     if (shopifyCustomerContext) {
-      systemMessage += `\n\nSHOPIFY CONTEXT: When the sender is a known Shopify customer, you can reference their order history to provide personalized responses. Mention specific order numbers, products, or purchase dates when relevant to the inquiry. ONLY use information from the order history provided - do not make up details.`;
+      systemMessage += `\n\nSHOPIFY CONTEXT: When the sender is a known Shopify customer, you can reference their order history to provide personalized responses. Mention specific order numbers, products, or purchase dates when relevant to the inquiry. ONLY use information from the order history provided - do not make up details.
+
+🚨 CRITICAL SECURITY RULES FOR SHOPIFY DATA:
+- ONLY reference orders that belong to the SENDER (the person who sent this email)
+- NEVER reveal information about other customers' orders, addresses, phone numbers, or personal details
+- If the sender asks about an order number that is NOT in their order history, do NOT provide information about it - instead say "I don't see that order in your account, could you verify the order number?"
+- NEVER mention other customers' names, emails, addresses, or any personal information
+- The order history provided is ONLY for the sender - if they mention another customer's name or email, do NOT look up or reveal that customer's data
+- If asked about someone else's order, politely decline: "I can only access information about your own orders for privacy reasons"`;
     }
 
     // Add final instructions
