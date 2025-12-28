@@ -80,11 +80,16 @@ export async function GET(request: NextRequest) {
     // Create response with redirect
     const response = NextResponse.redirect(authUrl.toString());
     
+    // For iframe contexts (Shopify App Bridge), we need sameSite: 'none' and secure: true
+    // For regular contexts, sameSite: 'lax' works fine
+    // Since we can't detect iframe context here, use 'none' to be safe (requires secure: true)
+    const isProduction = process.env.NODE_ENV === 'production';
+    
     // Store nonce in cookie for validation in callback
     response.cookies.set('shopify_nonce', nonce, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: isProduction, // Must be true for sameSite: 'none'
+      sameSite: isProduction ? 'none' : 'lax', // 'none' for iframe compatibility in production
       maxAge: 60 * 10, // 10 minutes
       path: '/',
     });
@@ -92,10 +97,17 @@ export async function GET(request: NextRequest) {
     // Also store shop in cookie for callback
     response.cookies.set('shopify_shop', shop, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: isProduction, // Must be true for sameSite: 'none'
+      sameSite: isProduction ? 'none' : 'lax', // 'none' for iframe compatibility in production
       maxAge: 60 * 10,
       path: '/',
+    });
+    
+    console.log('🟢 [OAuth Init] Cookies set:', {
+      nonce: nonce.substring(0, 10) + '...',
+      shop,
+      sameSite: isProduction ? 'none' : 'lax',
+      secure: isProduction,
     });
 
     return response;
