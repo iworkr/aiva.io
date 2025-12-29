@@ -1029,6 +1029,7 @@ export const generateReplyDraftAction = authActionClient
       const draft = await generateReplyDraft(messageId, workspaceId, {
         tone: tone || 'professional',
         maxLength: maxLength || 300,
+        isManualDraft: true, // CRITICAL: Manual drafts should NEVER auto-send
       });
 
       console.log('[generateReplyDraftAction] Draft generated:', { 

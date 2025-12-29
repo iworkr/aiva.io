@@ -35,6 +35,7 @@ interface ReplyOptions {
   context?: string;
   useAdminClient?: boolean; // Use admin client for background jobs
   skipFeatureCheck?: boolean; // Skip feature check for cron jobs
+  isManualDraft?: boolean; // If true, this is a manual draft from user clicking "Draft with AI" - should NEVER auto-send
 }
 
 interface ToneReason {
@@ -718,17 +719,20 @@ REMEMBER: Missing information handling:
 
     // Determine if draft should be held for human review
     // Hold if: 
-    // 1. Auto-send is disabled (always require review when disabled)
-    // 2. Confidence is below unified threshold
-    // 3. Message explicitly flagged for review (including thread limit reached)
-    // 4. Calendar mismatch detected (if review for scheduling enabled)
-    // 5. Critical missing information (pricing, commitments, etc.) (if review for commitments enabled)
-    // 6. Message is a complaint or sensitive category (if review for sensitive enabled)
-    // 7. Message is in a category that always requires review (sales_lead, bill, invoice)
-    // 8. AI marked as not auto-sendable (should always require review)
+    // 1. This is a MANUAL draft (user clicked "Draft with AI") - NEVER auto-send manual drafts
+    // 2. Auto-send is disabled (always require review when disabled)
+    // 3. Confidence is below unified threshold
+    // 4. Message explicitly flagged for review (including thread limit reached)
+    // 5. Calendar mismatch detected (if review for scheduling enabled)
+    // 6. Critical missing information (pricing, commitments, etc.) (if review for commitments enabled)
+    // 7. Message is a complaint or sensitive category (if review for sensitive enabled)
+    // 8. Message is in a category that always requires review (sales_lead, bill, invoice)
+    // 9. AI marked as not auto-sendable (should always require review)
     // Note: High priority messages can still auto-send if confidence is above threshold and auto-sendable
     // Note: Routine missing info (policy, shipping) with good confidence can still auto-send
-    const shouldHoldForReview = !autoSendEnabled || // Always review if auto-send disabled
+    const isManualDraft = options.isManualDraft ?? false;
+    const shouldHoldForReview = isManualDraft || // CRITICAL: Manual drafts should NEVER auto-send
+      !autoSendEnabled || // Always review if auto-send disabled
       confidenceBelowThreshold || // Always review if below unified threshold
       needsHumanReview || 
       isThreadLimitReached || // Always review if thread limit reached
@@ -754,7 +758,8 @@ REMEMBER: Missing information handling:
        undefined);
     
     const finalUncertaintyNotes = aiUncertaintyNotes || 
-      (isThreadLimitReached ? 'Thread reply limit reached - this conversation has exceeded the maximum number of auto-replies. Human review required.' :
+      (isManualDraft ? 'Manual draft - requires your review before sending' :
+       isThreadLimitReached ? 'Thread reply limit reached - this conversation has exceeded the maximum number of auto-replies. Human review required.' :
        !autoSendEnabled ? 'Auto-send is disabled - all drafts require review' :
        confidenceBelowThreshold ? `AI confidence is ${Math.round(result.confidenceScore * 100)}% - below threshold of ${Math.round(unifiedThreshold * 100)}%` :
        shouldReviewForScheduling ? 'Scheduling confirmation requires calendar verification' :
