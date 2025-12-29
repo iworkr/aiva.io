@@ -140,6 +140,18 @@ export async function POST(request: NextRequest) {
         console.error('[Shopify Create Account] Failed to trigger initial sync:', syncError);
         // Don't fail the account creation if sync fails
       }
+
+      // Register webhooks for real-time order updates
+      try {
+        console.log(`[Shopify Create Account] Registering webhooks for store ${updatedShop.id}`);
+        const { registerShopifyWebhooks } = await import('@/lib/shopify/webhooks');
+        registerShopifyWebhooks(updatedShop.id).catch((webhookError) => {
+          console.error('[Shopify Create Account] Webhook registration error (non-blocking):', webhookError);
+        });
+      } catch (webhookError) {
+        console.error('[Shopify Create Account] Failed to register webhooks:', webhookError);
+        // Don't fail the account creation if webhook registration fails
+      }
     }
 
     // Generate a secure token for server-side session creation

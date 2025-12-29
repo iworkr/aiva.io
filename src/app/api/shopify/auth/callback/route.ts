@@ -298,6 +298,18 @@ export async function GET(request: NextRequest) {
         console.error('[OAuth Callback] Failed to trigger initial sync:', syncError);
         // Don't fail OAuth if sync fails
       }
+
+      // Register webhooks for real-time order updates
+      try {
+        console.log(`[OAuth Callback] Registering webhooks for store ${shopForSync.id}`);
+        const { registerShopifyWebhooks } = await import('@/lib/shopify/webhooks');
+        registerShopifyWebhooks(shopForSync.id).catch((webhookError) => {
+          console.error('[OAuth Callback] Webhook registration error (non-blocking):', webhookError);
+        });
+      } catch (webhookError) {
+        console.error('[OAuth Callback] Failed to register webhooks:', webhookError);
+        // Don't fail OAuth if webhook registration fails
+      }
     } else {
       console.log(`[OAuth Callback] Store not linked to workspace yet, skipping initial sync. Sync will happen when store is linked.`);
     }
