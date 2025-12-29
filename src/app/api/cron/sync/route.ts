@@ -384,11 +384,13 @@ export async function GET(request: NextRequest) {
           // - No existing draft
           // - Include messages requiring human review (they still need drafts, just won't be auto-sent)
           // - Recent (last 24 hours)
+          // - CRITICAL: Only messages received by THIS connection (not other connections in the workspace)
           // - Include sender_email, category, provider_thread_id, labels for filtering
           const { data: actionableMessages } = await supabase
             .from('messages')
             .select('id, subject, actionability, has_draft_reply, sender_email, category, provider_thread_id, labels, requires_human_review')
             .eq('workspace_id', connection.workspace_id)
+            .eq('channel_connection_id', connection.id) // CRITICAL: Only process messages for THIS connection
             .in('actionability', ['question', 'request', 'fyi', 'scheduling_intent', 'task']) // All types except 'none'
             .eq('has_draft_reply', false)
             // Include messages requiring human review - they still need drafts for user review
