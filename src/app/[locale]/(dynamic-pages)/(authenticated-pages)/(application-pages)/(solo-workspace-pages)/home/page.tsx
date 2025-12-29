@@ -1,5 +1,6 @@
 import { DashboardLoadingFallback } from "@/components/workspaces/DashboardLoadingFallback";
 import { MorningBrief } from "@/components/workspaces/MorningBrief";
+import { AutoRefresh } from "@/components/workspaces/MorningBriefAutoRefresh";
 import { getCachedSoloWorkspace } from "@/rsc-data/user/workspaces";
 import type { Metadata } from "next";
 import { Suspense } from "react";
@@ -20,6 +21,7 @@ export default async function WorkspaceDashboardPage(props: {
   const workspace = await getCachedSoloWorkspace();
   return (
     <div className="container mx-auto py-8 max-w-4xl">
+      <AutoRefresh refreshInterval={30} />
       <Suspense fallback={<DashboardLoadingFallback />}>
         <MorningBrief />
       </Suspense>
