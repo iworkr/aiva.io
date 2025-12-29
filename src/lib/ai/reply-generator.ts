@@ -108,6 +108,55 @@ export async function generateReplyDraft(
       ? supabaseAdminClient 
       : await createSupabaseUserServerActionClient();
 
+    // CRITICAL: Check if a draft already exists for this message to prevent duplicates
+    // This prevents race conditions when multiple syncs process the same message
+    const { data: existingDrafts } = await supabase
+      .from("message_drafts")
+      .select("id, body, is_auto_sendable, auto_sent, hold_for_review")
+      .eq("message_id", messageId)
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (existingDrafts && existingDrafts.length > 0) {
+      const existingDraft = existingDrafts[0];
+      console.log("[AI Reply] Draft already exists for this message:", {
+        draftId: existingDraft.id,
+        hasBody: !!existingDraft.body,
+        isAutoSendable: existingDraft.is_auto_sendable,
+        autoSent: existingDraft.auto_sent,
+        holdForReview: existingDraft.hold_for_review,
+      });
+      
+      // Return existing draft info instead of creating a duplicate
+      // If draft was already sent, return error. Otherwise return the existing draft body.
+      if (existingDraft.auto_sent) {
+        return {
+          body: existingDraft.body ?? "",
+          confidenceScore: 0.9,
+          tone: "professional",
+          error: "Draft already sent",
+        };
+      }
+      
+      if (existingDraft.hold_for_review) {
+        return {
+          body: existingDraft.body ?? "",
+          confidenceScore: 0.9,
+          tone: "professional",
+          holdForReview: true,
+          error: "Draft held for review",
+        };
+      }
+      
+      // Draft exists but not sent - return it
+      return {
+        body: existingDraft.body ?? "",
+        confidenceScore: 0.9,
+        tone: "professional",
+      };
+    }
+
     // Get the message with channel connection user_id
     console.log("[AI Reply] Fetching message:", { messageId, workspaceId });
     const { data: message, error } = await supabase

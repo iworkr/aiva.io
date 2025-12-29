@@ -599,6 +599,30 @@ export async function queueAutoSend(
     };
   }
 
+  // CRITICAL: Check if this message is already queued to prevent duplicates
+  const { data: existingQueueItem } = await supabase
+    .from('auto_send_queue')
+    .select('id, status, scheduled_send_at')
+    .eq('message_id', messageId)
+    .eq('workspace_id', workspaceId)
+    .in('status', ['pending', 'processing'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (existingQueueItem) {
+    console.log('[Auto-Send Queue] Message already queued:', {
+      queueId: existingQueueItem.id,
+      status: existingQueueItem.status,
+      scheduledAt: existingQueueItem.scheduled_send_at,
+    });
+    return { 
+      queued: false, 
+      reason: 'Message already queued for auto-send',
+      scheduledAt: existingQueueItem.scheduled_send_at ? new Date(existingQueueItem.scheduled_send_at) : undefined,
+    };
+  }
+
   // Calculate scheduled send time
   let scheduledAt = calculateScheduledTime(settings);
   const delayMinutes = Math.round((scheduledAt.getTime() - Date.now()) / 60000);
