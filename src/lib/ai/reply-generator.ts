@@ -645,11 +645,16 @@ REMEMBER: Missing information handling:
     const shouldReviewForCommitments = reviewForCommitments && isCriticalMissingInfo;
     const shouldReviewForSensitive = reviewForSensitive && (isComplaint || isAlwaysReviewCategory);
 
+    // Check if message was marked for review due to thread reply limit
+    const isThreadLimitReached = message.requires_human_review && 
+      (message.review_reason === 'thread_reply_limit_reached' || 
+       (message.review_context as any)?.reason?.includes('Thread reply limit'));
+
     // Determine if draft should be held for human review
     // Hold if: 
     // 1. Auto-send is disabled (always require review when disabled)
     // 2. Confidence is below unified threshold
-    // 3. Message explicitly flagged for review
+    // 3. Message explicitly flagged for review (including thread limit reached)
     // 4. Calendar mismatch detected (if review for scheduling enabled)
     // 5. Critical missing information (pricing, commitments, etc.) (if review for commitments enabled)
     // 6. Message is a complaint or sensitive category (if review for sensitive enabled)
@@ -660,6 +665,7 @@ REMEMBER: Missing information handling:
     const shouldHoldForReview = !autoSendEnabled || // Always review if auto-send disabled
       confidenceBelowThreshold || // Always review if below unified threshold
       needsHumanReview || 
+      isThreadLimitReached || // Always review if thread limit reached
       shouldReviewForScheduling ||
       shouldReviewForCommitments ||
       shouldReviewForSensitive ||
@@ -669,7 +675,8 @@ REMEMBER: Missing information handling:
       (hasMissingInfo && !result.isAutoSendable && result.confidenceScore < 0.70);
     
     const finalReviewReason = reviewReason || 
-      (!autoSendEnabled ? 'auto_send_disabled' :
+      (isThreadLimitReached ? 'thread_reply_limit_reached' :
+       !autoSendEnabled ? 'auto_send_disabled' :
        confidenceBelowThreshold ? `low_confidence_below_threshold_${Math.round(unifiedThreshold * 100)}%` :
        shouldReviewForScheduling ? 'scheduling_review_required' :
        shouldReviewForCommitments ? `missing_information_${missingInfoType}` :
@@ -681,7 +688,8 @@ REMEMBER: Missing information handling:
        undefined);
     
     const finalUncertaintyNotes = aiUncertaintyNotes || 
-      (!autoSendEnabled ? 'Auto-send is disabled - all drafts require review' :
+      (isThreadLimitReached ? 'Thread reply limit reached - this conversation has exceeded the maximum number of auto-replies. Human review required.' :
+       !autoSendEnabled ? 'Auto-send is disabled - all drafts require review' :
        confidenceBelowThreshold ? `AI confidence is ${Math.round(result.confidenceScore * 100)}% - below threshold of ${Math.round(unifiedThreshold * 100)}%` :
        shouldReviewForScheduling ? 'Scheduling confirmation requires calendar verification' :
        shouldReviewForCommitments ? `AI is missing critical information (${missingInfoType}) - human follow-up required` :

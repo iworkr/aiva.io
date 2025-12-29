@@ -458,9 +458,30 @@ export async function GET(request: NextRequest) {
 
                 // If message requires human review, still generate draft (user needs to review it)
                 // But log that it was filtered for auto-send
+                // CRITICAL: Thread reply limit reached messages should still get drafts for human review
+                const isThreadLimitReached = !filterResult.eligible && filterResult.reason?.includes('Thread reply limit');
+                
                 if (!filterResult.eligible) {
-                  if (msg.requires_human_review) {
-                    console.log(`      ⚠️ Message requires human review but filtered for auto-send: ${filterResult.reason}`);
+                  if (msg.requires_human_review || isThreadLimitReached) {
+                    // Thread limit reached or already marked for review - still generate draft
+                    if (isThreadLimitReached) {
+                      console.log(`      ⚠️ Thread reply limit reached - generating draft for human review: ${filterResult.reason}`);
+                      // Mark message as requiring human review so it appears in review queue
+                      await supabase
+                        .from('messages')
+                        .update({
+                          requires_human_review: true,
+                          review_reason: 'thread_reply_limit_reached',
+                          review_context: {
+                            reason: filterResult.reason,
+                            details: filterResult.details,
+                            markedAt: new Date().toISOString(),
+                          },
+                        })
+                        .eq('id', msg.id);
+                    } else {
+                      console.log(`      ⚠️ Message requires human review but filtered for auto-send: ${filterResult.reason}`);
+                    }
                     console.log(`      ✍️ Still generating draft for human review...`);
                     // Continue to draft generation below
                   } else {
@@ -482,7 +503,8 @@ export async function GET(request: NextRequest) {
                 }
                 
                 // Generate draft (for both eligible messages and messages requiring human review)
-                if (filterResult.eligible || msg.requires_human_review) {
+                // Also generate for thread limit reached messages (they need human review)
+                if (filterResult.eligible || msg.requires_human_review || isThreadLimitReached) {
                   console.log(`      ✍️ Generating draft for: ${msg.subject?.substring(0, 40) || 'No subject'}...`);
                   
                   const draftResult = await generateReplyDraft(
