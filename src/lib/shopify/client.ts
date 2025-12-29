@@ -61,6 +61,19 @@ export interface ShopifyDiscountCode {
   type: string;
 }
 
+export interface ShopifyFulfillment {
+  id: number;
+  status: string;
+  tracking_company: string | null;
+  tracking_number: string | null;
+  tracking_numbers: string[];
+  tracking_url: string | null;
+  tracking_urls: string[];
+  created_at: string;
+  updated_at: string;
+  shipped_at: string | null;
+}
+
 export interface ShopifyOrder {
   id: number;
   name: string;
@@ -84,6 +97,7 @@ export interface ShopifyOrder {
   shipping_address: ShopifyAddress | null;
   billing_address: ShopifyAddress | null;
   discount_codes: ShopifyDiscountCode[];
+  fulfillments?: ShopifyFulfillment[];
   customer?: ShopifyCustomer | null;
 }
 
@@ -292,7 +306,16 @@ export async function getOrders(
   if (options.sinceId) params.set('since_id', String(options.sinceId));
   if (options.createdAtMin) params.set('created_at_min', options.createdAtMin);
   if (options.updatedAtMin) params.set('updated_at_min', options.updatedAtMin);
-  if (options.fields) params.set('fields', options.fields.join(','));
+  
+  // Request fulfillment fields to get tracking numbers
+  const fields = options.fields || [
+    'id', 'name', 'order_number', 'email', 'created_at', 'updated_at', 'processed_at',
+    'closed_at', 'cancelled_at', 'currency', 'total_price', 'subtotal_price',
+    'total_tax', 'total_discounts', 'financial_status', 'fulfillment_status',
+    'note', 'tags', 'line_items', 'shipping_address', 'billing_address',
+    'discount_codes', 'fulfillments', 'customer'
+  ];
+  params.set('fields', fields.join(','));
 
   const data = await shopifyAdminRequest<{ orders: ShopifyOrder[] }>(
     shopDomain,

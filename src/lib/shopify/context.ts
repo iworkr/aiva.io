@@ -33,6 +33,9 @@ export interface ShopifyOrderSummary {
   fulfillmentStatus: string | null;
   createdAt: string;
   lineItemsCount: number;
+  trackingNumbers?: string[];
+  trackingCompanies?: string[];
+  trackingUrls?: string[];
 }
 
 export interface ShopifyCustomerSummary {
@@ -139,18 +142,47 @@ export async function getShopifyContextForWorkspace(
       .order("created_at_shopify", { ascending: false })
       .limit(10);
 
-    const recentOrders: ShopifyOrderSummary[] = (ordersData || []).map((order) => ({
-      orderId: order.id,
-      orderNumber: order.order_number || order.name || `#${order.shopify_order_id}`,
-      customerName: order.customer_name ?? null,
-      email: order.email ?? null,
-      totalPrice: order.total_price != null ? parseFloat(String(order.total_price)) : 0,
-      currency: order.currency ?? null,
-      financialStatus: order.financial_status ?? null,
-      fulfillmentStatus: order.fulfillment_status ?? null,
-      createdAt: order.created_at_shopify ?? new Date().toISOString(),
-      lineItemsCount: Array.isArray(order.line_items) ? order.line_items.length : 0,
-    }));
+    const recentOrders: ShopifyOrderSummary[] = (ordersData || []).map((order) => {
+      // Extract tracking information from fulfillments
+      const fulfillments = (order.fulfillments as any) || [];
+      const trackingNumbers: string[] = [];
+      const trackingCompanies: string[] = [];
+      const trackingUrls: string[] = [];
+
+      fulfillments.forEach((fulfillment: any) => {
+        if (fulfillment.tracking_number) {
+          trackingNumbers.push(fulfillment.tracking_number);
+        }
+        if (fulfillment.tracking_numbers && Array.isArray(fulfillment.tracking_numbers)) {
+          trackingNumbers.push(...fulfillment.tracking_numbers);
+        }
+        if (fulfillment.tracking_company) {
+          trackingCompanies.push(fulfillment.tracking_company);
+        }
+        if (fulfillment.tracking_url) {
+          trackingUrls.push(fulfillment.tracking_url);
+        }
+        if (fulfillment.tracking_urls && Array.isArray(fulfillment.tracking_urls)) {
+          trackingUrls.push(...fulfillment.tracking_urls);
+        }
+      });
+
+      return {
+        orderId: order.id,
+        orderNumber: order.order_number || order.name || `#${order.shopify_order_id}`,
+        customerName: order.customer_name ?? null,
+        email: order.email ?? null,
+        totalPrice: order.total_price != null ? parseFloat(String(order.total_price)) : 0,
+        currency: order.currency ?? null,
+        financialStatus: order.financial_status ?? null,
+        fulfillmentStatus: order.fulfillment_status ?? null,
+        createdAt: order.created_at_shopify ?? new Date().toISOString(),
+        lineItemsCount: Array.isArray(order.line_items) ? order.line_items.length : 0,
+        trackingNumbers: trackingNumbers.length > 0 ? trackingNumbers : undefined,
+        trackingCompanies: trackingCompanies.length > 0 ? [...new Set(trackingCompanies)] : undefined,
+        trackingUrls: trackingUrls.length > 0 ? trackingUrls : undefined,
+      };
+    });
 
     // Fetch top customers by total spent (top 5)
     const { data: customersData } = await supabase
@@ -362,18 +394,47 @@ export async function getCustomerOrderHistory(
       .order("created_at_shopify", { ascending: false })
       .limit(20);
 
-    const orders: ShopifyOrderSummary[] = (ordersData || []).map((order) => ({
-      orderId: order.id,
-      orderNumber: order.order_number || order.name || `#${order.shopify_order_id}`,
-      customerName: order.customer_name ?? null,
-      email: order.email ?? null,
-      totalPrice: order.total_price != null ? parseFloat(String(order.total_price)) : 0,
-      currency: order.currency ?? null,
-      financialStatus: order.financial_status ?? null,
-      fulfillmentStatus: order.fulfillment_status ?? null,
-      createdAt: order.created_at_shopify ?? new Date().toISOString(),
-      lineItemsCount: Array.isArray(order.line_items) ? order.line_items.length : 0,
-    }));
+    const orders: ShopifyOrderSummary[] = (ordersData || []).map((order) => {
+      // Extract tracking information from fulfillments
+      const fulfillments = (order.fulfillments as any) || [];
+      const trackingNumbers: string[] = [];
+      const trackingCompanies: string[] = [];
+      const trackingUrls: string[] = [];
+
+      fulfillments.forEach((fulfillment: any) => {
+        if (fulfillment.tracking_number) {
+          trackingNumbers.push(fulfillment.tracking_number);
+        }
+        if (fulfillment.tracking_numbers && Array.isArray(fulfillment.tracking_numbers)) {
+          trackingNumbers.push(...fulfillment.tracking_numbers);
+        }
+        if (fulfillment.tracking_company) {
+          trackingCompanies.push(fulfillment.tracking_company);
+        }
+        if (fulfillment.tracking_url) {
+          trackingUrls.push(fulfillment.tracking_url);
+        }
+        if (fulfillment.tracking_urls && Array.isArray(fulfillment.tracking_urls)) {
+          trackingUrls.push(...fulfillment.tracking_urls);
+        }
+      });
+
+      return {
+        orderId: order.id,
+        orderNumber: order.order_number || order.name || `#${order.shopify_order_id}`,
+        customerName: order.customer_name ?? null,
+        email: order.email ?? null,
+        totalPrice: order.total_price != null ? parseFloat(String(order.total_price)) : 0,
+        currency: order.currency ?? null,
+        financialStatus: order.financial_status ?? null,
+        fulfillmentStatus: order.fulfillment_status ?? null,
+        createdAt: order.created_at_shopify ?? new Date().toISOString(),
+        lineItemsCount: Array.isArray(order.line_items) ? order.line_items.length : 0,
+        trackingNumbers: trackingNumbers.length > 0 ? trackingNumbers : undefined,
+        trackingCompanies: trackingCompanies.length > 0 ? [...new Set(trackingCompanies)] : undefined,
+        trackingUrls: trackingUrls.length > 0 ? trackingUrls : undefined,
+      };
+    });
 
     const totalSpent = orders.reduce((sum, order) => sum + order.totalPrice, 0);
 
@@ -491,6 +552,14 @@ export function formatCustomerHistoryForAI(history: CustomerOrderHistory): strin
       let statusDescription = "";
       if (financialStatus === "paid" && fulfillmentStatus === "fulfilled") {
         statusDescription = "✅ Paid & Shipped";
+        // Add tracking info if available
+        if (order.trackingNumbers && order.trackingNumbers.length > 0) {
+          const trackingText = order.trackingNumbers.map((num, idx) => {
+            const company = order.trackingCompanies?.[idx] || 'shipping';
+            return `${company}: ${num}`;
+          }).join(', ');
+          statusDescription += ` (Tracking: ${trackingText})`;
+        }
       } else if (financialStatus === "paid" && fulfillmentStatus === "partial") {
         statusDescription = "✅ Paid & Partially Shipped";
       } else if (financialStatus === "paid" && fulfillmentStatus === "unfulfilled") {

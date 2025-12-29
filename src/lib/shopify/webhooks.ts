@@ -28,15 +28,17 @@ export async function registerShopifyWebhooks(storeId: string): Promise<boolean>
     }
 
     // Webhook topics to register
+    // Note: Shopify uses 'orders/updated' not 'orders/update'
+    // Refunds use 'refunds/create' not 'orders/refunded'
     const webhookTopics = [
       'app/uninstalled',
-      'orders/update',
+      'orders/updated', // Changed from 'orders/update'
       'orders/paid',
       'orders/fulfilled',
       'orders/partially_fulfilled',
       'orders/cancelled',
-      'orders/refunded',
-      'orders/partially_refunded',
+      'refunds/create', // Changed from 'orders/refunded' - this covers all refunds
+      // Note: 'orders/partially_refunded' doesn't exist - refunds/create covers all refunds
     ];
 
     console.log(`[Shopify Webhooks] Registering ${webhookTopics.length} webhooks for ${store.shop_domain}`);
@@ -171,13 +173,12 @@ export async function checkShopifyWebhooks(storeId: string): Promise<{
 
     const requiredTopics = [
       'app/uninstalled',
-      'orders/update',
+      'orders/updated',
       'orders/paid',
       'orders/fulfilled',
       'orders/partially_fulfilled',
       'orders/cancelled',
-      'orders/refunded',
-      'orders/partially_refunded',
+      'refunds/create',
     ];
 
     const missing = requiredTopics.filter((topic) => !registeredTopics.includes(topic));

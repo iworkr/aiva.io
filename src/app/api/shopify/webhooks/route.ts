@@ -81,13 +81,12 @@ export async function POST(request: NextRequest) {
         await handleShopRedact(supabase, shopDomain!, payload);
         break;
 
-      case 'orders/update':
+      case 'orders/updated': // Shopify uses 'orders/updated' not 'orders/update'
       case 'orders/paid':
       case 'orders/fulfilled':
       case 'orders/partially_fulfilled':
       case 'orders/cancelled':
-      case 'orders/refunded':
-      case 'orders/partially_refunded':
+      case 'refunds/create': // Refunds use 'refunds/create' not 'orders/refunded'
         await handleOrderUpdate(supabase, shopDomain!, payload);
         break;
 

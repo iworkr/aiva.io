@@ -28,13 +28,12 @@ uri = "/api/shopify/webhooks"
 # Order update webhooks for real-time order status tracking
 [[webhooks.subscriptions]]
 topics = [
-  "orders/update",
+  "orders/updated",
   "orders/paid",
   "orders/fulfilled",
   "orders/partially_fulfilled",
   "orders/cancelled",
-  "orders/refunded",
-  "orders/partially_refunded"
+  "refunds/create"
 ]
 uri = "/api/shopify/webhooks"
 

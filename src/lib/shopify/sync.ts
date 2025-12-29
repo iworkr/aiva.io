@@ -263,6 +263,20 @@ function transformOrderForDatabase(
     ? `${order.customer.first_name || ""} ${order.customer.last_name || ""}`.trim()
     : null;
 
+  // Extract tracking information from fulfillments
+  const fulfillments = order.fulfillments || [];
+  const trackingInfo = fulfillments
+    .filter((f: any) => f.tracking_number || (f.tracking_numbers && f.tracking_numbers.length > 0))
+    .map((f: any) => ({
+      tracking_company: f.tracking_company || null,
+      tracking_number: f.tracking_number || (f.tracking_numbers && f.tracking_numbers[0]) || null,
+      tracking_numbers: f.tracking_numbers || (f.tracking_number ? [f.tracking_number] : []),
+      tracking_url: f.tracking_url || null,
+      tracking_urls: f.tracking_urls || (f.tracking_url ? [f.tracking_url] : []),
+      status: f.status || null,
+      shipped_at: f.shipped_at || null,
+    }));
+
   return {
     workspace_id: workspaceId,
     shopify_store_id: storeId,
@@ -284,6 +298,7 @@ function transformOrderForDatabase(
     shipping_address: order.shipping_address,
     billing_address: order.billing_address,
     discount_codes: order.discount_codes,
+    fulfillments: fulfillments.length > 0 ? fulfillments : null, // Store full fulfillments
     note: order.note,
     tags: order.tags,
     created_at_shopify: order.created_at,
