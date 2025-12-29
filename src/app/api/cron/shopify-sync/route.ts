@@ -2,7 +2,11 @@
  * Shopify Data Sync Cron Job
  * Periodically syncs orders, customers, and products from Shopify
  * 
- * Schedule: Every 6 hours (configurable in vercel.json)
+ * Schedule: Every 15 minutes (configurable in vercel.json)
+ * 
+ * This job uses incremental syncs to only fetch orders updated since the last sync,
+ * making it efficient for frequent runs. Combined with webhooks for real-time updates,
+ * this ensures order status changes are captured quickly.
  * 
  * This job syncs data from all active Shopify stores that have:
  * - An active connection (is_active = true)

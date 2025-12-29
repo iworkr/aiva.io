@@ -81,6 +81,16 @@ export async function POST(request: NextRequest) {
         await handleShopRedact(supabase, shopDomain!, payload);
         break;
 
+      case 'orders/update':
+      case 'orders/paid':
+      case 'orders/fulfilled':
+      case 'orders/partially_fulfilled':
+      case 'orders/cancelled':
+      case 'orders/refunded':
+      case 'orders/partially_refunded':
+        await handleOrderUpdate(supabase, shopDomain!, payload);
+        break;
+
       default:
         console.log('Unhandled Shopify webhook topic:', topic);
     }
@@ -257,5 +267,66 @@ async function handleShopRedact(
   });
 
   console.log('✅ Shop data deleted');
+}
+
+/**
+ * Handle order update webhooks
+ * Called when an order is created, updated, paid, fulfilled, cancelled, or refunded
+ * This provides real-time order status updates
+ */
+async function handleOrderUpdate(
+  supabase: typeof supabaseAdminClient,
+  shopDomain: string,
+  payload: {
+    id: number;
+    name?: string;
+    email?: string;
+    financial_status?: string;
+    fulfillment_status?: string;
+    updated_at?: string;
+    [key: string]: unknown;
+  }
+) {
+  console.log('📦 Order update webhook for shop:', shopDomain);
+  console.log('Order ID:', payload.id, 'Status:', payload.financial_status, payload.fulfillment_status);
+
+  try {
+    // Get the store
+    const { data: store, error: storeError } = await supabase
+      .from('shopify_stores')
+      .select('id, workspace_id, sync_enabled')
+      .eq('shop_domain', shopDomain)
+      .eq('is_active', true)
+      .single();
+
+    if (storeError || !store) {
+      console.error('Store not found for order webhook:', shopDomain);
+      return;
+    }
+
+    if (!store.sync_enabled) {
+      console.log('Sync disabled for store, skipping order update');
+      return;
+    }
+
+    // Import sync function dynamically to avoid circular dependencies
+    const { syncShopifyOrders } = await import('@/lib/shopify/sync');
+
+    // Sync just this order (or recent orders if we can't sync a single order)
+    // The sync function will use incremental sync to get recent updates
+    const syncResult = await syncShopifyOrders(store.id, store.workspace_id, {
+      maxRecords: 10, // Only sync a few recent orders
+      sinceDate: new Date(Date.now() - 5 * 60 * 1000).toISOString(), // Last 5 minutes
+    });
+
+    console.log('✅ Order update synced:', {
+      orderId: payload.id,
+      synced: syncResult.recordsSynced,
+      updated: syncResult.recordsUpdated,
+    });
+  } catch (error) {
+    console.error('Failed to sync order update:', error);
+    // Don't throw - webhook should still return 200
+  }
 }
 
