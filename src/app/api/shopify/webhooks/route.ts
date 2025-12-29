@@ -304,6 +304,11 @@ async function handleOrderUpdate(
       return;
     }
 
+    if (!store.workspace_id) {
+      console.error('Store has no workspace_id, skipping order update');
+      return;
+    }
+
     if (!store.sync_enabled) {
       console.log('Sync disabled for store, skipping order update');
       return;

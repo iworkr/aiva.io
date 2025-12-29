@@ -3436,6 +3436,7 @@ export type Database = {
           auto_send_sender_cooldown_minutes: number | null
           auto_send_time_end: string | null
           auto_send_time_start: string | null
+          daily_digest_email_addresses: string[] | null
           daily_digest_enabled: boolean | null
           daily_digest_time: string | null
           human_review_confidence_threshold: number | null
@@ -3445,6 +3446,7 @@ export type Database = {
           human_review_for_sensitive: boolean | null
           inbox_type: string | null
           inbox_zero_enabled: boolean | null
+          notification_email_addresses: string[] | null
           notify_on_high_priority: boolean | null
           notify_on_review_needed: boolean | null
           push_notifications_enabled: boolean | null
@@ -3470,6 +3472,7 @@ export type Database = {
           auto_send_sender_cooldown_minutes?: number | null
           auto_send_time_end?: string | null
           auto_send_time_start?: string | null
+          daily_digest_email_addresses?: string[] | null
           daily_digest_enabled?: boolean | null
           daily_digest_time?: string | null
           human_review_confidence_threshold?: number | null
@@ -3479,6 +3482,7 @@ export type Database = {
           human_review_for_sensitive?: boolean | null
           inbox_type?: string | null
           inbox_zero_enabled?: boolean | null
+          notification_email_addresses?: string[] | null
           notify_on_high_priority?: boolean | null
           notify_on_review_needed?: boolean | null
           push_notifications_enabled?: boolean | null
@@ -3504,6 +3508,7 @@ export type Database = {
           auto_send_sender_cooldown_minutes?: number | null
           auto_send_time_end?: string | null
           auto_send_time_start?: string | null
+          daily_digest_email_addresses?: string[] | null
           daily_digest_enabled?: boolean | null
           daily_digest_time?: string | null
           human_review_confidence_threshold?: number | null
@@ -3513,6 +3518,7 @@ export type Database = {
           human_review_for_sensitive?: boolean | null
           inbox_type?: string | null
           inbox_zero_enabled?: boolean | null
+          notification_email_addresses?: string[] | null
           notify_on_high_priority?: boolean | null
           notify_on_review_needed?: boolean | null
           push_notifications_enabled?: boolean | null

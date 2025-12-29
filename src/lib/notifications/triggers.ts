@@ -105,13 +105,13 @@ export async function notifyReviewNeeded(
 
   // Get user emails for email notifications
   const { data: users } = await supabaseAdminClient
-    .from('user_profiles')
-    .select('id, email, full_name')
+    .from('user_application_settings')
+    .select('id, email_readonly, user_profiles(full_name)')
     .in('id', members);
 
   const userEmails = new Map<string, string>();
   (users || []).forEach(u => {
-    if (u.email) userEmails.set(u.id, u.email);
+    if (u.email_readonly) userEmails.set(u.id, u.email_readonly);
   });
 
   // Get email addresses to notify (from settings or use user emails)
@@ -186,13 +186,13 @@ export async function notifyHighPriority(
 
   // Get user emails for email notifications
   const { data: users } = await supabaseAdminClient
-    .from('user_profiles')
-    .select('id, email, full_name')
+    .from('user_application_settings')
+    .select('id, email_readonly, user_profiles(full_name)')
     .in('id', members);
 
   const userEmails = new Map<string, string>();
   (users || []).forEach(u => {
-    if (u.email) userEmails.set(u.id, u.email);
+    if (u.email_readonly) userEmails.set(u.id, u.email_readonly);
   });
 
   // Get email addresses to notify (from settings or use user emails)

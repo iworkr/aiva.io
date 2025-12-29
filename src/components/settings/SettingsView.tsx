@@ -245,6 +245,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
             applyAivaLabel?: boolean;
             dailyDigestEnabled?: boolean;
             dailyDigestTime?: string;
+            dailyDigestEmailAddresses?: string[] | null;
           };
         };
         const profile = data.profile;
