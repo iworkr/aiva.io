@@ -25,6 +25,19 @@ api_version = "2024-01"
 topics = ["app/uninstalled"]
 uri = "/api/shopify/webhooks"
 
+# Order update webhooks for real-time order status tracking
+[[webhooks.subscriptions]]
+topics = [
+  "orders/update",
+  "orders/paid",
+  "orders/fulfilled",
+  "orders/partially_fulfilled",
+  "orders/cancelled",
+  "orders/refunded",
+  "orders/partially_refunded"
+]
+uri = "/api/shopify/webhooks"
+
 [pos]
 embedded = false
 
