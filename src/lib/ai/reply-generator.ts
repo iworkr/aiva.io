@@ -200,6 +200,72 @@ export async function generateReplyDraft(
     } = options;
 
     // ============================================
+    // CHECK THREAD REPLY LIMIT (before generating draft)
+    // ============================================
+    // This check must happen here so it applies to both manual and automatic draft generation
+    let threadLimitReached = false;
+    if (message.provider_thread_id && message.channel_connection) {
+      try {
+        // Get workspace settings for max replies per thread
+        const { data: wsSettings } = await supabase
+          .from('workspace_settings')
+          .select('auto_send_max_replies_per_thread')
+          .eq('workspace_id', workspaceId)
+          .single();
+
+        const maxRepliesPerThread = wsSettings?.auto_send_max_replies_per_thread ?? 2;
+        
+        // Get connection email
+        const connectionEmail = (message.channel_connection as any)?.provider_account_name || 
+                               (message.channel_connection as any)?.provider_account_id || '';
+        
+        if (connectionEmail) {
+          const { hasRepliedToThread } = await import('@/lib/workers/auto-send-worker');
+          const threadCheck = await hasRepliedToThread(
+            message.provider_thread_id,
+            workspaceId,
+            connectionEmail,
+            maxRepliesPerThread
+          );
+          
+          if (threadCheck.hasReplied) {
+            threadLimitReached = true;
+            console.log('[AI Reply] Thread reply limit reached:', {
+              replyCount: threadCheck.replyCount,
+              maxReplies: maxRepliesPerThread,
+              threadId: message.provider_thread_id,
+            });
+            
+            // Mark message as requiring human review if not already marked
+            if (!message.requires_human_review) {
+              await supabase
+                .from('messages')
+                .update({
+                  requires_human_review: true,
+                  review_reason: 'thread_reply_limit_reached',
+                  review_context: {
+                    reason: `Thread reply limit reached (${threadCheck.replyCount}/${maxRepliesPerThread})`,
+                    threadId: message.provider_thread_id,
+                    replyCount: threadCheck.replyCount,
+                    maxReplies: maxRepliesPerThread,
+                    markedAt: new Date().toISOString(),
+                  },
+                })
+                .eq('id', messageId);
+              
+              // Update message object for later use
+              message.requires_human_review = true;
+              message.review_reason = 'thread_reply_limit_reached';
+            }
+          }
+        }
+      } catch (threadCheckError) {
+        console.warn('[AI Reply] Error checking thread reply limit:', threadCheckError);
+        // Continue with draft generation even if check fails
+      }
+    }
+
+    // ============================================
     // HUMAN REVIEW DETECTION
     // ============================================
     let needsHumanReview = false;
@@ -207,7 +273,7 @@ export async function generateReplyDraft(
     let calendarContext: CalendarVerificationResult | undefined;
     let aiUncertaintyNotes: string | undefined;
 
-    // Check if message was already flagged for review by classifier
+    // Check if message was already flagged for review by classifier or thread limit
     if (message.requires_human_review) {
       needsHumanReview = true;
       reviewReason = message.review_reason || 'flagged_by_classifier';
