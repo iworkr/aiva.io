@@ -52,6 +52,8 @@ import {
   Home,
   Shuffle,
   Inbox,
+  X,
+  Plus,
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
@@ -152,6 +154,8 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   const [isGeneratingContext, setIsGeneratingContext] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
+  const [notificationEmailAddresses, setNotificationEmailAddresses] = useState<string[]>([]);
+  const [notificationEmailInput, setNotificationEmailInput] = useState('');
   const [displayName, setDisplayName] = useState(user?.user_metadata?.full_name || '');
   const [timezone, setTimezone] = useState(() => detectUserTimezone()); // Auto-detect on init
   const [syncFrequency, setSyncFrequency] = useState('15');
@@ -189,6 +193,8 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   const [applyAivaLabel, setApplyAivaLabel] = useState(true);
   const [dailyDigestEnabled, setDailyDigestEnabled] = useState(true);
   const [dailyDigestTime, setDailyDigestTime] = useState('18:00');
+  const [dailyDigestEmailAddresses, setDailyDigestEmailAddresses] = useState<string[]>([]);
+  const [dailyDigestEmailInput, setDailyDigestEmailInput] = useState('');
   
   // Check Pro subscription status
   const { hasPro, loading: loadingPro } = useProSubscription(workspaceId);
@@ -264,6 +270,15 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
           setEmailNotifications(settings.notifications.email ?? true);
           setPushNotifications(settings.notifications.push ?? true);
         }
+        
+        // Set notification email addresses (from direct column, not JSON)
+        const rawSettings = data.settings as any;
+        if (rawSettings?.notificationEmailAddresses) {
+          setNotificationEmailAddresses(rawSettings.notificationEmailAddresses);
+        } else if (user?.email) {
+          // Auto-add user's account email if no addresses set
+          setNotificationEmailAddresses([user.email]);
+        }
 
         // Set account settings
         if (profile?.full_name) {
@@ -285,6 +300,14 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
           setApplyAivaLabel(settings.inboxZero.applyAivaLabel ?? true);
           setDailyDigestEnabled(settings.inboxZero.dailyDigestEnabled ?? true);
           setDailyDigestTime(settings.inboxZero.dailyDigestTime || '18:00');
+          
+          // Set daily digest email addresses
+          if (settings.inboxZero.dailyDigestEmailAddresses) {
+            setDailyDigestEmailAddresses(settings.inboxZero.dailyDigestEmailAddresses);
+          } else if (user?.email) {
+            // Auto-add user's account email if no addresses set
+            setDailyDigestEmailAddresses([user.email]);
+          }
         }
 
         // Set auto-send settings
@@ -555,7 +578,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   // Inbox Zero Settings - auto-save
   const { execute: saveInboxZeroSettings, status: inboxZeroStatus } = useAction(updateInboxZeroSettingsAction, {
     onSuccess: () => {
-      toast.success('Inbox Zero setting updated', { duration: 2000 });
+      // Don't show toast for every auto-save to avoid spam
     },
     onError: ({ error }) => {
       toast.error(error.serverError || 'Failed to save Inbox Zero setting');
@@ -565,6 +588,30 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   // Auto-send timer ref for debounced saves
   const autoSendSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const filterSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const inboxZeroSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Handler for inbox zero settings with debounce
+  const triggerInboxZeroSave = useCallback((updates: {
+    inboxZeroEnabled?: boolean;
+    autoArchiveHandled?: boolean;
+    applyAivaLabel?: boolean;
+    dailyDigestEnabled?: boolean;
+    dailyDigestTime?: string;
+    dailyDigestEmailAddresses?: string[];
+  }) => {
+    if (!hasInitializedRef.current) return;
+    
+    if (inboxZeroSaveTimerRef.current) {
+      clearTimeout(inboxZeroSaveTimerRef.current);
+    }
+    
+    inboxZeroSaveTimerRef.current = setTimeout(() => {
+      saveInboxZeroSettings({
+        workspaceId,
+        ...updates,
+      });
+    }, 500);
+  }, [workspaceId, saveInboxZeroSettings]);
 
   // Track unsaved changes for AI Context and Rules
   const [aiContextUnsaved, setAiContextUnsaved] = useState(false);
@@ -616,7 +663,8 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   // Auto-save notification settings when switches change
   const triggerNotifAutoSave = useCallback((updates: { 
     emailNotifications?: boolean; 
-    pushNotifications?: boolean 
+    pushNotifications?: boolean;
+    notificationEmailAddresses?: string[];
   }) => {
     if (!hasInitializedRef.current) return;
     
@@ -629,9 +677,10 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
         workspaceId,
         emailNotifications: updates.emailNotifications ?? emailNotifications,
         pushNotifications: updates.pushNotifications ?? pushNotifications,
+        notificationEmailAddresses: updates.notificationEmailAddresses ?? notificationEmailAddresses,
       });
     }, 500);
-  }, [workspaceId, emailNotifications, pushNotifications, saveNotificationSettings]);
+  }, [workspaceId, emailNotifications, pushNotifications, notificationEmailAddresses, saveNotificationSettings]);
 
   // Auto-save sync settings when selects change
   const triggerSyncAutoSave = useCallback((updates: { 
@@ -1829,8 +1878,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                       disabled={inboxZeroStatus === 'executing'}
                       onCheckedChange={(checked) => {
                         setInboxZeroEnabled(checked);
-                        saveInboxZeroSettings({
-                          workspaceId,
+                        triggerInboxZeroSave({
                           inboxZeroEnabled: checked,
                         });
                       }}
@@ -1861,8 +1909,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                           onCheckedChange={(checked) => {
                             const value = checked === true;
                             setAutoArchiveHandled(value);
-                            saveInboxZeroSettings({
-                              workspaceId,
+                            triggerInboxZeroSave({
                               autoArchiveHandled: value,
                             });
                           }}
@@ -1879,8 +1926,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                           onCheckedChange={(checked) => {
                             const value = checked === true;
                             setApplyAivaLabel(value);
-                            saveInboxZeroSettings({
-                              workspaceId,
+                            triggerInboxZeroSave({
                               applyAivaLabel: value,
                             });
                           }}
@@ -1908,8 +1954,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                         disabled={inboxZeroStatus === 'executing'}
                         onCheckedChange={(checked) => {
                           setDailyDigestEnabled(checked);
-                          saveInboxZeroSettings({
-                            workspaceId,
+                          triggerInboxZeroSave({
                             dailyDigestEnabled: checked,
                           });
                         }}
@@ -1925,13 +1970,100 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                         onChange={(e) => {
                           const newTime = e.target.value;
                           setDailyDigestTime(newTime);
-                          saveInboxZeroSettings({
-                            workspaceId,
+                          triggerInboxZeroSave({
                             dailyDigestTime: newTime,
                           });
                         }}
                       />
                     </div>
+                    {dailyDigestEnabled && (
+                      <div className="space-y-2 pt-2">
+                        <Label className="text-sm">Digest Email Addresses</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Email addresses to receive daily digest (separate from the email Aiva manages)
+                        </p>
+                        <div className="flex flex-wrap gap-2 p-3 border rounded-lg min-h-[60px]">
+                          {dailyDigestEmailAddresses.map((email, index) => (
+                            <Badge key={index} variant="secondary" className="gap-1 pr-1">
+                              {email}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newEmails = dailyDigestEmailAddresses.filter((_, i) => i !== index);
+                                  setDailyDigestEmailAddresses(newEmails);
+                                  triggerInboxZeroSave({
+                                    dailyDigestEmailAddresses: newEmails,
+                                  });
+                                }}
+                                className="ml-1 rounded-full hover:bg-secondary/80 p-0.5"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                          <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                            <Input
+                              type="email"
+                              placeholder="Add email address..."
+                              value={dailyDigestEmailInput}
+                              onChange={(e) => setDailyDigestEmailInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ',') {
+                                  e.preventDefault();
+                                  const email = dailyDigestEmailInput.trim().toLowerCase();
+                                  if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                                    if (!dailyDigestEmailAddresses.includes(email)) {
+                                      const newEmails = [...dailyDigestEmailAddresses, email];
+                                      setDailyDigestEmailAddresses(newEmails);
+                                      setDailyDigestEmailInput('');
+                                      triggerInboxZeroSave({
+                                        dailyDigestEmailAddresses: newEmails,
+                                      });
+                                    } else {
+                                      toast.error('Email already added');
+                                      setDailyDigestEmailInput('');
+                                    }
+                                  } else if (email) {
+                                    toast.error('Please enter a valid email address');
+                                  }
+                                }
+                              }}
+                              className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-8"
+                              disabled={inboxZeroStatus === 'executing'}
+                            />
+                            {dailyDigestEmailInput.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dailyDigestEmailInput.trim().toLowerCase()) && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  const email = dailyDigestEmailInput.trim().toLowerCase();
+                                  if (!dailyDigestEmailAddresses.includes(email)) {
+                                    const newEmails = [...dailyDigestEmailAddresses, email];
+                                    setDailyDigestEmailAddresses(newEmails);
+                                    setDailyDigestEmailInput('');
+                                    triggerInboxZeroSave({
+                                      dailyDigestEmailAddresses: newEmails,
+                                    });
+                                  } else {
+                                    toast.error('Email already added');
+                                    setDailyDigestEmailInput('');
+                                  }
+                                }}
+                                disabled={inboxZeroStatus === 'executing'}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                        {dailyDigestEmailAddresses.length === 0 && (
+                          <p className="text-xs text-amber-600 dark:text-amber-500">
+                            No email addresses configured. Digest will be sent to your account email ({user?.email || 'not set'}).
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/30 dark:border-green-800 p-3">
@@ -1966,7 +2098,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                   <div className="space-y-0.5">
                     <Label htmlFor="email-notif">Email notifications</Label>
                     <p className="text-sm text-muted-foreground">
-                      Receive email notifications for important messages
+                      Receive email notifications when messages need review or are high priority
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1979,6 +2111,92 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                     />
                   </div>
                 </div>
+
+                {emailNotifications && (
+                  <>
+                    <Separator />
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <Label>Notification Email Addresses</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Email addresses to receive notifications (separate from the email Aiva manages)
+                        </p>
+                        <div className="flex flex-wrap gap-2 p-3 border rounded-lg min-h-[60px]">
+                          {notificationEmailAddresses.map((email, index) => (
+                            <Badge key={index} variant="secondary" className="gap-1 pr-1">
+                              {email}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newEmails = notificationEmailAddresses.filter((_, i) => i !== index);
+                                  setNotificationEmailAddresses(newEmails);
+                                  triggerNotifAutoSave({ notificationEmailAddresses: newEmails });
+                                }}
+                                className="ml-1 rounded-full hover:bg-secondary/80 p-0.5"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                          <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                            <Input
+                              type="email"
+                              placeholder="Add email address..."
+                              value={notificationEmailInput}
+                              onChange={(e) => setNotificationEmailInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ',') {
+                                  e.preventDefault();
+                                  const email = notificationEmailInput.trim().toLowerCase();
+                                  if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                                    if (!notificationEmailAddresses.includes(email)) {
+                                      const newEmails = [...notificationEmailAddresses, email];
+                                      setNotificationEmailAddresses(newEmails);
+                                      setNotificationEmailInput('');
+                                      triggerNotifAutoSave({ notificationEmailAddresses: newEmails });
+                                    } else {
+                                      toast.error('Email already added');
+                                      setNotificationEmailInput('');
+                                    }
+                                  } else if (email) {
+                                    toast.error('Please enter a valid email address');
+                                  }
+                                }
+                              }}
+                              className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-8"
+                            />
+                            {notificationEmailInput.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(notificationEmailInput.trim().toLowerCase()) && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  const email = notificationEmailInput.trim().toLowerCase();
+                                  if (!notificationEmailAddresses.includes(email)) {
+                                    const newEmails = [...notificationEmailAddresses, email];
+                                    setNotificationEmailAddresses(newEmails);
+                                    setNotificationEmailInput('');
+                                    triggerNotifAutoSave({ notificationEmailAddresses: newEmails });
+                                  } else {
+                                    toast.error('Email already added');
+                                    setNotificationEmailInput('');
+                                  }
+                                }}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                        {notificationEmailAddresses.length === 0 && (
+                          <p className="text-xs text-amber-600 dark:text-amber-500">
+                            No email addresses configured. Notifications will be sent to your account email ({user?.email || 'not set'}).
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 <Separator />
 

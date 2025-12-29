@@ -31,6 +31,7 @@ const updateNotificationSettingsSchema = z.object({
   workspaceId: z.string().uuid(),
   emailNotifications: z.boolean().optional(),
   pushNotifications: z.boolean().optional(),
+  notificationEmailAddresses: z.array(z.string().email()).optional(),
 });
 
 const updateAccountSettingsSchema = z.object({
@@ -93,6 +94,7 @@ const updateInboxZeroSettingsSchema = z.object({
   applyAivaLabel: z.boolean().optional(),
   dailyDigestEnabled: z.boolean().optional(),
   dailyDigestTime: z.string().optional(), // "HH:MM" format
+  dailyDigestEmailAddresses: z.array(z.string().email()).optional(),
 });
 
 // ============================================================================
@@ -520,12 +522,18 @@ export const updateNotificationSettingsAction = authActionClient
       }
     });
 
+    // Build update object for direct columns (email addresses)
+    const updateData: Record<string, any> = {
+      workspace_settings: updatedSettings,
+    };
+    if (settings.notificationEmailAddresses !== undefined) {
+      updateData.notification_email_addresses = settings.notificationEmailAddresses;
+    }
+
     const { error } = await supabase
       .from('workspace_settings')
-      .upsert({
-        workspace_id: workspaceId,
-        workspace_settings: updatedSettings,
-      });
+      .update(updateData)
+      .eq('workspace_id', workspaceId);
 
     if (error) throw new Error(error.message);
 
@@ -931,6 +939,9 @@ export const updateInboxZeroSettingsAction = authActionClient
     if (settings.dailyDigestTime !== undefined) {
       updateData.daily_digest_time = settings.dailyDigestTime;
     }
+    if (settings.dailyDigestEmailAddresses !== undefined) {
+      updateData.daily_digest_email_addresses = settings.dailyDigestEmailAddresses;
+    }
 
     const { error } = await supabase
       .from('workspace_settings')
@@ -1080,7 +1091,7 @@ export async function getWorkspaceSettings(workspaceId: string, userId: string) 
 
   const { data, error } = await supabase
     .from('workspace_settings')
-    .select('workspace_settings, inbox_zero_enabled, auto_archive_handled, apply_aiva_label, daily_digest_enabled, daily_digest_time')
+    .select('workspace_settings, inbox_zero_enabled, auto_archive_handled, apply_aiva_label, daily_digest_enabled, daily_digest_time, daily_digest_email_addresses, notification_email_addresses')
     .eq('workspace_id', workspaceId)
     .single();
 
@@ -1097,7 +1108,9 @@ export async function getWorkspaceSettings(workspaceId: string, userId: string) 
       applyAivaLabel: data?.apply_aiva_label ?? true,
       dailyDigestEnabled: data?.daily_digest_enabled ?? true,
       dailyDigestTime: data?.daily_digest_time || '18:00',
+      dailyDigestEmailAddresses: data?.daily_digest_email_addresses || null,
     },
+    notificationEmailAddresses: data?.notification_email_addresses || null,
   };
 }
 

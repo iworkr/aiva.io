@@ -6,6 +6,7 @@
 'use server';
 
 import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
+import { sendEmail } from '@/utils/api-routes/utils';
 
 export type NotificationType = 
   | 'review_needed'
@@ -55,15 +56,20 @@ async function createNotification(
 async function getNotificationSettings(workspaceId: string) {
   const { data } = await supabaseAdminClient
     .from('workspace_settings')
-    .select('push_notifications_enabled, notify_on_high_priority, notify_on_review_needed, daily_digest_enabled')
+    .select('push_notifications_enabled, notify_on_high_priority, notify_on_review_needed, daily_digest_enabled, notification_email_addresses, workspace_settings')
     .eq('workspace_id', workspaceId)
     .single();
+
+  const workspaceSettings = (data?.workspace_settings as any) || {};
+  const notifications = workspaceSettings.notifications || {};
 
   return {
     pushEnabled: data?.push_notifications_enabled ?? true,
     notifyHighPriority: data?.notify_on_high_priority ?? true,
     notifyReviewNeeded: data?.notify_on_review_needed ?? true,
     dailyDigestEnabled: data?.daily_digest_enabled ?? true,
+    emailNotifications: notifications.email ?? true,
+    notificationEmailAddresses: data?.notification_email_addresses || null,
   };
 }
 
@@ -97,6 +103,22 @@ export async function notifyReviewNeeded(
 
   const members = await getWorkspaceMembers(workspaceId);
 
+  // Get user emails for email notifications
+  const { data: users } = await supabaseAdminClient
+    .from('user_profiles')
+    .select('id, email, full_name')
+    .in('id', members);
+
+  const userEmails = new Map<string, string>();
+  (users || []).forEach(u => {
+    if (u.email) userEmails.set(u.id, u.email);
+  });
+
+  // Get email addresses to notify (from settings or use user emails)
+  const emailAddresses = settings.notificationEmailAddresses && settings.notificationEmailAddresses.length > 0
+    ? settings.notificationEmailAddresses
+    : Array.from(userEmails.values());
+
   for (const userId of members) {
     await createNotification(userId, workspaceId, {
       type: 'review_needed',
@@ -109,6 +131,38 @@ export async function notifyReviewNeeded(
         reviewReason,
       },
     });
+  }
+
+  // Send email notifications if enabled
+  if (settings.emailNotifications && emailAddresses.length > 0) {
+    const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.aiva.io'}/dashboard`;
+    const emailHtml = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #18181b;">Message Needs Your Review</h2>
+        <p style="color: #52525b; line-height: 1.6;">
+          <strong>Subject:</strong> "${subject}"<br>
+          <strong>From:</strong> ${senderName}<br>
+          <strong>Reason:</strong> ${reviewReason}
+        </p>
+        <a href="${dashboardUrl}" style="display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 16px;">
+          Review in Aiva
+        </a>
+      </div>
+    `;
+
+    // Send to all configured email addresses
+    for (const email of emailAddresses) {
+      try {
+        await sendEmail({
+          to: email,
+          from: process.env.ADMIN_EMAIL || 'notifications@aiva.io',
+          subject: `Review needed: "${subject}"`,
+          html: emailHtml,
+        });
+      } catch (error) {
+        console.error(`[Notifications] Failed to send email to ${email}:`, error);
+      }
+    }
   }
 }
 
@@ -130,6 +184,22 @@ export async function notifyHighPriority(
 
   const members = await getWorkspaceMembers(workspaceId);
 
+  // Get user emails for email notifications
+  const { data: users } = await supabaseAdminClient
+    .from('user_profiles')
+    .select('id, email, full_name')
+    .in('id', members);
+
+  const userEmails = new Map<string, string>();
+  (users || []).forEach(u => {
+    if (u.email) userEmails.set(u.id, u.email);
+  });
+
+  // Get email addresses to notify (from settings or use user emails)
+  const emailAddresses = settings.notificationEmailAddresses && settings.notificationEmailAddresses.length > 0
+    ? settings.notificationEmailAddresses
+    : Array.from(userEmails.values());
+
   for (const userId of members) {
     await createNotification(userId, workspaceId, {
       type: 'high_priority',
@@ -142,6 +212,37 @@ export async function notifyHighPriority(
         priority,
       },
     });
+  }
+
+  // Send email notifications if enabled
+  if (settings.emailNotifications && emailAddresses.length > 0) {
+    const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.aiva.io'}/dashboard`;
+    const emailHtml = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #18181b;">${priority.charAt(0).toUpperCase() + priority.slice(1)} Priority Message</h2>
+        <p style="color: #52525b; line-height: 1.6;">
+          <strong>Subject:</strong> "${subject}"<br>
+          <strong>From:</strong> ${senderName}
+        </p>
+        <a href="${dashboardUrl}" style="display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 16px;">
+          View in Aiva
+        </a>
+      </div>
+    `;
+
+    // Send to all configured email addresses
+    for (const email of emailAddresses) {
+      try {
+        await sendEmail({
+          to: email,
+          from: process.env.ADMIN_EMAIL || 'notifications@aiva.io',
+          subject: `${priority.charAt(0).toUpperCase() + priority.slice(1)} Priority: "${subject}"`,
+          html: emailHtml,
+        });
+      } catch (error) {
+        console.error(`[Notifications] Failed to send email to ${email}:`, error);
+      }
+    }
   }
 }
 

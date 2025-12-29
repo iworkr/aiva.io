@@ -18,7 +18,8 @@ interface WorkspaceDigestData {
   workspaceId: string;
   workspaceName: string;
   userId: string;
-  userEmail: string;
+  userEmail: string; // Keep for backward compatibility
+  emailAddresses?: string[]; // New: array of emails to send to
   userName: string;
   messagesHandled: number;
   autoReplies: number;
@@ -104,15 +105,30 @@ async function getWorkspacesForDigest(): Promise<WorkspaceDigestData[]> {
         .in('priority', ['urgent', 'high']),
     ]);
 
+    // Get daily digest email addresses from settings
+    const { data: digestSettings } = await supabase
+      .from('workspace_settings')
+      .select('daily_digest_email_addresses')
+      .eq('workspace_id', workspaceId)
+      .single();
+
+    const digestEmailAddresses = digestSettings?.daily_digest_email_addresses || null;
+
     for (const member of members) {
       const user = member.user as any;
       if (!user?.email) continue;
+
+      // Use configured email addresses or fall back to user email
+      const emailAddresses = digestEmailAddresses && digestEmailAddresses.length > 0
+        ? digestEmailAddresses
+        : [user.email];
 
       results.push({
         workspaceId,
         workspaceName,
         userId: user.id,
-        userEmail: user.email,
+        userEmail: user.email, // Keep for backward compatibility
+        emailAddresses, // New: array of emails to send to
         userName: user.full_name?.split(' ')[0] || 'there',
         messagesHandled: messagesHandled || 0,
         autoReplies: autoReplies || 0,
@@ -291,19 +307,46 @@ export async function GET(request: NextRequest) {
 
         const { subject, html } = generateDigestEmail(data);
 
-        // Send email via Resend
-        const emailResult = await resend.emails.send({
-          from: 'Aiva <digest@aiva.io>',
-          to: data.userEmail,
-          subject,
-          html,
-        });
+        // Get email addresses to send to (use configured addresses or fall back to user email)
+        const emailAddresses = data.emailAddresses && data.emailAddresses.length > 0
+          ? data.emailAddresses
+          : [data.userEmail];
 
-        if (emailResult.error) {
-          console.error(`❌ Failed to send digest to ${data.userEmail}:`, emailResult.error);
+        // Send email to all configured addresses
+        let sentCount = 0;
+        let failedCount = 0;
+        const errors: string[] = [];
+
+        for (const email of emailAddresses) {
+          try {
+            const emailResult = await resend.emails.send({
+              from: 'Aiva <digest@aiva.io>',
+              to: email,
+              subject,
+              html,
+            });
+
+            if (emailResult.error) {
+              console.error(`❌ Failed to send digest to ${email}:`, emailResult.error);
+              failedCount++;
+              errors.push(`${email}: ${emailResult.error.message}`);
+            } else {
+              sentCount++;
+              console.log(`✅ Sent digest to ${email}`);
+            }
+          } catch (error) {
+            console.error(`❌ Error sending digest to ${email}:`, error);
+            failedCount++;
+            errors.push(`${email}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+        }
+
+        if (failedCount > 0) {
           results.failed++;
-          results.errors.push(`${data.userEmail}: ${emailResult.error.message}`);
-          continue;
+          results.errors.push(...errors);
+        }
+        if (sentCount === 0) {
+          continue; // Skip logging if all sends failed
         }
 
         // Log the notification
@@ -312,12 +355,11 @@ export async function GET(request: NextRequest) {
           workspace_id: data.workspaceId,
           type: 'daily_digest',
           title: 'Daily Digest Sent',
-          body: `Your daily digest for ${new Date().toLocaleDateString()} was sent.`,
+          body: `Your daily digest for ${new Date().toLocaleDateString()} was sent to ${sentCount} email address${sentCount > 1 ? 'es' : ''}.`,
           sent_email: true,
         });
 
-        console.log(`✅ Sent digest to ${data.userEmail}`);
-        results.sent++;
+        results.sent += sentCount;
       } catch (error) {
         console.error(`❌ Error processing digest for ${data.userEmail}:`, error);
         results.failed++;
