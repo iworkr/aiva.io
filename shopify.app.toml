@@ -45,14 +45,8 @@ uri = "/api/shopify/webhooks"
 [pos]
 embedded = false
 
-# App navigation links (shown in Shopify admin sidebar when app is expanded)
-[[app.navigation.links]]
-label = "Dashboard"
-destination = "/api/shopify/app"
-
-[[app.navigation.links]]
-label = "Billing"
-destination = "/api/shopify/billing"
+# Note: Shopify deprecated static sidebar navigation in 2024
+# Navigation is now handled via App Bridge in the app's header UI
 
 [build]
 dev_store_url = "aivateststore.myshopify.com"
