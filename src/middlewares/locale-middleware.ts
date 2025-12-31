@@ -8,6 +8,14 @@ import { isStringALocale } from "./utils";
 export const localeMiddleware: MiddlewareConfig = {
   matcher: ["/((?!api|_next|.*\\..*).*)", ...allPaths],
   middleware: async (request) => {
+    const pathname = request.nextUrl.pathname;
+    
+    // Skip locale handling for Shopify embedded app routes
+    // These run in an iframe and don't need locale prefixes
+    if (pathname.startsWith('/shopify')) {
+      return [NextResponse.next(), null];
+    }
+
     // Create the i18n middleware handler
     const handler = createMiddleware({
       locales: LOCALES,
@@ -16,7 +24,6 @@ export const localeMiddleware: MiddlewareConfig = {
     });
 
     // Get the locale from the URL path
-    const pathname = request.nextUrl.pathname;
     const localeFromPath = pathname.split("/")[1];
     const searchParams = request.nextUrl.searchParams.toString();
     const search = searchParams ? `?${searchParams}` : "";

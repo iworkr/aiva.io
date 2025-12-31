@@ -311,7 +311,6 @@ function AivaLogo() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     minHeight: '100vh',
-    background: COLORS.grayLight,
   },
   nav: {
     background: COLORS.navy,
