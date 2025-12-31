@@ -476,6 +476,57 @@ export type Database = {
           },
         ]
       }
+      billing_events: {
+        Row: {
+          created_at: string | null
+          entitlement_id: string | null
+          event_type: string
+          id: string
+          idempotency_key: string | null
+          payload: Json
+          provider: Database["public"]["Enums"]["entitlement_provider"]
+          shop_domain: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          entitlement_id?: string | null
+          event_type: string
+          id?: string
+          idempotency_key?: string | null
+          payload?: Json
+          provider: Database["public"]["Enums"]["entitlement_provider"]
+          shop_domain?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          entitlement_id?: string | null
+          event_type?: string
+          id?: string
+          idempotency_key?: string | null
+          payload?: Json
+          provider?: Database["public"]["Enums"]["entitlement_provider"]
+          shop_domain?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_events_entitlement_id_fkey"
+            columns: ["entitlement_id"]
+            isOneToOne: false
+            referencedRelation: "entitlements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_invoices: {
         Row: {
           amount: number
@@ -1185,6 +1236,59 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "contacts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      entitlements: {
+        Row: {
+          created_at: string | null
+          current_period_end: string | null
+          id: string
+          metadata: Json | null
+          plan: Database["public"]["Enums"]["plan_type"]
+          provider: Database["public"]["Enums"]["entitlement_provider"]
+          provider_subscription_id: string | null
+          shop_domain: string | null
+          status: Database["public"]["Enums"]["entitlement_status"]
+          trial_ends_at: string | null
+          updated_at: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          current_period_end?: string | null
+          id?: string
+          metadata?: Json | null
+          plan?: Database["public"]["Enums"]["plan_type"]
+          provider: Database["public"]["Enums"]["entitlement_provider"]
+          provider_subscription_id?: string | null
+          shop_domain?: string | null
+          status?: Database["public"]["Enums"]["entitlement_status"]
+          trial_ends_at?: string | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          current_period_end?: string | null
+          id?: string
+          metadata?: Json | null
+          plan?: Database["public"]["Enums"]["plan_type"]
+          provider?: Database["public"]["Enums"]["entitlement_provider"]
+          provider_subscription_id?: string | null
+          shop_domain?: string | null
+          status?: Database["public"]["Enums"]["entitlement_status"]
+          trial_ends_at?: string | null
+          updated_at?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entitlements_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -2292,6 +2396,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      shopify_billing_plans: {
+        Row: {
+          created_at: string | null
+          display_order: number | null
+          is_active: boolean | null
+          plan: Database["public"]["Enums"]["plan_type"]
+          shopify_amount_annual: number | null
+          shopify_amount_monthly: number
+          shopify_plan_name_annual: string | null
+          shopify_plan_name_monthly: string
+          stripe_price_id_annual: string | null
+          stripe_price_id_monthly: string | null
+          trial_days: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number | null
+          is_active?: boolean | null
+          plan: Database["public"]["Enums"]["plan_type"]
+          shopify_amount_annual?: number | null
+          shopify_amount_monthly: number
+          shopify_plan_name_annual?: string | null
+          shopify_plan_name_monthly: string
+          stripe_price_id_annual?: string | null
+          stripe_price_id_monthly?: string | null
+          trial_days?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number | null
+          is_active?: boolean | null
+          plan?: Database["public"]["Enums"]["plan_type"]
+          shopify_amount_annual?: number | null
+          shopify_amount_monthly?: number
+          shopify_plan_name_annual?: string | null
+          shopify_plan_name_monthly?: string
+          stripe_price_id_annual?: string | null
+          stripe_price_id_monthly?: string | null
+          trial_days?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       shopify_customers: {
         Row: {
@@ -3686,6 +3835,8 @@ export type Database = {
         | "instagram"
         | "facebook_messenger"
         | "linkedin"
+      entitlement_provider: "shopify" | "stripe"
+      entitlement_status: "active" | "trialing" | "past_due" | "canceled"
       marketing_blog_post_status: "draft" | "published"
       marketing_changelog_status: "draft" | "published"
       marketing_feedback_moderator_hold_category:
@@ -3750,6 +3901,7 @@ export type Database = {
         | "declined_invitation"
         | "joined"
       organization_member_role: "owner" | "admin" | "member" | "readonly"
+      plan_type: "free" | "basic" | "pro" | "enterprise"
       pricing_plan_interval: "day" | "week" | "month" | "year"
       pricing_type: "one_time" | "recurring"
       project_status: "draft" | "pending_approval" | "approved" | "completed"
@@ -3933,6 +4085,8 @@ export const Constants = {
         "facebook_messenger",
         "linkedin",
       ],
+      entitlement_provider: ["shopify", "stripe"],
+      entitlement_status: ["active", "trialing", "past_due", "canceled"],
       marketing_blog_post_status: ["draft", "published"],
       marketing_changelog_status: ["draft", "published"],
       marketing_feedback_moderator_hold_category: [
@@ -4004,6 +4158,7 @@ export const Constants = {
         "joined",
       ],
       organization_member_role: ["owner", "admin", "member", "readonly"],
+      plan_type: ["free", "basic", "pro", "enterprise"],
       pricing_plan_interval: ["day", "week", "month", "year"],
       pricing_type: ["one_time", "recurring"],
       project_status: ["draft", "pending_approval", "approved", "completed"],

@@ -3,6 +3,7 @@
  * 
  * Handles mandatory webhooks required for Shopify App Store approval:
  * - app/uninstalled - When merchant uninstalls your app
+ * - app_subscriptions/update - When subscription status changes
  * - customers/data_request - GDPR: Customer requests their data
  * - customers/redact - GDPR: Request to delete customer data
  * - shop/redact - GDPR: Request to delete shop data
@@ -11,6 +12,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
+import { 
+  cancelEntitlement, 
+  syncShopifySubscriptionToEntitlement,
+  logBillingEvent,
+  hasBillingEventBeenProcessed
+} from '@/lib/entitlements';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -67,6 +74,10 @@ export async function POST(request: NextRequest) {
     switch (topic) {
       case 'app/uninstalled':
         await handleAppUninstalled(supabase, shopDomain!, payload);
+        break;
+
+      case 'app_subscriptions/update':
+        await handleAppSubscriptionUpdate(supabase, shopDomain!, payload);
         break;
 
       case 'customers/data_request':
@@ -131,7 +142,114 @@ async function handleAppUninstalled(
     throw error;
   }
 
+  // Cancel any active entitlement for this shop
+  try {
+    await cancelEntitlement(shopDomain);
+    console.log('✅ Entitlement canceled for shop:', shopDomain);
+  } catch (entitlementError) {
+    // Log but don't throw - entitlement might not exist
+    console.warn('Could not cancel entitlement:', entitlementError);
+  }
+
+  // Log the billing event
+  await logBillingEvent(
+    'app_uninstalled',
+    'shopify',
+    { shop: shopDomain },
+    { shopDomain }
+  );
+
   console.log('✅ Store marked as uninstalled');
+}
+
+/**
+ * Handle app_subscriptions/update webhook
+ * Called when a subscription status changes (activated, cancelled, etc.)
+ */
+async function handleAppSubscriptionUpdate(
+  supabase: typeof supabaseAdminClient,
+  shopDomain: string,
+  payload: {
+    app_subscription: {
+      admin_graphql_api_id: string;
+      name: string;
+      status: string;
+      created_at: string;
+      updated_at: string;
+      currency: string;
+      capped_amount?: string;
+      trial_days?: number;
+      test?: boolean;
+    };
+  }
+) {
+  console.log('💳 App subscription update for shop:', shopDomain);
+  console.log('Subscription:', payload.app_subscription);
+
+  const subscription = payload.app_subscription;
+  
+  // Create idempotency key
+  const idempotencyKey = `sub-update-${shopDomain}-${subscription.admin_graphql_api_id}-${subscription.updated_at}`;
+  
+  // Check if already processed
+  const alreadyProcessed = await hasBillingEventBeenProcessed(idempotencyKey);
+  if (alreadyProcessed) {
+    console.log('Subscription update already processed:', idempotencyKey);
+    return;
+  }
+
+  try {
+    // Sync the subscription to entitlements
+    const entitlement = await syncShopifySubscriptionToEntitlement(shopDomain, {
+      id: subscription.admin_graphql_api_id,
+      name: subscription.name,
+      status: subscription.status,
+      trialDays: subscription.trial_days,
+      test: subscription.test,
+    });
+
+    // Log the billing event
+    await logBillingEvent(
+      'subscription_updated',
+      'shopify',
+      {
+        shop: shopDomain,
+        subscriptionId: subscription.admin_graphql_api_id,
+        subscriptionName: subscription.name,
+        status: subscription.status,
+        entitlementPlan: entitlement.plan,
+        entitlementStatus: entitlement.status,
+      },
+      {
+        shopDomain,
+        entitlementId: entitlement.id,
+        idempotencyKey,
+      }
+    );
+
+    console.log('✅ Subscription update processed:', {
+      subscriptionId: subscription.admin_graphql_api_id,
+      status: subscription.status,
+      entitlementPlan: entitlement.plan,
+      entitlementStatus: entitlement.status,
+    });
+  } catch (error) {
+    console.error('Failed to process subscription update:', error);
+    
+    // Still log the event for debugging
+    await logBillingEvent(
+      'subscription_update_failed',
+      'shopify',
+      {
+        shop: shopDomain,
+        subscription: payload.app_subscription,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { shopDomain, idempotencyKey }
+    );
+    
+    throw error;
+  }
 }
 
 /**

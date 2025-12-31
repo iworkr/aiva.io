@@ -20,9 +20,14 @@ redirect_urls = [
 [webhooks]
 api_version = "2024-01"
 
-# App uninstall webhook
+# App lifecycle webhooks
 [[webhooks.subscriptions]]
 topics = ["app/uninstalled"]
+uri = "/api/shopify/webhooks"
+
+# Billing/subscription webhooks
+[[webhooks.subscriptions]]
+topics = ["app_subscriptions/update"]
 uri = "/api/shopify/webhooks"
 
 # Order update webhooks for real-time order status tracking

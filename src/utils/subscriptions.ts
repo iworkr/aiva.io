@@ -1,10 +1,20 @@
 /**
  * Subscription utility functions
  * Helper functions to check subscription status and feature permissions
+ * 
+ * Supports both:
+ * - Stripe subscriptions (via SubscriptionData)
+ * - Shopify subscriptions (via entitlements table)
  */
 
 import { SubscriptionData } from "@/payments/AbstractPaymentGateway";
 import { toLower } from "lodash";
+import { 
+  getEntitlementByWorkspaceId, 
+  getEntitlementByShopDomain,
+  Entitlement,
+  EntitlementStatus
+} from "@/lib/entitlements";
 
 /**
  * Plan types available in Aiva.io
@@ -240,5 +250,163 @@ export function isValidSyncFrequency(planType: PlanType, frequencyMinutes: numbe
 export function getEffectiveSyncFrequency(planType: PlanType, requestedFrequency: number): number {
   const limits = PLAN_SYNC_LIMITS[planType];
   return Math.max(requestedFrequency, limits.minSyncIntervalMinutes);
+}
+
+// =====================================================
+// ENTITLEMENT-BASED FUNCTIONS
+// These functions check the unified entitlements table
+// which supports both Shopify and Stripe billing
+// =====================================================
+
+/**
+ * Get plan type from an entitlement
+ */
+export function getPlanTypeFromEntitlement(entitlement: Entitlement | null): PlanType {
+  if (!entitlement) {
+    return "free";
+  }
+
+  // Check if entitlement is active
+  const activeStatuses: EntitlementStatus[] = ['active', 'trialing'];
+  if (!activeStatuses.includes(entitlement.status)) {
+    return "free";
+  }
+
+  // Return the plan from entitlement
+  return entitlement.plan as PlanType;
+}
+
+/**
+ * Get plan type for a workspace (async - checks entitlements first, then falls back to Stripe)
+ */
+export async function getPlanTypeForWorkspace(workspaceId: string): Promise<PlanType> {
+  try {
+    // First, check entitlements table (supports both Shopify and Stripe)
+    const entitlement = await getEntitlementByWorkspaceId(workspaceId);
+    
+    if (entitlement) {
+      const activeStatuses: EntitlementStatus[] = ['active', 'trialing'];
+      if (activeStatuses.includes(entitlement.status)) {
+        return entitlement.plan as PlanType;
+      }
+    }
+    
+    // No active entitlement found - return free
+    // Note: For backward compatibility with existing Stripe subscriptions,
+    // callers should also check billing_subscriptions if needed
+    return "free";
+  } catch (error) {
+    console.error("Error fetching plan type for workspace:", error);
+    return "free";
+  }
+}
+
+/**
+ * Get plan type for a Shopify shop (async)
+ */
+export async function getPlanTypeForShop(shopDomain: string): Promise<PlanType> {
+  try {
+    const entitlement = await getEntitlementByShopDomain(shopDomain);
+    return getPlanTypeFromEntitlement(entitlement);
+  } catch (error) {
+    console.error("Error fetching plan type for shop:", error);
+    return "free";
+  }
+}
+
+/**
+ * Check if a workspace has any active entitlement (async)
+ */
+export async function workspaceHasActiveEntitlement(workspaceId: string): Promise<boolean> {
+  try {
+    const entitlement = await getEntitlementByWorkspaceId(workspaceId);
+    if (!entitlement) return false;
+    
+    const activeStatuses: EntitlementStatus[] = ['active', 'trialing'];
+    return activeStatuses.includes(entitlement.status);
+  } catch (error) {
+    console.error("Error checking workspace entitlement:", error);
+    return false;
+  }
+}
+
+/**
+ * Check if a shop has any active entitlement (async)
+ */
+export async function shopHasActiveEntitlement(shopDomain: string): Promise<boolean> {
+  try {
+    const entitlement = await getEntitlementByShopDomain(shopDomain);
+    if (!entitlement) return false;
+    
+    const activeStatuses: EntitlementStatus[] = ['active', 'trialing'];
+    return activeStatuses.includes(entitlement.status);
+  } catch (error) {
+    console.error("Error checking shop entitlement:", error);
+    return false;
+  }
+}
+
+/**
+ * Check if a workspace has a specific feature (async - uses entitlements)
+ */
+export async function workspaceHasFeature(
+  workspaceId: string,
+  feature: keyof (typeof PLAN_FEATURES)["free"]
+): Promise<boolean> {
+  const planType = await getPlanTypeForWorkspace(workspaceId);
+  const features = PLAN_FEATURES[planType];
+  return Boolean(features[feature]);
+}
+
+/**
+ * Check if a shop has a specific feature (async)
+ */
+export async function shopHasFeature(
+  shopDomain: string,
+  feature: keyof (typeof PLAN_FEATURES)["free"]
+): Promise<boolean> {
+  const planType = await getPlanTypeForShop(shopDomain);
+  const features = PLAN_FEATURES[planType];
+  return Boolean(features[feature]);
+}
+
+/**
+ * Get all features for a workspace (async)
+ */
+export async function getWorkspaceFeatures(workspaceId: string) {
+  const planType = await getPlanTypeForWorkspace(workspaceId);
+  return PLAN_FEATURES[planType];
+}
+
+/**
+ * Get all features for a shop (async)
+ */
+export async function getShopFeatures(shopDomain: string) {
+  const planType = await getPlanTypeForShop(shopDomain);
+  return PLAN_FEATURES[planType];
+}
+
+/**
+ * Get billing provider for a workspace
+ */
+export async function getWorkspaceBillingProvider(workspaceId: string): Promise<'shopify' | 'stripe' | null> {
+  try {
+    const entitlement = await getEntitlementByWorkspaceId(workspaceId);
+    return entitlement?.provider || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get billing provider for a shop
+ */
+export async function getShopBillingProvider(shopDomain: string): Promise<'shopify' | 'stripe' | null> {
+  try {
+    const entitlement = await getEntitlementByShopDomain(shopDomain);
+    return entitlement?.provider || null;
+  } catch {
+    return null;
+  }
 }
 
