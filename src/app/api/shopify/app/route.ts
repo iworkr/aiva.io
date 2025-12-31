@@ -83,6 +83,7 @@ export async function GET(request: NextRequest) {
       shop,
       host,
       apiKey,
+      appUrl,
       authUrl,
       shopName: shop.replace('.myshopify.com', ''),
     });
@@ -97,6 +98,7 @@ export async function GET(request: NextRequest) {
       shop,
       host,
       apiKey,
+      appUrl,
       authUrl,
       shopName: shop.replace('.myshopify.com', ''),
     });
@@ -128,6 +130,7 @@ export async function GET(request: NextRequest) {
     shop,
     host,
     apiKey,
+    appUrl,
     shopName: shopData.shop_name || shop.replace('.myshopify.com', ''),
     isLinked,
     autoLoginUrl,
@@ -144,6 +147,7 @@ interface PageData {
   shop: string;
   host: string;
   apiKey: string;
+  appUrl: string;
   shopName?: string;
   authUrl?: string;
   isLinked?: boolean;
@@ -157,7 +161,7 @@ interface PageData {
 }
 
 function renderPage(type: 'auth_required' | 'dashboard', data: PageData): NextResponse {
-  const { shop, host, apiKey, shopName = shop.replace('.myshopify.com', '') } = data;
+  const { shop, host, apiKey, appUrl, shopName = shop.replace('.myshopify.com', '') } = data;
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -364,7 +368,7 @@ function renderPage(type: 'auth_required' | 'dashboard', data: PageData): NextRe
     }
     
     function handleNavigate(path) {
-      const url = '${process.env.SHOPIFY_APP_URL || 'https://www.tryaiva.io'}' + path + '?shop=${shop}&host=${host}';
+      const url = '${appUrl}' + path + '?shop=${shop}&host=${host}';
       try {
         if (window['app-bridge'] && window['app-bridge'].createApp) {
           const AppBridge = window['app-bridge'];
@@ -435,7 +439,7 @@ function renderDashboard(data: PageData): string {
     <div class="plan-badge">
       <span class="plan-label">Current Plan:</span>
       <span class="plan-value">Free</span>
-      <button class="upgrade-link" onclick="handleNavigate('/shopify/billing')">Upgrade →</button>
+      <button class="upgrade-link" onclick="handleNavigate('/api/shopify/billing')">Upgrade →</button>
     </div>
   `;
 
@@ -455,7 +459,7 @@ function renderDashboard(data: PageData): string {
         <div class="nav-left">
           <span class="nav-logo">Aiva</span>
           <button class="nav-link active">Dashboard</button>
-          <button class="nav-link" onclick="handleNavigate('/shopify/billing')">Billing</button>
+          <button class="nav-link" onclick="handleNavigate('/api/shopify/billing')">Billing</button>
         </div>
         <div>
           <span class="shop-badge">${shopName}</span>

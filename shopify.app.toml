@@ -45,5 +45,14 @@ uri = "/api/shopify/webhooks"
 [pos]
 embedded = false
 
+# App navigation links (shown in Shopify admin sidebar when app is expanded)
+[[app.navigation.links]]
+label = "Dashboard"
+destination = "/api/shopify/app"
+
+[[app.navigation.links]]
+label = "Billing"
+destination = "/api/shopify/billing"
+
 [build]
 dev_store_url = "aivateststore.myshopify.com"

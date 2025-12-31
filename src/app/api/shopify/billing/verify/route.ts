@@ -156,7 +156,8 @@ function redirectToBilling(
   error?: string
 ): NextResponse {
   const appUrl = process.env.SHOPIFY_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://www.tryaiva.io';
-  const redirectUrl = new URL('/shopify/billing', appUrl);
+  // Use the API route for billing to work in Shopify iframe
+  const redirectUrl = new URL('/api/shopify/billing', appUrl);
   
   redirectUrl.searchParams.set('shop', shop);
   redirectUrl.searchParams.set('host', host);
