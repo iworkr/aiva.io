@@ -256,6 +256,7 @@ export function ChannelSidebar({
       {/* Connect Channel Dialog */}
       <ConnectChannelDialog
         workspaceId={workspaceId}
+        userId={userId}
         open={connectDialogOpen}
         onOpenChange={setConnectDialogOpen}
         onConnected={handleChannelConnected}

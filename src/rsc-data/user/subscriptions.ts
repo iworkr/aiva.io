@@ -1,85 +1,127 @@
 /**
  * Server-side subscription utilities
  * For use in Server Components and Server Actions
+ * 
+ * Uses the unified entitlements table (supports both Shopify and Stripe)
+ * FAIL CLOSED: Denies access on errors for premium features
  */
 
-import { SubscriptionData } from "@/payments/AbstractPaymentGateway";
-import { StripePaymentGateway } from "@/payments/StripePaymentGateway";
-import {
-  hasProSubscription,
-  getPlanType,
-  hasFeature,
-  PlanType,
-} from "@/utils/subscriptions";
+import { PLAN_FEATURES, PlanType } from "@/utils/subscriptions";
+import { 
+  requireActiveEntitlement, 
+  hasFeatureAccess,
+  isEntitlementActive 
+} from "@/lib/entitlements-guard";
+import { 
+  getEntitlementByWorkspaceId,
+  getPlanFeaturesFromEntitlement 
+} from "@/lib/entitlements";
 
 /**
  * Check if a workspace has Pro subscription (server-side)
+ * Uses unified entitlements table
  */
 export async function getHasProSubscription(
   workspaceId: string
 ): Promise<boolean> {
   try {
-    // Only check if Stripe is configured
-    if (!process.env.STRIPE_SECRET_KEY) {
-      // If Stripe not configured, allow access (for development)
-      return true;
+    const entitlementCheck = await requireActiveEntitlement(workspaceId);
+    
+    if (!entitlementCheck.isValid) {
+      return false;
     }
-
-    const paymentGateway = new StripePaymentGateway();
-    const subscriptions =
-      await paymentGateway.db.getSubscriptionsByWorkspaceId(workspaceId);
-    return hasProSubscription(subscriptions);
+    
+    // Pro or Enterprise counts as "pro subscription"
+    const plan = entitlementCheck.planFeatures.plan;
+    return plan === "pro" || plan === "enterprise";
   } catch (error) {
-    console.error("Error checking subscription:", error);
-    // On error, allow access (fail open)
-    return true;
+    console.error("[Subscriptions] Error checking pro subscription:", error);
+    // FAIL CLOSED: Deny pro access on error
+    return false;
   }
 }
 
 /**
  * Get workspace plan type (server-side)
+ * Uses unified entitlements table
  */
 export async function getWorkspacePlanType(
   workspaceId: string
 ): Promise<PlanType> {
   try {
-    if (!process.env.STRIPE_SECRET_KEY) {
-      // Development mode - return pro for testing
-      return "pro";
+    const entitlement = await getEntitlementByWorkspaceId(workspaceId);
+    
+    if (!entitlement || !isEntitlementActive(entitlement)) {
+      return "free";
     }
-
-    const paymentGateway = new StripePaymentGateway();
-    const subscriptions =
-      await paymentGateway.db.getSubscriptionsByWorkspaceId(workspaceId);
-    return getPlanType(subscriptions);
+    
+    return entitlement.plan as PlanType;
   } catch (error) {
-    console.error("Error getting plan type:", error);
+    console.error("[Subscriptions] Error getting plan type:", error);
+    // FAIL CLOSED: Return free on error
     return "free";
   }
 }
 
 /**
  * Check if workspace has a specific feature (server-side)
+ * Uses unified entitlements table
+ * FAIL CLOSED for premium features
  */
 export async function getHasFeature(
   workspaceId: string,
-  feature: Parameters<typeof hasFeature>[1]
+  feature: keyof typeof PLAN_FEATURES.free
 ): Promise<boolean> {
   try {
-    if (!process.env.STRIPE_SECRET_KEY) {
-      // Development mode - allow all features
-      return true;
+    const entitlementCheck = await requireActiveEntitlement(workspaceId);
+    
+    if (!entitlementCheck.isValid) {
+      // No active subscription - only allow basic features
+      const basicFeatures: string[] = ["autoClassify", "basicAI"];
+      return basicFeatures.includes(feature);
     }
-
-    const paymentGateway = new StripePaymentGateway();
-    const subscriptions =
-      await paymentGateway.db.getSubscriptionsByWorkspaceId(workspaceId);
-    return hasFeature(subscriptions, feature);
+    
+    // Check if the plan includes this feature
+    const planFeatures = entitlementCheck.planFeatures;
+    const featureValue = planFeatures[feature as keyof typeof planFeatures];
+    
+    return Boolean(featureValue);
   } catch (error) {
-    console.error("Error checking feature:", error);
-    // Fail open for basic features, closed for premium features
-    const basicFeatures = ["autoClassify", "basicAI"];
+    console.error("[Subscriptions] Error checking feature:", error);
+    // FAIL CLOSED for premium features, ALLOW for basic features
+    const basicFeatures: string[] = ["autoClassify", "basicAI"];
     return basicFeatures.includes(feature);
   }
 }
 
+/**
+ * Get full plan features for a workspace
+ */
+export async function getWorkspacePlanFeatures(workspaceId: string) {
+  try {
+    const entitlement = await getEntitlementByWorkspaceId(workspaceId);
+    return getPlanFeaturesFromEntitlement(entitlement);
+  } catch (error) {
+    console.error("[Subscriptions] Error getting plan features:", error);
+    // Return free plan features on error
+    return {
+      plan: "free" as const,
+      ...PLAN_FEATURES.free,
+    };
+  }
+}
+
+/**
+ * Check if workspace has an active subscription (any plan)
+ */
+export async function getHasActiveSubscription(
+  workspaceId: string
+): Promise<boolean> {
+  try {
+    const entitlementCheck = await requireActiveEntitlement(workspaceId);
+    return entitlementCheck.isValid;
+  } catch (error) {
+    console.error("[Subscriptions] Error checking active subscription:", error);
+    return false;
+  }
+}

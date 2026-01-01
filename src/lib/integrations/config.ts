@@ -83,7 +83,7 @@ export const messagingIntegrations: Integration[] = [
     bgColor: "bg-purple-100 dark:bg-purple-900/20",
     textColor: "text-purple-600",
     logoUrl: "https://static.cdnlogo.com/logos/s/40/slack-new.svg",
-    status: "available",
+    status: "coming_soon",
     features: [
       "Direct messages",
       "Channel messages",
@@ -104,7 +104,7 @@ export const messagingIntegrations: Integration[] = [
     bgColor: "bg-indigo-100 dark:bg-indigo-900/20",
     textColor: "text-indigo-600",
     logoUrl: "https://static.cdnlogo.com/logos/m/22/microsoft-teams.svg",
-    status: "available",
+    status: "coming_soon",
     features: [
       "Chat messages",
       "Channel posts",
@@ -125,7 +125,7 @@ export const messagingIntegrations: Integration[] = [
     bgColor: "bg-sky-100 dark:bg-sky-900/20",
     textColor: "text-sky-600",
     logoUrl: "https://static.cdnlogo.com/logos/w/29/whatsapp-icon.svg",
-    status: "available",
+    status: "coming_soon",
     features: [
       "Business messages",
       "Customer chats",
@@ -146,7 +146,7 @@ export const messagingIntegrations: Integration[] = [
     bgColor: "bg-sky-100 dark:bg-sky-900/20",
     textColor: "text-sky-600",
     logoUrl: "https://static.cdnlogo.com/logos/t/84/telegram.svg",
-    status: "available",
+    status: "coming_soon",
     features: [
       "Private messages",
       "Group chats",
@@ -171,7 +171,7 @@ export const socialIntegrations: Integration[] = [
     bgColor: "bg-pink-100 dark:bg-pink-900/20",
     textColor: "text-pink-600",
     logoUrl: "https://static.cdnlogo.com/logos/i/92/instagram.svg",
-    status: "available",
+    status: "coming_soon",
     features: [
       "Direct messages",
       "Comments",
@@ -192,7 +192,7 @@ export const socialIntegrations: Integration[] = [
     bgColor: "bg-blue-100 dark:bg-blue-900/20",
     textColor: "text-blue-600",
     logoUrl: "https://static.cdnlogo.com/logos/f/52/facebook-messenger.svg",
-    status: "available",
+    status: "coming_soon",
     features: [
       "Page messages",
       "Customer inquiries",
@@ -213,7 +213,7 @@ export const socialIntegrations: Integration[] = [
     bgColor: "bg-blue-100 dark:bg-blue-900/20",
     textColor: "text-blue-700",
     logoUrl: "https://static.cdnlogo.com/logos/l/66/linkedin-icon.svg",
-    status: "available",
+    status: "coming_soon",
     features: [
       "InMail messages",
       "Connection requests",
@@ -234,7 +234,7 @@ export const socialIntegrations: Integration[] = [
     bgColor: "bg-gray-100 dark:bg-gray-800",
     textColor: "text-gray-900 dark:text-gray-100",
     logoUrl: "https://static.cdnlogo.com/logos/x/9/x.svg",
-    status: "available",
+    status: "coming_soon",
     features: [
       "Direct messages",
       "Mentions",
@@ -259,7 +259,7 @@ export const calendarIntegrations: Integration[] = [
     bgColor: "bg-blue-100 dark:bg-blue-900/20",
     textColor: "text-blue-600",
     logoUrl: "https://static.cdnlogo.com/logos/g/96/google-calendar.svg",
-    status: "available",
+    status: "coming_soon",
     features: [
       "Event sync",
       "Smart scheduling",
@@ -280,7 +280,7 @@ export const calendarIntegrations: Integration[] = [
     bgColor: "bg-blue-100 dark:bg-blue-900/20",
     textColor: "text-blue-600",
     logoUrl: "https://static.cdnlogo.com/logos/o/82/outlook.svg",
-    status: "available",
+    status: "coming_soon",
     features: [
       "Event sync",
       "Smart scheduling",
@@ -301,7 +301,7 @@ export const calendarIntegrations: Integration[] = [
     bgColor: "bg-gray-100 dark:bg-gray-800",
     textColor: "text-gray-900",
     logoUrl: "https://static.cdnlogo.com/logos/a/12/apple.svg",
-    status: "available",
+    status: "coming_soon",
     features: [
       "Event sync",
       "iCloud integration",

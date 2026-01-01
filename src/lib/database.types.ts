@@ -3688,6 +3688,53 @@ export type Database = {
           },
         ]
       }
+      workspace_usage: {
+        Row: {
+          ai_classifications: number
+          ai_drafts_generated: number
+          auto_sends_count: number
+          billing_period_end: string
+          billing_period_start: string
+          created_at: string | null
+          id: string
+          messages_synced: number
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          ai_classifications?: number
+          ai_drafts_generated?: number
+          auto_sends_count?: number
+          billing_period_end: string
+          billing_period_start: string
+          created_at?: string | null
+          id?: string
+          messages_synced?: number
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          ai_classifications?: number
+          ai_drafts_generated?: number
+          auto_sends_count?: number
+          billing_period_end?: string
+          billing_period_start?: string
+          created_at?: string | null
+          id?: string
+          messages_synced?: number
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_usage_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspaces: {
         Row: {
           created_at: string
@@ -3747,6 +3794,10 @@ export type Database = {
         Args: { email: string }
         Returns: boolean
       }
+      check_usage_limit: {
+        Args: { p_limit: number; p_usage_type: string; p_workspace_id: string }
+        Returns: boolean
+      }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       decrement_credits: {
         Args: { amount: number; org_id: string }
@@ -3755,6 +3806,27 @@ export type Database = {
       get_customer_workspace_id: {
         Args: { customer_id_arg: string }
         Returns: string
+      }
+      get_or_create_current_usage: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          ai_classifications: number
+          ai_drafts_generated: number
+          auto_sends_count: number
+          billing_period_end: string
+          billing_period_start: string
+          created_at: string | null
+          id: string
+          messages_synced: number
+          updated_at: string | null
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspace_usage"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       get_project_workspace_uuid: {
         Args: { project_id: string }
@@ -3785,6 +3857,14 @@ export type Database = {
       has_workspace_permission: {
         Args: { permission: string; user_id: string; workspace_id: string }
         Returns: boolean
+      }
+      increment_usage: {
+        Args: {
+          p_amount?: number
+          p_usage_type: string
+          p_workspace_id: string
+        }
+        Returns: number
       }
       is_application_admin: { Args: { user_id?: string }; Returns: boolean }
       is_workspace_admin: {

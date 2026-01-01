@@ -5,6 +5,7 @@ import {
   dashboardOnboardingMiddleware,
   onboardingRedirectMiddleware,
 } from "./onboarding-middleware";
+import { subscriptionMiddleware } from "./subscription-middleware";
 import { MiddlewareConfig } from "./types";
 
 export const middlewareList: MiddlewareConfig[] = [
@@ -12,5 +13,6 @@ export const middlewareList: MiddlewareConfig[] = [
   authMiddleware,
   dashboardOnboardingMiddleware,
   onboardingRedirectMiddleware,
+  subscriptionMiddleware,
   adminMiddleware,
 ];

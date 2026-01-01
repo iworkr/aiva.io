@@ -62,6 +62,12 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   
+  // Entitlement/usage state for channel limits
+  const [channelCount, setChannelCount] = useState(0);
+  const [maxChannels, setMaxChannels] = useState(-1); // -1 = unlimited
+  const [planName, setPlanName] = useState('Free');
+  const [messageUsage, setMessageUsage] = useState({ current: 0, limit: -1 });
+  
   // Global sync status from context
   const { 
     dialogOpen: syncProgressDialogOpen, 
@@ -79,6 +85,41 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
   useEffect(() => {
     setWorkspaceId(workspaceId);
   }, [workspaceId, setWorkspaceId]);
+
+  // Fetch entitlement/usage data for channel limits
+  useEffect(() => {
+    async function fetchEntitlementStatus() {
+      try {
+        const response = await fetch(`/api/entitlements?workspaceId=${workspaceId}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.entitlement) {
+            setPlanName(data.plan?.charAt(0).toUpperCase() + data.plan?.slice(1) || 'Free');
+          }
+        }
+        
+        // Also get channel count from existing channels
+        const channels = await getUserChannelConnections(workspaceId, userId);
+        setChannelCount(channels?.length || 0);
+        
+        // Set limits based on plan
+        // This is a simplified version - ideally we'd have an API endpoint for this
+        const planLimits: Record<string, { channels: number; messages: number }> = {
+          'Free': { channels: 1, messages: 100 },
+          'Basic': { channels: 3, messages: 1000 },
+          'Pro': { channels: -1, messages: -1 },
+          'Enterprise': { channels: -1, messages: -1 },
+        };
+        const limits = planLimits[planName] || planLimits['Free'];
+        setMaxChannels(limits.channels);
+        setMessageUsage(prev => ({ ...prev, limit: limits.messages }));
+      } catch (error) {
+        console.error('Error fetching entitlement status:', error);
+      }
+    }
+    
+    fetchEntitlementStatus();
+  }, [workspaceId, userId, planName]);
 
   // Debounce search for better performance
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
@@ -705,6 +746,7 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
       {/* Connect Channel Dialog - Lazy Loaded */}
       <LazyConnectChannelDialog
         workspaceId={workspaceId}
+        userId={userId}
         open={connectDialogOpen}
         onOpenChange={setConnectDialogOpen}
         onConnected={() => {
@@ -712,6 +754,7 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
           // Refresh channels check
           getUserChannelConnections(workspaceId, userId).then((channels) => {
             setHasChannels(channels && channels.length > 0);
+            setChannelCount(channels?.length || 0);
             if (channels && channels.length > 0) {
               toast.success('Channel connected! Syncing messages...');
               performSync('all');

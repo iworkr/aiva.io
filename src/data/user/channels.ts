@@ -16,6 +16,7 @@ import {
   type ChannelProvider,
 } from '@/utils/zod-schemas/aiva-schemas';
 import { isWorkspaceMember } from '../user/workspaces';
+import { requireActiveEntitlement, getChannelCount } from '@/lib/entitlements-guard';
 
 // ============================================================================
 // CREATE CHANNEL CONNECTION
@@ -43,6 +44,27 @@ export const createChannelConnectionAction = authActionClient
     }
 
     const supabase = await createSupabaseUserServerActionClient();
+
+    // ENTITLEMENT CHECK: Verify workspace has active subscription
+    const entitlementCheck = await requireActiveEntitlement(workspaceId);
+    if (!entitlementCheck.isValid) {
+      throw new Error(`No active subscription: ${entitlementCheck.reason}. Please subscribe to connect channels.`);
+    }
+
+    // CHANNEL LIMIT CHECK: Verify workspace hasn't exceeded channel limit
+    const currentChannelCount = await getChannelCount(workspaceId);
+    const maxChannels = entitlementCheck.planFeatures.maxChannels;
+    
+    // -1 means unlimited, otherwise check against limit
+    // Note: We check >= because we're about to ADD a new channel
+    if (maxChannels !== -1 && currentChannelCount >= maxChannels) {
+      const planName = entitlementCheck.planFeatures.plan.charAt(0).toUpperCase() + 
+                       entitlementCheck.planFeatures.plan.slice(1);
+      throw new Error(
+        `Channel limit reached. Your ${planName} plan allows ${maxChannels} channel${maxChannels === 1 ? '' : 's'}. ` +
+        `You currently have ${currentChannelCount} connected. Please upgrade your plan to connect more channels.`
+      );
+    }
 
     // Check if connection already exists in THIS workspace
     const { data: existing } = await supabase

@@ -86,6 +86,20 @@ export default async function ShopifyDashboardPage({ searchParams }: PageProps) 
   // Get entitlement status
   const entitlement = await getEntitlementByShopDomain(shop);
   
+  // Check if entitlement is active
+  const isEntitlementActive = entitlement && 
+    (entitlement.status === 'active' || entitlement.status === 'trialing' ||
+     // For canceled subscriptions, check if still within the paid period
+     (entitlement.status === 'canceled' && entitlement.current_period_end && 
+      new Date(entitlement.current_period_end) > new Date()));
+  
+  // If no active entitlement, redirect to billing page
+  if (!isEntitlementActive) {
+    const appUrl = process.env.SHOPIFY_APP_URL || 'https://www.tryaiva.io';
+    const billingUrl = `${appUrl}/shopify/billing?shop=${shop}&host=${host}`;
+    redirect(billingUrl);
+  }
+  
   // Generate token for auto-login if linked
   let autoLoginUrl: string | undefined;
   if (shopData.linked_user_id) {

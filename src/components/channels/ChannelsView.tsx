@@ -277,6 +277,7 @@ export function ChannelsView({ workspaceId, userId }: ChannelsViewProps) {
       {/* Connect Dialog */}
       <ConnectChannelDialog
         workspaceId={workspaceId}
+        userId={userId}
         open={showConnectDialog}
         onOpenChange={setShowConnectDialog}
         onConnected={refreshChannels}

@@ -34,7 +34,6 @@ interface ReplyOptions {
   maxLength?: number;
   context?: string;
   useAdminClient?: boolean; // Use admin client for background jobs
-  skipFeatureCheck?: boolean; // Skip feature check for cron jobs
   isManualDraft?: boolean; // If true, this is a manual draft from user clicking "Draft with AI" - should NEVER auto-send
 }
 
@@ -68,7 +67,6 @@ interface ReplyDraftResult {
 /**
  * Generate reply draft for a message
  * @param options.useAdminClient - Use admin client for background jobs (cron, webhooks)
- * @param options.skipFeatureCheck - Skip feature check for cron jobs
  */
 export async function generateReplyDraft(
   messageId: string,
@@ -76,32 +74,23 @@ export async function generateReplyDraft(
   options: ReplyOptions = {},
 ): Promise<ReplyDraftResult> {
   try {
-    // Skip feature check for cron jobs
-    if (!options.skipFeatureCheck) {
-      // Check feature access - AI drafts require Pro plan
-      const { getHasFeature } = await import("@/rsc-data/user/subscriptions");
+    // Check feature access - AI drafts require Pro plan
+    // FAIL CLOSED: Always check, no bypass
+    const { getHasFeature } = await import("@/rsc-data/user/subscriptions");
 
-      let hasAIDrafts = true;
-      try {
-        hasAIDrafts = await getHasFeature(workspaceId, "aiDrafts");
-        console.log("[AI Reply] Feature check result:", {
-          workspaceId,
-          hasAIDrafts,
-        });
-      } catch (featureError) {
-        // If feature check fails, allow access in development
-        console.warn(
-          "[AI Reply] Feature check failed, defaulting to allowed:",
-          featureError,
-        );
-        hasAIDrafts = true;
-      }
+    const hasAIDrafts = await getHasFeature(workspaceId, "aiDrafts");
+    console.log("[AI Reply] Feature check result:", {
+      workspaceId,
+      hasAIDrafts,
+    });
 
-      if (!hasAIDrafts) {
-        throw new Error(
-          "AI reply drafts are a Pro feature. Upgrade your plan to access AI-powered reply generation.",
-        );
-      }
+    if (!hasAIDrafts) {
+      return {
+        body: "",
+        confidenceScore: 0,
+        tone: "professional",
+        error: "AI reply drafts require a Professional or Enterprise plan. Please upgrade to access AI-powered reply generation.",
+      };
     }
 
     console.log("[AI Reply] Creating Supabase client...");

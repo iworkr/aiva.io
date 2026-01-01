@@ -2,8 +2,7 @@
  * Cron Job: Automatic Message Sync
  * Runs periodically to sync all active channel connections
  * 
- * Simplified version - syncs ALL workspaces with active connections
- * regardless of plan tier for reliability
+ * ENFORCES subscription status and usage limits before syncing
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -17,6 +16,13 @@ import {
   DEFAULT_EXCLUDED_SENDER_PATTERNS,
   DEFAULT_EXCLUDED_CATEGORIES,
 } from '@/lib/workers/auto-send-worker';
+import {
+  requireActiveEntitlement,
+  checkUsageLimits,
+  incrementUsage,
+  isEntitlementActive,
+  hasFeatureAccess,
+} from '@/lib/entitlements-guard';
 
 /**
  * Verify the request is from Vercel Cron or an authorized source
@@ -127,6 +133,38 @@ export async function GET(request: NextRequest) {
     for (const connection of connections) {
       console.log(`\n🔄 Syncing ${connection.provider}: ${connection.provider_account_name}...`);
       
+      // ENTITLEMENT CHECK: Verify workspace has active subscription
+      const entitlementCheck = await requireActiveEntitlement(connection.workspace_id);
+      if (!entitlementCheck.isValid) {
+        console.log(`   🚫 Skipping - no active subscription: ${entitlementCheck.reason}`);
+        results.push({
+          connectionId: connection.id,
+          provider: connection.provider,
+          account: connection.provider_account_name,
+          success: false,
+          skipped: true,
+          skipReason: `No active subscription: ${entitlementCheck.reason}`,
+        });
+        continue;
+      }
+      
+      // USAGE LIMIT CHECK: Verify workspace is within message limits
+      const usageLimits = await checkUsageLimits(connection.workspace_id);
+      if (!usageLimits.withinLimits) {
+        console.log(`   🚫 Skipping - usage limit reached: ${usageLimits.reason}`);
+        results.push({
+          connectionId: connection.id,
+          provider: connection.provider,
+          account: connection.provider_account_name,
+          success: false,
+          skipped: true,
+          skipReason: `Usage limit reached: ${usageLimits.reason}`,
+        });
+        continue;
+      }
+      
+      console.log(`   ✅ Entitlement valid (${entitlementCheck.planFeatures.plan}), usage: ${usageLimits.currentUsage.messages}/${usageLimits.limits.maxMessages === -1 ? 'unlimited' : usageLimits.limits.maxMessages}`);
+      
       // Rate limit protection: Skip if last sync was less than 2 minutes ago
       // Reduced from 5 minutes to 2 minutes to process messages faster
       // Gmail quota: 1 billion quota units per day, ~250 units per message fetch
@@ -143,22 +181,35 @@ export async function GET(request: NextRequest) {
         }
       }
       
+      // Calculate max messages to sync based on remaining limit
+      const remainingMessages = usageLimits.limits.maxMessages === -1 
+        ? 100 
+        : Math.min(usageLimits.limits.maxMessages - usageLimits.currentUsage.messages, 100);
+      
+      if (remainingMessages <= 0) {
+        console.log(`   🚫 Skipping - no remaining message quota`);
+        continue;
+      }
+      
       try {
         let syncResult: any;
 
+        // Calculate message limit for this sync (respect plan limits)
+        const maxMessagesForSync = Math.min(remainingMessages, connection.provider === 'gmail' ? 25 : 50);
+        
         switch (connection.provider) {
           case 'gmail':
-            console.log('   📧 Starting Gmail sync...');
+            console.log(`   📧 Starting Gmail sync (max ${maxMessagesForSync} messages)...`);
             syncResult = await syncGmailMessages(connection.id, connection.workspace_id, {
-              maxMessages: 25, // Increased from 10 to 25 to process more messages per run
+              maxMessages: maxMessagesForSync,
               useAdminClient: true, // Critical: use admin client for cron jobs
             });
             break;
 
           case 'outlook':
-            console.log('   📧 Starting Outlook sync...');
+            console.log(`   📧 Starting Outlook sync (max ${maxMessagesForSync} messages)...`);
             syncResult = await syncOutlookMessages(connection.id, connection.workspace_id, {
-              maxMessages: 50, // Increased from 20 to 50 to process more messages per run
+              maxMessages: maxMessagesForSync,
               useAdminClient: true, // Critical: use admin client for cron jobs
             });
             break;
@@ -169,6 +220,12 @@ export async function GET(request: NextRequest) {
         }
 
         console.log(`   ✅ Sync complete: ${syncResult?.syncedCount || 0} messages (${syncResult?.newCount || 0} new)`);
+        
+        // INCREMENT USAGE: Track synced messages
+        if (syncResult?.newCount > 0) {
+          await incrementUsage(connection.workspace_id, 'messages', syncResult.newCount);
+          console.log(`   📊 Usage updated: +${syncResult.newCount} messages`);
+        }
         
         totalSynced++;
         totalNewMessages += syncResult?.newCount || 0;
@@ -372,11 +429,17 @@ export async function GET(request: NextRequest) {
           console.error(`   ❌ Classification error:`, classifyError);
         }
 
-        // ALWAYS generate drafts for actionable messages (drafts are useful regardless of auto-send)
-        // Auto-send setting only controls whether drafts get QUEUED for automatic sending
-        // But we now filter OUT inappropriate messages (self-replies, system emails, etc.)
-        console.log(`   ✍️ Generating drafts for actionable messages (auto-send: ${autoSendEnabled ? 'enabled' : 'disabled'}, threshold: ${confidenceThreshold})...`);
-        console.log(`      🔍 Filter: connection email=${filterSettings.connectionEmail}, excluded categories=${filterSettings.excludedCategories.length}, excluded senders=${filterSettings.excludedSenderPatterns.length}`);
+        // PLAN CHECK: Only generate AI drafts for Pro/Enterprise plans
+        const hasAIDraftsFeature = entitlementCheck.planFeatures.aiDrafts === true;
+        
+        if (!hasAIDraftsFeature) {
+          console.log(`   ⏭️ Skipping AI draft generation - ${entitlementCheck.planFeatures.plan} plan does not include AI drafts`);
+        } else {
+          // Generate drafts for actionable messages (Pro/Enterprise only)
+          // Auto-send setting only controls whether drafts get QUEUED for automatic sending
+          // But we now filter OUT inappropriate messages (self-replies, system emails, etc.)
+          console.log(`   ✍️ Generating drafts for actionable messages (auto-send: ${autoSendEnabled ? 'enabled' : 'disabled'}, threshold: ${confidenceThreshold})...`);
+          console.log(`      🔍 Filter: connection email=${filterSettings.connectionEmail}, excluded categories=${filterSettings.excludedCategories.length}, excluded senders=${filterSettings.excludedSenderPatterns.length}`);
         
         try {
           // Get messages that need drafts:
@@ -512,12 +575,14 @@ export async function GET(request: NextRequest) {
                     connection.workspace_id,
                     {
                       useAdminClient: true,
-                      skipFeatureCheck: true,
+                      // Feature check already done above - plan has aiDrafts enabled
                     }
                   );
                   
                   if (draftResult.body && !draftResult.error) {
                     draftsGenerated++;
+                    // Track AI draft usage
+                    await incrementUsage(connection.workspace_id, 'ai_drafts', 1);
                     console.log(`         ✅ Draft generated (confidence: ${draftResult.confidenceScore})`);
                   } else if (draftResult.error) {
                     console.log(`         ⚠️ Draft error: ${draftResult.error}`);
@@ -535,6 +600,7 @@ export async function GET(request: NextRequest) {
         } catch (draftError) {
           console.error(`   ❌ Draft generation error:`, draftError);
         }
+        } // End of hasAIDraftsFeature check
         
         results.push({
           connectionId: connection.id,
