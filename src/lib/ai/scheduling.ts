@@ -228,16 +228,43 @@ export async function createCalendarEventFromSentEmail(
       return { success: false, message: 'Draft not found' };
     }
 
-    // Extract date/time from message
-    const dateTimeInfo = await extractDateTimeReferences(
+    // Extract date/time from the ORIGINAL incoming message
+    console.log('[Calendar Event] Extracting dates from message:', {
+      subject: message.subject,
+      bodyLength: message.body?.length || 0,
+    });
+    
+    let dateTimeInfo = await extractDateTimeReferences(
       message.subject || '',
       message.body || ''
     );
 
+    console.log('[Calendar Event] Date extraction from original message:', {
+      hasDateTime: dateTimeInfo.hasDateTime,
+      dateReferences: dateTimeInfo.dateReferences,
+      parsedDates: dateTimeInfo.parsedDates,
+      timeReferences: dateTimeInfo.timeReferences,
+      confidence: dateTimeInfo.confidence,
+    });
+
+    // If no dates found in original message, try extracting from the draft reply
+    if (dateTimeInfo.parsedDates.length === 0 && draft.body) {
+      console.log('[Calendar Event] No dates in original message, trying draft body...');
+      const draftDateInfo = await extractDateTimeReferences(
+        message.subject || '',
+        draft.body
+      );
+      
+      if (draftDateInfo.parsedDates.length > 0) {
+        console.log('[Calendar Event] Found dates in draft:', draftDateInfo.parsedDates);
+        dateTimeInfo = draftDateInfo;
+      }
+    }
+
     // Check if we have date/time information
     if (!dateTimeInfo.hasDateTime && dateTimeInfo.parsedDates.length === 0) {
-      console.log('[Calendar Event] No date/time found in message');
-      return { success: false, message: 'No date/time information found' };
+      console.log('[Calendar Event] No date/time found in message or draft');
+      return { success: false, message: 'No date/time information found in the message. Please specify a date.' };
     }
 
     // Find calendar connection
@@ -264,16 +291,29 @@ export async function createCalendarEventFromSentEmail(
     if (dateTimeInfo.parsedDates.length > 0) {
       // Use the first parsed date
       eventDate = parseISO(dateTimeInfo.parsedDates[0]);
+      console.log('[Calendar Event] Using parsed date:', eventDate.toISOString());
     } else {
-      // Fall back to calendar_context searchedDateRange if available
-      const calendarContext = draft.calendar_context as any;
-      if (calendarContext?.searchedDateRange?.start) {
-        eventDate = parseISO(calendarContext.searchedDateRange.start);
+      // No parsed dates - this shouldn't happen since we check above, but handle gracefully
+      // IMPORTANT: Do NOT use searchedDateRange.start as that's the search START (usually today),
+      // not the date mentioned in the email!
+      console.log('[Calendar Event] Warning: No parsed dates, defaulting to next business day');
+      
+      // Default to next business day
+      eventDate = new Date();
+      const dayOfWeek = eventDate.getDay();
+      
+      // If Friday, Saturday, or Sunday, go to next Monday
+      if (dayOfWeek === 5) {
+        eventDate.setDate(eventDate.getDate() + 3); // Friday -> Monday
+      } else if (dayOfWeek === 6) {
+        eventDate.setDate(eventDate.getDate() + 2); // Saturday -> Monday
+      } else if (dayOfWeek === 0) {
+        eventDate.setDate(eventDate.getDate() + 1); // Sunday -> Monday
       } else {
-        // Default to tomorrow if no date found
-        eventDate = new Date();
-        eventDate.setDate(eventDate.getDate() + 1);
+        eventDate.setDate(eventDate.getDate() + 1); // Next day
       }
+      
+      console.log('[Calendar Event] Defaulted to:', eventDate.toISOString());
     }
 
     // Check if time is specified
@@ -297,17 +337,22 @@ export async function createCalendarEventFromSentEmail(
         startTime = eventDate.toISOString();
         endTime = addMinutes(eventDate, duration).toISOString();
       } else {
-        // Handle meal times
+        // Handle common time expressions
         if (timeRef.includes('lunch')) {
           eventDate.setHours(12, 0, 0, 0);
         } else if (timeRef.includes('breakfast')) {
           eventDate.setHours(8, 0, 0, 0);
-        } else if (timeRef.includes('dinner')) {
+        } else if (timeRef.includes('dinner') || timeRef.includes('evening')) {
           eventDate.setHours(19, 0, 0, 0);
+        } else if (timeRef.includes('afternoon')) {
+          eventDate.setHours(14, 0, 0, 0); // 2pm for afternoon
+        } else if (timeRef.includes('morning')) {
+          eventDate.setHours(10, 0, 0, 0); // 10am for morning
         } else {
-          // Default to noon if time reference but can't parse
-          eventDate.setHours(12, 0, 0, 0);
+          // Default to 2pm if time reference but can't parse (common meeting time)
+          eventDate.setHours(14, 0, 0, 0);
         }
+        console.log('[Calendar Event] Parsed time reference:', timeRef, '-> hour:', eventDate.getHours());
         startTime = eventDate.toISOString();
         endTime = addMinutes(eventDate, duration).toISOString();
       }
