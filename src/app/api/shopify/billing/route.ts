@@ -611,17 +611,17 @@ function renderBillingPage(data: BillingPageData): NextResponse {
       errorBanner.style.display = 'none';
       
       try {
-        console.log('[Billing] Sending request to /api/shopify/billing/create');
+        // Use absolute URL since we're in Shopify's iframe
+        const createUrl = appUrl + '/api/shopify/billing/create';
+        console.log('[Billing] Sending request to:', createUrl);
         
-        // Use relative URL to avoid CORS issues
-        const response = await fetch('/api/shopify/billing/create', {
+        const response = await fetch(createUrl, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
-            'X-Shopify-Shop': shop,
-            'X-Shopify-Host': host,
           },
           body: JSON.stringify({ shop, plan, interval: billingInterval }),
+          credentials: 'omit', // Don't send cookies for CORS
         });
         
         console.log('[Billing] Response status:', response.status);

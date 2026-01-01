@@ -17,6 +17,21 @@ import {
 
 export const dynamic = 'force-dynamic';
 
+// CORS headers for Shopify embedded app
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Shopify-Shop, X-Shopify-Host',
+};
+
+// Handle CORS preflight
+export async function OPTIONS() {
+  return new NextResponse(null, { 
+    status: 204,
+    headers: corsHeaders 
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -26,7 +41,7 @@ export async function POST(request: NextRequest) {
     if (!shop || !plan) {
       return NextResponse.json(
         { error: 'Missing required fields: shop and plan' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -35,7 +50,7 @@ export async function POST(request: NextRequest) {
     if (!validPlans.includes(plan)) {
       return NextResponse.json(
         { error: `Invalid plan: ${plan}. Must be one of: ${validPlans.join(', ')}` },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -43,7 +58,7 @@ export async function POST(request: NextRequest) {
     if (interval !== 'monthly' && interval !== 'annual') {
       return NextResponse.json(
         { error: 'Invalid interval. Must be "monthly" or "annual"' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -61,14 +76,14 @@ export async function POST(request: NextRequest) {
       console.error('[Shopify Billing Create] Shop not found:', shopError);
       return NextResponse.json(
         { error: 'Shop not found or not authorized' },
-        { status: 404 }
+        { status: 404, headers: corsHeaders }
       );
     }
 
     if (!shopData.access_token) {
       return NextResponse.json(
         { error: 'Shop access token not found. Please reinstall the app.' },
-        { status: 401 }
+        { status: 401, headers: corsHeaders }
       );
     }
 
@@ -86,7 +101,7 @@ export async function POST(request: NextRequest) {
           error: canSubscribe.reason || 'Cannot subscribe via Shopify',
           existingProvider: canSubscribe.existingProvider,
         },
-        { status: 409 }
+        { status: 409, headers: corsHeaders }
       );
     }
 
@@ -148,7 +163,7 @@ export async function POST(request: NextRequest) {
       success: true,
       subscriptionId: result.subscriptionId,
       confirmationUrl: result.confirmationUrl,
-    });
+    }, { headers: corsHeaders });
 
   } catch (error) {
     console.error('[Shopify Billing Create] Error:', error);
@@ -172,7 +187,7 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json(
       { error: errorMessage },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
