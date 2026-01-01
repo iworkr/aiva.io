@@ -50,14 +50,26 @@ export async function POST(request: NextRequest) {
 
     console.log('🔵 Shopify webhook received:', { topic, shopDomain });
 
-    // Verify webhook signature
+    // MANDATORY: Verify webhook HMAC signature
+    // Shopify requires returning 401 Unauthorized for invalid signatures
     const apiSecret = process.env.SHOPIFY_API_SECRET;
-    if (apiSecret && hmacHeader) {
+    
+    // Always verify HMAC if the header is present
+    if (hmacHeader) {
+      if (!apiSecret) {
+        console.error('SHOPIFY_API_SECRET not configured - cannot verify webhook');
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      
       const isValid = verifyWebhookSignature(body, hmacHeader, apiSecret);
       if (!isValid) {
         console.error('Shopify webhook signature verification failed');
-        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
+    } else {
+      // No HMAC header = reject the request
+      console.error('Missing x-shopify-hmac-sha256 header');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const payload = JSON.parse(body);
