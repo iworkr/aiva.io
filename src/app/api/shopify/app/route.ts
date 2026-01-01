@@ -437,6 +437,10 @@ function renderAuthRequired(data: PageData): string {
 function renderDashboard(data: PageData): string {
   const { shopName, isLinked, autoLoginUrl, linkUrl, entitlement } = data;
   
+  // Check if user has an active subscription
+  const hasActiveSubscription = entitlement && 
+    (entitlement.status === 'active' || entitlement.status === 'trialing');
+  
   const planBadgeHtml = entitlement ? `
     <div class="plan-badge">
       <span class="plan-label">Current Plan:</span>
@@ -454,15 +458,31 @@ function renderDashboard(data: PageData): string {
     </div>
   `;
 
-  const actionButtonHtml = isLinked && autoLoginUrl ? `
-    <button class="btn-primary" onclick="handleRedirect('${autoLoginUrl}')">
-      Open Aiva Dashboard →
-    </button>
-  ` : linkUrl ? `
-    <button class="btn-primary" onclick="handleRedirect('${linkUrl}')">
-      Connect Your Account →
-    </button>
-  ` : '';
+  // Show different action buttons based on subscription status
+  let actionButtonHtml = '';
+  
+  if (!hasActiveSubscription) {
+    // No active subscription - prompt to subscribe
+    actionButtonHtml = `
+      <button class="btn-primary" onclick="handleNavigate('/api/shopify/billing')">
+        Choose a Plan to Get Started →
+      </button>
+    `;
+  } else if (isLinked && autoLoginUrl) {
+    // Has subscription and linked - show dashboard button
+    actionButtonHtml = `
+      <button class="btn-primary" onclick="handleRedirect('${autoLoginUrl}')">
+        Open Aiva Dashboard →
+      </button>
+    `;
+  } else if (linkUrl) {
+    // Has subscription but not linked - prompt to connect
+    actionButtonHtml = `
+      <button class="btn-primary" onclick="handleRedirect('${linkUrl}')">
+        Connect Your Account →
+      </button>
+    `;
+  }
 
   return `
     <nav class="nav">
@@ -496,6 +516,14 @@ function renderDashboard(data: PageData): string {
           
           ${planBadgeHtml}
           
+          ${!hasActiveSubscription ? `
+          <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 16px; margin: 16px 0; text-align: center;">
+            <div style="font-size: 24px; margin-bottom: 8px;">⚡</div>
+            <div style="font-weight: 600; color: #92400e; margin-bottom: 4px;">Subscription Required</div>
+            <div style="color: #a16207; font-size: 14px;">Choose a plan to start using Aiva's AI features</div>
+          </div>
+          ` : ''}
+          
           <div class="features">
             <div class="feature">
               <div class="feature-icon">🛒</div>
@@ -521,7 +549,7 @@ function renderDashboard(data: PageData): string {
           </div>
           
           ${actionButtonHtml}
-          <p class="note">Opens in a new tab for the full experience</p>
+          <p class="note">${hasActiveSubscription ? 'Opens in a new tab for the full experience' : 'All plans include a 14-day free trial'}</p>
         </div>
       </div>
     </div>
