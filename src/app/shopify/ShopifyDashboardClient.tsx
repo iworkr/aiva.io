@@ -197,12 +197,25 @@ export default function ShopifyDashboardClient({
           </div>
           
           <div style={styles.content}>
-            {/* Status Badge */}
-            <div style={styles.statusBadge}>
-              <div style={styles.statusIcon}>✓</div>
+            {/* Status Badge - shows connection AND link status */}
+            <div style={{
+              ...styles.statusBadge,
+              backgroundColor: isLinked ? '#dcfce7' : '#fef3c7',
+              borderColor: isLinked ? '#22c55e' : '#f59e0b',
+            }}>
+              <div style={{
+                ...styles.statusIcon,
+                backgroundColor: isLinked ? '#22c55e' : '#f59e0b',
+              }}>{isLinked ? '✓' : '!'}</div>
               <div>
-                <strong style={styles.statusTitle}>Store Connected</strong>
-                <span style={styles.statusText}>{displayName} is linked to Aiva</span>
+                <strong style={styles.statusTitle}>
+                  {isLinked ? 'Store Connected' : 'Link Required'}
+                </strong>
+                <span style={styles.statusText}>
+                  {isLinked 
+                    ? `${displayName} is linked to Aiva` 
+                    : `${displayName} needs to be linked to your Aiva account`}
+                </span>
               </div>
             </div>
 

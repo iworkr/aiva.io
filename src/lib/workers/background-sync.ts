@@ -131,16 +131,25 @@ export async function syncWorkspaceInBackground(
 }
 
 /**
- * Get workspace plan type from subscription data
- * 
- * Note: Currently returns 'free' for all workspaces since billing is not yet set up.
- * When billing is enabled, this will query through billing_customers to get subscription data.
+ * Get workspace plan tier from entitlements
  */
 async function getWorkspacePlan(workspaceId: string): Promise<PlanTier> {
-  // TODO: When billing is set up, query billing_customers -> billing_subscriptions
-  // For now, return 'free' for all workspaces
-  console.log(`📊 Getting plan for workspace ${workspaceId}: free (billing not configured)`);
-  return 'free';
+  try {
+    const { requireActiveEntitlement } = await import('@/lib/entitlements-guard');
+    const entitlementCheck = await requireActiveEntitlement(workspaceId);
+    
+    if (entitlementCheck.isValid) {
+      const plan = entitlementCheck.planFeatures.plan as PlanTier;
+      console.log(`📊 Getting plan for workspace ${workspaceId}: ${plan}`);
+      return plan;
+    }
+    
+    console.log(`📊 Getting plan for workspace ${workspaceId}: free (no active entitlement)`);
+    return 'free';
+  } catch (error) {
+    console.error(`📊 Error getting plan for workspace ${workspaceId}:`, error);
+    return 'free';
+  }
 }
 
 /**
