@@ -564,10 +564,13 @@ function renderBillingPage(data: BillingPageData): NextResponse {
       const loading = document.getElementById('loading');
       const errorBanner = document.getElementById('error-banner');
       
+      console.log('[Billing] Starting subscription for plan:', plan, 'interval:', billingInterval);
       loading.classList.add('visible');
       errorBanner.style.display = 'none';
       
       try {
+        console.log('[Billing] Sending request to /api/shopify/billing/create');
+        
         // Use relative URL to avoid CORS issues
         const response = await fetch('/api/shopify/billing/create', {
           method: 'POST',
@@ -579,13 +582,17 @@ function renderBillingPage(data: BillingPageData): NextResponse {
           body: JSON.stringify({ shop, plan, interval: billingInterval }),
         });
         
+        console.log('[Billing] Response status:', response.status);
         const data = await response.json();
+        console.log('[Billing] Response data:', data);
         
         if (!response.ok) {
           throw new Error(data.error || 'Failed to create subscription');
         }
         
         if (data.confirmationUrl) {
+          console.log('[Billing] Got confirmation URL:', data.confirmationUrl);
+          
           // Redirect to Shopify confirmation using App Bridge
           try {
             if (window['app-bridge'] && window['app-bridge'].createApp) {
@@ -593,23 +600,28 @@ function renderBillingPage(data: BillingPageData): NextResponse {
               const app = AppBridge.createApp({ apiKey, host });
               const Redirect = AppBridge.actions.Redirect;
               if (Redirect) {
+                console.log('[Billing] Redirecting via App Bridge');
                 const redirect = Redirect.create(app);
                 redirect.dispatch(Redirect.Action.REMOTE, data.confirmationUrl);
                 return;
               }
             }
           } catch (e) {
-            console.log('App Bridge error:', e);
+            console.log('[Billing] App Bridge error:', e);
           }
+          console.log('[Billing] Fallback: redirecting via window.location');
           window.location.href = data.confirmationUrl;
         } else {
           throw new Error('No confirmation URL returned');
         }
       } catch (err) {
-        console.error('Subscription error:', err);
-        errorBanner.textContent = err.message || 'Failed to create subscription';
-        errorBanner.style.display = 'block';
+        console.error('[Billing] Subscription error:', err);
         loading.classList.remove('visible');
+        errorBanner.textContent = err.message || 'Failed to create subscription. Please try again.';
+        errorBanner.style.display = 'block';
+        
+        // Scroll to error
+        errorBanner.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
   </script>
