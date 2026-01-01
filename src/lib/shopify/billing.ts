@@ -100,20 +100,16 @@ const CURRENT_APP_INSTALLATION_QUERY = `
         currentPeriodEnd
         trialDays
         test
-        lineItems(first: 10) {
-          edges {
-            node {
-              id
-              plan {
-                pricingDetails {
-                  ... on AppRecurringPricing {
-                    price {
-                      amount
-                      currencyCode
-                    }
-                    interval
-                  }
+        lineItems {
+          id
+          plan {
+            pricingDetails {
+              ... on AppRecurringPricing {
+                price {
+                  amount
+                  currencyCode
                 }
+                interval
               }
             }
           }
@@ -331,22 +327,18 @@ export async function getCurrentSubscriptions(
         currentPeriodEnd?: string;
         trialDays?: number;
         test: boolean;
-        lineItems: {
-          edges: Array<{
-            node: {
-              id: string;
-              plan: {
-                pricingDetails: {
-                  price: {
-                    amount: string;
-                    currencyCode: string;
-                  };
-                  interval: 'EVERY_30_DAYS' | 'ANNUAL';
-                };
+        lineItems: Array<{
+          id: string;
+          plan: {
+            pricingDetails: {
+              price: {
+                amount: string;
+                currencyCode: string;
               };
+              interval: 'EVERY_30_DAYS' | 'ANNUAL';
             };
-          }>;
-        };
+          };
+        }>;
       }>;
     };
   }>(shopDomain, accessToken, CURRENT_APP_INSTALLATION_QUERY);
@@ -362,9 +354,9 @@ export async function getCurrentSubscriptions(
     currentPeriodEnd: sub.currentPeriodEnd,
     trialDays: sub.trialDays,
     test: sub.test,
-    lineItems: sub.lineItems.edges.map(edge => ({
-      id: edge.node.id,
-      plan: edge.node.plan,
+    lineItems: sub.lineItems.map(item => ({
+      id: item.id,
+      plan: item.plan,
     })),
   }));
 
