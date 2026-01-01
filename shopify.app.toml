@@ -30,19 +30,6 @@ uri = "/api/shopify/webhooks"
 topics = ["app_subscriptions/update"]
 uri = "/api/shopify/webhooks"
 
-# MANDATORY: GDPR/Privacy compliance webhooks (required for App Store approval)
-[[webhooks.subscriptions]]
-topics = ["customers/data_request"]
-uri = "/api/shopify/webhooks"
-
-[[webhooks.subscriptions]]
-topics = ["customers/redact"]
-uri = "/api/shopify/webhooks"
-
-[[webhooks.subscriptions]]
-topics = ["shop/redact"]
-uri = "/api/shopify/webhooks"
-
 # Order update webhooks for real-time order status tracking
 [[webhooks.subscriptions]]
 topics = [
@@ -58,10 +45,9 @@ uri = "/api/shopify/webhooks"
 [pos]
 embedded = false
 
-[privacy_compliance]
-customer_data_request_url = "https://www.tryaiva.io/api/shopify/webhooks"
-customer_deletion_url = "https://www.tryaiva.io/api/shopify/webhooks"
-shop_deletion_url = "https://www.tryaiva.io/api/shopify/webhooks"
+# Note: Privacy compliance URLs (customer_data_request, customer_deletion, shop_deletion)
+# are configured in the Shopify Partner Dashboard, not in this file.
+# The webhook handlers are registered above and handled at /api/shopify/webhooks
 
 # Note: Shopify deprecated static sidebar navigation in 2024
 # Navigation is now handled via App Bridge in the app's header UI
