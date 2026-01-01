@@ -20,7 +20,7 @@ const Pricing = () => {
         icon={<DollarSign size={16} />}
         title="Simple, Transparent Pricing"
         section="Pricing"
-        subtitle="Choose the plan that fits your needs. All plans include a 14-day free trial. No credit card required."
+        subtitle="Choose the plan that fits your needs. All plans include a 7-day free trial. No credit card required."
       />
 
       <Tabs

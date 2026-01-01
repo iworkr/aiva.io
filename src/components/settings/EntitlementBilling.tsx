@@ -225,11 +225,11 @@ export function EntitlementBilling({ workspaceId }: EntitlementBillingProps) {
               <>
                 <li className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Check className="h-4 w-4 text-green-500" />
-                  Up to 1 channel
+                  Limited trial access
                 </li>
                 <li className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Check className="h-4 w-4 text-green-500" />
-                  Basic AI responses
+                  Upgrade to unlock full features
                 </li>
               </>
             )}
@@ -237,11 +237,19 @@ export function EntitlementBilling({ workspaceId }: EntitlementBillingProps) {
               <>
                 <li className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Check className="h-4 w-4 text-green-500" />
-                  Up to 3 channels
+                  Unified inbox (up to 3 channels)
                 </li>
                 <li className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Check className="h-4 w-4 text-green-500" />
-                  AI-powered classification
+                  AI-powered message classification
+                </li>
+                <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Check className="h-4 w-4 text-green-500" />
+                  Deep history search
+                </li>
+                <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Check className="h-4 w-4 text-green-500" />
+                  Calendar event extraction
                 </li>
                 <li className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Check className="h-4 w-4 text-green-500" />
@@ -257,19 +265,19 @@ export function EntitlementBilling({ workspaceId }: EntitlementBillingProps) {
               <>
                 <li className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Check className="h-4 w-4 text-green-500" />
-                  Unlimited channels
+                  Everything in Basic
                 </li>
                 <li className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Check className="h-4 w-4 text-green-500" />
-                  AI reply drafts
-                </li>
-                <li className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Check className="h-4 w-4 text-green-500" />
-                  Auto-responses
+                  AI reply drafts & auto-responses
                 </li>
                 <li className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Check className="h-4 w-4 text-green-500" />
                   Custom AI prompts
+                </li>
+                <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Check className="h-4 w-4 text-green-500" />
+                  Unlimited channels & messages
                 </li>
                 <li className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Check className="h-4 w-4 text-green-500" />
@@ -285,7 +293,7 @@ export function EntitlementBilling({ workspaceId }: EntitlementBillingProps) {
               <>
                 <li className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Check className="h-4 w-4 text-green-500" />
-                  Everything in Pro
+                  Everything in Professional
                 </li>
                 <li className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Check className="h-4 w-4 text-green-500" />
@@ -293,7 +301,7 @@ export function EntitlementBilling({ workspaceId }: EntitlementBillingProps) {
                 </li>
                 <li className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Check className="h-4 w-4 text-green-500" />
-                  Custom integrations
+                  Dedicated account manager
                 </li>
                 <li className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Check className="h-4 w-4 text-green-500" />
@@ -301,7 +309,7 @@ export function EntitlementBilling({ workspaceId }: EntitlementBillingProps) {
                 </li>
                 <li className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Check className="h-4 w-4 text-green-500" />
-                  Dedicated account manager
+                  Custom AI training
                 </li>
                 <li className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Check className="h-4 w-4 text-green-500" />
