@@ -8,10 +8,8 @@ import { getUser } from '@/utils/server/serverSessionUtils';
 import { createSupabaseUserServerComponentClient } from '@/supabase-clients/user/createSupabaseUserServerComponentClient';
 import { SettingsView } from '@/components/settings/SettingsView';
 import { SettingsSkeleton } from '@/components/settings/SettingsSkeleton';
+import { EntitlementBilling } from '@/components/settings/EntitlementBilling';
 import { redirect } from 'next/navigation';
-
-// Note: WorkspaceBilling is disabled until Stripe integration is complete
-// import { WorkspaceBilling } from '@/components/workspaces/settings/billing/WorkspaceBilling';
 
 export const metadata = {
   title: 'Settings - Aiva.io',
@@ -55,9 +53,7 @@ export default async function SettingsPage() {
             workspaceId={workspace.id} 
             userId={user.id} 
             user={user}
-            // billingContent is intentionally not passed - shows "Coming Soon" fallback
-            // Enable when Stripe integration is complete:
-            // billingContent={<WorkspaceBilling workspaceSlug={workspace.slug} />}
+            billingContent={<EntitlementBilling workspaceId={workspace.id} />}
           />
         </Suspense>
       </div>
