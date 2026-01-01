@@ -351,6 +351,39 @@ export async function MorningBrief() {
     return true;
   });
 
+  // FIX: With Zero Inbox, newMessages should match the DEDUPLICATED count shown to user
+  // The earlier calculation used raw attentionItems.length, but we need the final count
+  // after deduplication to match what's displayed in "What needs your attention"
+  if (isZeroInboxEnabled) {
+    // Count only message items (not events) in the deduplicated list
+    const messageItemsCount = deduplicatedItems.filter(item => item.type === 'message').length;
+    newMessages = messageItemsCount;
+    
+    // Recalculate active conversations based on deduplicated message items
+    const deduplicatedMessageIds = deduplicatedItems
+      .filter(item => item.type === 'message' && item.messageId)
+      .map(item => item.messageId!)
+      .filter((id): id is string => id !== undefined);
+    
+    if (deduplicatedMessageIds.length > 0) {
+      const { data: messagesWithThreads } = await supabase
+        .from('messages')
+        .select('provider_thread_id')
+        .eq('workspace_id', workspaceId)
+        .in('id', deduplicatedMessageIds)
+        .not('provider_thread_id', 'is', null);
+      
+      const uniqueThreads = new Set(
+        (messagesWithThreads || [])
+          .map((msg: any) => msg.provider_thread_id)
+          .filter(Boolean)
+      );
+      activeConversations = uniqueThreads.size || deduplicatedMessageIds.length;
+    } else {
+      activeConversations = 0;
+    }
+  }
+
   // Server-side debug logging
   console.log('[MorningBrief] Server-side render:', {
     workspaceId,
