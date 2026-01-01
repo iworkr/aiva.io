@@ -458,6 +458,12 @@ function renderBillingPage(data: BillingPageData): NextResponse {
   </style>
 </head>
 <body>
+  <!-- App Bridge Navigation Menu (web component) -->
+  <ui-nav-menu>
+    <a href="/api/shopify/app?shop=${shop}&host=${host}" rel="home">Home</a>
+    <a href="/api/shopify/billing?shop=${shop}&host=${host}">Billing</a>
+  </ui-nav-menu>
+
   <nav class="nav">
     <div class="nav-inner">
       <div class="nav-left">
@@ -523,47 +529,6 @@ function renderBillingPage(data: BillingPageData): NextResponse {
     const shop = '${shop}';
     const appUrl = '${appUrl}';
     let billingInterval = 'monthly';
-    
-    // Initialize App Bridge and Navigation Menu
-    (function initAppBridge() {
-      try {
-        const AppBridge = window['app-bridge'];
-        if (!AppBridge || !AppBridge.createApp) {
-          console.log('App Bridge not loaded yet, retrying...');
-          setTimeout(initAppBridge, 100);
-          return;
-        }
-        
-        const app = AppBridge.createApp({ apiKey, host });
-        
-        // Create navigation links for sidebar
-        const AppLink = AppBridge.actions.AppLink;
-        const NavigationMenu = AppBridge.actions.NavigationMenu;
-        
-        if (AppLink && NavigationMenu) {
-          const homeLink = AppLink.create(app, {
-            label: 'Home',
-            destination: '/api/shopify/app?shop=' + shop + '&host=' + host,
-          });
-          
-          const billingLink = AppLink.create(app, {
-            label: 'Billing',
-            destination: '/api/shopify/billing?shop=' + shop + '&host=' + host,
-          });
-          
-          const navMenu = NavigationMenu.create(app, {
-            items: [homeLink, billingLink],
-          });
-          
-          // Set Billing as active since we're on the billing page
-          navMenu.set({ active: billingLink });
-          
-          console.log('[App Bridge] Navigation menu created');
-        }
-      } catch (e) {
-        console.log('[App Bridge] Error initializing:', e);
-      }
-    })();
     
     function setInterval(interval) {
       billingInterval = interval;
