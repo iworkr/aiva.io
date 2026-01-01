@@ -517,8 +517,28 @@ function renderBillingPage(data: BillingPageData): NextResponse {
       <strong>Billed through Shopify</strong> — Charges will appear on your Shopify invoice.
       Secure payment processed by Shopify.
     </div>
+    
+    ${currentPlan !== 'free' && isActive ? `
+    <div class="cancel-section" style="margin-top: 24px; padding: 16px; background: ${COLORS.white}; border-radius: 8px; border: 1px solid #e5e7eb;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="font-weight: 600; color: ${COLORS.navy}; margin-bottom: 4px;">Need to cancel?</div>
+          <div style="font-size: 13px; color: ${COLORS.gray};">You can cancel your subscription at any time.</div>
+        </div>
+        <button 
+          id="cancel-btn"
+          onclick="handleCancel()"
+          style="padding: 8px 16px; background: transparent; border: 1px solid #ef4444; color: #ef4444; border-radius: 6px; font-size: 14px; cursor: pointer; transition: all 0.2s;"
+          onmouseover="this.style.background='#fef2f2'"
+          onmouseout="this.style.background='transparent'"
+        >
+          Cancel Subscription
+        </button>
+      </div>
+    </div>
+    ` : ''}
   </div>
-  
+
   <div class="loading-overlay" id="loading">
     <div class="loading-spinner"></div>
   </div>
@@ -638,6 +658,51 @@ function renderBillingPage(data: BillingPageData): NextResponse {
         errorBanner.style.display = 'block';
         
         // Scroll to error
+        errorBanner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+    
+    async function handleCancel() {
+      const confirmed = confirm('Are you sure you want to cancel your subscription? You will lose access to premium features at the end of your billing period.');
+      
+      if (!confirmed) return;
+      
+      const loading = document.getElementById('loading');
+      const errorBanner = document.getElementById('error-banner');
+      const cancelBtn = document.getElementById('cancel-btn');
+      
+      loading.classList.add('visible');
+      errorBanner.style.display = 'none';
+      if (cancelBtn) cancelBtn.disabled = true;
+      
+      try {
+        const cancelUrl = appUrl + '/api/shopify/billing/cancel';
+        console.log('[Billing] Sending cancel request to:', cancelUrl);
+        
+        const response = await fetch(cancelUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ shop }),
+          credentials: 'omit',
+        });
+        
+        console.log('[Billing] Cancel response status:', response.status);
+        const data = await response.json();
+        console.log('[Billing] Cancel response data:', data);
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to cancel subscription');
+        }
+        
+        // Reload the page to show updated status
+        window.location.reload();
+        
+      } catch (err) {
+        console.error('[Billing] Cancel error:', err);
+        loading.classList.remove('visible');
+        if (cancelBtn) cancelBtn.disabled = false;
+        errorBanner.textContent = err.message || 'Failed to cancel subscription. Please try again.';
+        errorBanner.style.display = 'block';
         errorBanner.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
