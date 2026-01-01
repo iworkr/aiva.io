@@ -197,19 +197,6 @@ export default function ShopifyDashboardClient({
           </div>
           
           <div style={styles.content}>
-            {/* DEBUG: Remove this after fixing */}
-            <div style={{ 
-              background: '#ff0', 
-              color: '#000', 
-              padding: '8px', 
-              marginBottom: '12px',
-              fontSize: '12px',
-              fontFamily: 'monospace',
-              borderRadius: '4px'
-            }}>
-              DEBUG: isLinked={String(isLinked)}, shop={shop}
-            </div>
-
             {/* Status Badge - shows connection AND link status */}
             <div style={{
               ...styles.statusBadge,

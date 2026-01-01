@@ -404,6 +404,9 @@ function renderPage(type: 'auth_required' | 'dashboard', data: PageData): NextRe
     headers: {
       'Content-Type': 'text/html',
       'X-Frame-Options': 'ALLOWALL',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
     },
   });
 }
@@ -484,6 +487,25 @@ function renderDashboard(data: PageData): string {
     `;
   }
 
+  // Status badge - shows different state based on link status
+  const statusBadgeHtml = isLinked ? `
+    <div class="status-badge" style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%); border-color: rgba(34, 197, 94, 0.3);">
+      <div class="status-icon" style="background: #22c55e;">✓</div>
+      <div>
+        <div class="status-title">Store Connected</div>
+        <div class="status-text">${shopName} is linked to Aiva</div>
+      </div>
+    </div>
+  ` : `
+    <div class="status-badge" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%); border-color: rgba(245, 158, 11, 0.3);">
+      <div class="status-icon" style="background: #f59e0b;">!</div>
+      <div>
+        <div class="status-title">Link Required</div>
+        <div class="status-text">${shopName} needs to be linked to your Aiva account</div>
+      </div>
+    </div>
+  `;
+
   return `
     <nav class="nav">
       <div class="nav-inner">
@@ -506,13 +528,7 @@ function renderDashboard(data: PageData): string {
           <p class="card-subtitle">Your intelligent communication assistant</p>
         </div>
         <div class="card-content">
-          <div class="status-badge">
-            <div class="status-icon">✓</div>
-            <div>
-              <div class="status-title">Store Connected</div>
-              <div class="status-text">${shopName} is linked to Aiva</div>
-            </div>
-          </div>
+          ${statusBadgeHtml}
           
           ${planBadgeHtml}
           
