@@ -6,6 +6,10 @@
 import { Metadata } from 'next';
 import Script from 'next/script';
 
+// Force dynamic rendering - never cache this layout
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export const metadata: Metadata = {
   title: 'Aiva - AI Inbox Assistant',
   description: 'Intelligent communication assistant for Shopify merchants',
