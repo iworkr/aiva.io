@@ -12,6 +12,8 @@ import { getEntitlementByShopDomain } from '@/lib/entitlements';
 import ShopifyDashboardClient from './ShopifyDashboardClient';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 
 interface PageProps {
   searchParams: Promise<{ shop?: string; host?: string }>;
@@ -46,6 +48,15 @@ export default async function ShopifyDashboardPage({ searchParams }: PageProps) 
     .eq('shop_domain', shop)
     .eq('is_active', true)
     .single();
+
+  // Debug logging
+  console.log('[Shopify Dashboard] Shop data:', {
+    shop,
+    hasData: !!shopData,
+    linked_user_id: shopData?.linked_user_id,
+    workspace_id: shopData?.workspace_id,
+    isLinked: !!shopData?.linked_user_id,
+  });
 
   if (error && error.code !== 'PGRST116') {
     console.error('Error fetching shop data:', error);

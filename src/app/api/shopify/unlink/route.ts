@@ -54,7 +54,14 @@ export async function POST(request: NextRequest) {
     
     // Unlink the store (don't delete, just remove user association)
     // The store data remains for if they want to reconnect
-    const { error: updateError } = await supabaseAdminClient
+    console.log('[Shopify Unlink] Attempting to unlink store:', {
+      storeId,
+      shopDomain: store.shop_domain,
+      currentLinkedUserId: store.linked_user_id,
+      requestingUserId: user.id,
+    });
+
+    const { error: updateError, data: updateData } = await supabaseAdminClient
       .from('shopify_stores')
       .update({
         linked_user_id: null,
@@ -62,15 +69,24 @@ export async function POST(request: NextRequest) {
         workspace_id: null,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', storeId);
+      .eq('id', storeId)
+      .select('id, linked_user_id, workspace_id')
+      .single();
     
     if (updateError) {
-      console.error('Error unlinking store:', updateError);
+      console.error('[Shopify Unlink] Error unlinking store:', updateError);
       return NextResponse.json(
         { error: 'Failed to unlink store' },
         { status: 500 }
       );
     }
+
+    console.log('[Shopify Unlink] Successfully unlinked store:', {
+      storeId,
+      shopDomain: store.shop_domain,
+      newLinkedUserId: updateData?.linked_user_id,
+      newWorkspaceId: updateData?.workspace_id,
+    });
     
     return NextResponse.json({
       success: true,
