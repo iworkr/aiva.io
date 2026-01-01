@@ -501,3 +501,160 @@ export async function getEntitlementStatus(workspaceId: string): Promise<{
     },
   };
 }
+
+// =====================================================
+// WORKSPACE & TEAM MEMBER LIMITS
+// =====================================================
+
+/**
+ * Get the number of workspaces a user is a member of
+ */
+export async function getUserWorkspaceCount(userId: string): Promise<number> {
+  try {
+    const { count, error } = await supabaseAdminClient
+      .from('workspace_members')
+      .select('workspace_id', { count: 'exact', head: true })
+      .eq('workspace_member_id', userId);
+
+    if (error) {
+      console.error('[Entitlements Guard] Error getting user workspace count:', error);
+      return 0;
+    }
+
+    return count || 0;
+  } catch (error) {
+    console.error('[Entitlements Guard] Error getting user workspace count:', error);
+    return 0;
+  }
+}
+
+/**
+ * Get the number of members in a workspace
+ */
+export async function getWorkspaceMemberCount(workspaceId: string): Promise<number> {
+  try {
+    const { count, error } = await supabaseAdminClient
+      .from('workspace_members')
+      .select('workspace_member_id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId);
+
+    if (error) {
+      console.error('[Entitlements Guard] Error getting workspace member count:', error);
+      return 0;
+    }
+
+    return count || 0;
+  } catch (error) {
+    console.error('[Entitlements Guard] Error getting workspace member count:', error);
+    return 0;
+  }
+}
+
+/**
+ * Check if a user can create a new workspace based on their plan limits
+ */
+export async function canUserCreateWorkspace(userId: string): Promise<{
+  allowed: boolean;
+  currentCount: number;
+  maxAllowed: number;
+  reason?: string;
+}> {
+  try {
+    // Get user's current workspace count
+    const currentCount = await getUserWorkspaceCount(userId);
+
+    // Get user's workspaces to check their best plan
+    const { data: memberships } = await supabaseAdminClient
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('workspace_member_id', userId);
+
+    // Find the best plan across all user's workspaces
+    let maxWorkspaces = 1; // Default to free tier
+    
+    if (memberships && memberships.length > 0) {
+      for (const membership of memberships) {
+        const entitlement = await requireActiveEntitlement(membership.workspace_id);
+        if (entitlement.isValid && entitlement.planFeatures.maxWorkspaces !== undefined) {
+          const planMax = entitlement.planFeatures.maxWorkspaces;
+          if (planMax === -1) {
+            maxWorkspaces = -1;
+            break; // Unlimited - no need to check more
+          }
+          maxWorkspaces = Math.max(maxWorkspaces, planMax);
+        }
+      }
+    }
+
+    // Check if can create
+    if (maxWorkspaces === -1) {
+      return { allowed: true, currentCount, maxAllowed: -1 };
+    }
+
+    if (currentCount >= maxWorkspaces) {
+      return {
+        allowed: false,
+        currentCount,
+        maxAllowed: maxWorkspaces,
+        reason: `Workspace limit reached. Your plan allows ${maxWorkspaces} workspace(s). Upgrade to Professional for unlimited workspaces.`,
+      };
+    }
+
+    return { allowed: true, currentCount, maxAllowed: maxWorkspaces };
+  } catch (error) {
+    console.error('[Entitlements Guard] Error checking workspace limit:', error);
+    // Fail closed - don't allow on error
+    return {
+      allowed: false,
+      currentCount: 0,
+      maxAllowed: 1,
+      reason: 'Error checking workspace limits',
+    };
+  }
+}
+
+/**
+ * Check if a workspace can add more team members based on plan limits
+ */
+export async function canWorkspaceAddMember(workspaceId: string): Promise<{
+  allowed: boolean;
+  currentCount: number;
+  maxAllowed: number;
+  reason?: string;
+}> {
+  try {
+    // Get workspace's current member count
+    const currentCount = await getWorkspaceMemberCount(workspaceId);
+
+    // Get workspace's entitlement
+    const entitlement = await requireActiveEntitlement(workspaceId);
+    const maxMembers = entitlement.planFeatures.maxTeamMembers;
+
+    // Check if can add
+    if (maxMembers === -1) {
+      return { allowed: true, currentCount, maxAllowed: -1 };
+    }
+
+    if (currentCount >= maxMembers) {
+      const planName = entitlement.planFeatures.plan.charAt(0).toUpperCase() + 
+                       entitlement.planFeatures.plan.slice(1);
+      return {
+        allowed: false,
+        currentCount,
+        maxAllowed: maxMembers,
+        reason: `Team member limit reached. Your ${planName} plan allows ${maxMembers} team member(s). Upgrade to add more members.`,
+      };
+    }
+
+    return { allowed: true, currentCount, maxAllowed: maxMembers };
+  } catch (error) {
+    console.error('[Entitlements Guard] Error checking member limit:', error);
+    // Fail closed - don't allow on error
+    return {
+      allowed: false,
+      currentCount: 0,
+      maxAllowed: 1,
+      reason: 'Error checking team member limits',
+    };
+  }
+}

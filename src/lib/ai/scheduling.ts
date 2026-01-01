@@ -26,6 +26,16 @@ export async function autoCreateEventFromMessage(
   } = {}
 ) {
   try {
+    // SCHEDULING ASSISTANT CHECK: Require Pro+ plan
+    const { hasFeatureAccess } = await import('@/lib/entitlements-guard');
+    const hasSchedulingAssistant = await hasFeatureAccess(workspaceId, 'schedulingAssistant');
+    if (!hasSchedulingAssistant) {
+      return {
+        success: false,
+        message: 'Intelligent scheduling assistant requires a Professional plan. Please upgrade.',
+      };
+    }
+
     // Detect scheduling intent
     const intent = await detectSchedulingIntent(messageId, workspaceId);
 
@@ -183,6 +193,16 @@ export async function createCalendarEventFromSentEmail(
   userId: string
 ): Promise<{ success: boolean; eventId?: string; message?: string }> {
   try {
+    // SCHEDULING ASSISTANT CHECK: Require Pro+ plan
+    const { hasFeatureAccess } = await import('@/lib/entitlements-guard');
+    const hasSchedulingAssistant = await hasFeatureAccess(workspaceId, 'schedulingAssistant');
+    if (!hasSchedulingAssistant) {
+      return {
+        success: false,
+        message: 'Calendar event creation from emails requires a Professional plan. Please upgrade.',
+      };
+    }
+
     const supabase = await createSupabaseUserServerActionClient();
 
     // Get message and draft

@@ -109,6 +109,25 @@ export const updateAISettingsAction = authActionClient
     const isMember = await isWorkspaceMember(userId, workspaceId);
     if (!isMember) throw new Error('Not a workspace member');
 
+    // FEATURE ACCESS CHECKS
+    const { hasFeatureAccess } = await import('@/lib/entitlements-guard');
+
+    // CUSTOM PROMPTS CHECK: If trying to set custom AI context/rules, require Pro+ plan
+    if ((settings.aiContext !== undefined || settings.aiRules !== undefined)) {
+      const hasCustomPrompts = await hasFeatureAccess(workspaceId, 'customPrompts');
+      if (!hasCustomPrompts) {
+        throw new Error('Custom AI prompts require a Professional plan. Please upgrade to customize AI behavior.');
+      }
+    }
+
+    // SCHEDULING ASSISTANT CHECK: If trying to enable auto-create events, require Pro+ plan
+    if (settings.autoCreateEvents === true) {
+      const hasSchedulingAssistant = await hasFeatureAccess(workspaceId, 'schedulingAssistant');
+      if (!hasSchedulingAssistant) {
+        throw new Error('Auto-create calendar events requires a Professional plan. Please upgrade.');
+      }
+    }
+
     const supabase = await createSupabaseUserServerActionClient();
 
     // Get existing workspace settings
@@ -170,6 +189,13 @@ export const generateAIContextAction = authActionClient
 
     const isMember = await isWorkspaceMember(userId, workspaceId);
     if (!isMember) throw new Error('Not a workspace member');
+
+    // CUSTOM PROMPTS CHECK: Generating AI context is a Pro+ feature
+    const { hasFeatureAccess } = await import('@/lib/entitlements-guard');
+    const hasCustomPrompts = await hasFeatureAccess(workspaceId, 'customPrompts');
+    if (!hasCustomPrompts) {
+      throw new Error('Custom AI context generation requires a Professional plan. Please upgrade.');
+    }
 
     const supabase = await createSupabaseUserServerActionClient();
     

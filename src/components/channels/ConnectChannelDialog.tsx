@@ -46,7 +46,7 @@ interface ChannelConnection {
   id: string;
   provider: string;
   status: string;
-  provider_account_name?: string;
+  provider_account_name: string | null;
 }
 
 interface ConnectChannelDialogProps {

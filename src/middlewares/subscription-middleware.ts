@@ -26,6 +26,9 @@ const SUBSCRIPTION_EXEMPT_PATHS = [
   '/logout',
 ];
 
+// Regex to extract workspace slug from URL paths like /workspace/[slug]/...
+const WORKSPACE_PATH_REGEX = /\/workspace\/([^\/]+)/;
+
 // Check if path is exempt from subscription check
 function isExemptPath(pathname: string): boolean {
   // Remove locale prefix if present
@@ -174,6 +177,87 @@ export const subscriptionMiddleware: MiddlewareConfig = {
           NextResponse.redirect(toSiteURL(withMaybeLocale(req, "/settings?tab=billing&reason=subscription_required"))),
           maybeUser,
         ];
+      }
+
+      // STRICT WORKSPACE LIMIT CHECK
+      // Check if user is accessing a specific workspace and whether they have access
+      const pathWithoutLocale = req.nextUrl.pathname.replace(/^\/[a-z]{2}(-[A-Z]{2})?/, '');
+      const workspaceMatch = pathWithoutLocale.match(WORKSPACE_PATH_REGEX);
+      
+      if (workspaceMatch) {
+        const requestedWorkspaceSlug = workspaceMatch[1];
+        
+        // Get user's workspaces with their entitlements, ordered by creation date
+        const { data: userWorkspaces, error: workspacesError } = await supabase
+          .from('workspace_members')
+          .select(`
+            workspace_id,
+            workspaces!inner (
+              id,
+              slug,
+              created_at
+            )
+          `)
+          .eq('workspace_member_id', maybeUser.id)
+          .order('created_at', { ascending: true, referencedTable: 'workspaces' });
+
+        if (!workspacesError && userWorkspaces && userWorkspaces.length > 0) {
+          // Find the best plan across user's entitled workspaces
+          let maxWorkspaces = 1; // Default to 1
+
+          for (const membership of userWorkspaces) {
+            const ws = membership.workspaces as unknown as { id: string; slug: string; created_at: string };
+            if (!ws) continue;
+
+            // Check entitlement for this workspace
+            const { data: wsEntitlement } = await supabase
+              .from('entitlements')
+              .select('plan, status, current_period_end')
+              .eq('workspace_id', ws.id)
+              .in('status', ['active', 'trialing'])
+              .single();
+
+            if (wsEntitlement) {
+              const planLimits: Record<string, number> = {
+                'free': 1,
+                'basic': 1,
+                'pro': -1, // Unlimited
+                'enterprise': -1, // Unlimited
+              };
+              const planMax = planLimits[wsEntitlement.plan] ?? 1;
+              if (planMax === -1) {
+                maxWorkspaces = -1;
+                break;
+              }
+              maxWorkspaces = Math.max(maxWorkspaces, planMax);
+            }
+          }
+
+          // If limited, check if the requested workspace is within the allowed ones
+          if (maxWorkspaces !== -1) {
+            // Sort workspaces by creation date and get only the allowed ones
+            const sortedWorkspaces = userWorkspaces
+              .map(m => m.workspaces as unknown as { id: string; slug: string; created_at: string })
+              .filter(Boolean)
+              .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+            const allowedWorkspaces = sortedWorkspaces.slice(0, maxWorkspaces);
+            const isAllowed = allowedWorkspaces.some(ws => ws.slug === requestedWorkspaceSlug);
+
+            if (!isAllowed) {
+              middlewareLogger.log(
+                "User trying to access workspace beyond limit",
+                { requestedSlug: requestedWorkspaceSlug, maxWorkspaces, allowedCount: allowedWorkspaces.length },
+              );
+              
+              // Redirect to billing page with upgrade message
+              return [
+                NextResponse.redirect(toSiteURL(withMaybeLocale(req, "/settings?tab=billing&reason=workspace_limit_exceeded"))),
+                maybeUser,
+              ];
+            }
+          }
+        }
       }
 
       return [res, maybeUser];

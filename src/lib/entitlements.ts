@@ -44,6 +44,7 @@ export interface EntitlementUpdate {
 
 export interface PlanFeatures {
   plan: EntitlementPlan;
+  // Feature flags
   autoClassify: boolean;
   basicAI: boolean;
   aiDrafts: boolean;
@@ -53,8 +54,14 @@ export interface PlanFeatures {
   unlimitedChannels: boolean;
   teamWorkspaces: boolean;
   voiceChat: boolean;
+  schedulingAssistant: boolean;
+  ssoEnabled: boolean;
+  apiAccess: boolean;
+  // Numeric limits (-1 = unlimited)
   maxChannels: number;
   maxMessagesPerMonth: number;
+  maxWorkspaces: number;
+  maxTeamMembers: number;
 }
 
 // =====================================================

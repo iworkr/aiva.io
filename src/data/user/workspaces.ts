@@ -27,6 +27,7 @@ import {
   updateWorkspaceMembershipType,
 } from "./elevatedQueries";
 import { refreshSessionAction } from "./session";
+import { canUserCreateWorkspace, canWorkspaceAddMember } from "@/lib/entitlements-guard";
 
 export const getWorkspaceIdBySlug = async (slug: string) => {
   const supabaseClient = await createSupabaseUserServerComponentClient();
@@ -186,6 +187,12 @@ export const createWorkspaceAction = authActionClient
       parsedInput: { name, slug, workspaceType, isOnboardingFlow },
       ctx: { userId },
     }) => {
+      // WORKSPACE LIMIT CHECK: Verify user can create another workspace
+      const workspaceCheck = await canUserCreateWorkspace(userId);
+      if (!workspaceCheck.allowed) {
+        throw new Error(workspaceCheck.reason || 'Workspace limit reached. Please upgrade your plan.');
+      }
+
       const workspaceId = uuid();
       const supabaseClient = await createSupabaseUserServerActionClient();
       const { error } = await supabaseClient.from("workspaces").insert({

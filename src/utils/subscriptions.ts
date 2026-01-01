@@ -34,14 +34,23 @@ export enum FeatureFlag {
   UnlimitedChannels = "unlimitedChannels",
   TeamWorkspaces = "teamWorkspaces",
   VoiceChat = "voiceChat",
+  SchedulingAssistant = "schedulingAssistant",
+  SsoEnabled = "ssoEnabled",
+  ApiAccess = "apiAccess",
 }
 
 /**
  * Feature flags for different plan tiers
+ * 
+ * Limits:
+ * - maxChannels: -1 = unlimited
+ * - maxMessagesPerMonth: -1 = unlimited
+ * - maxWorkspaces: -1 = unlimited
+ * - maxTeamMembers: -1 = unlimited
  */
 export const PLAN_FEATURES = {
   free: {
-    // No active subscription
+    // No active subscription - very limited trial
     autoClassify: true,
     basicAI: true,
     aiDrafts: false,
@@ -50,40 +59,55 @@ export const PLAN_FEATURES = {
     customPrompts: false,
     unlimitedChannels: false,
     teamWorkspaces: false,
-    voiceChat: false, // Voice Aiva - NOT available
+    voiceChat: false,
+    schedulingAssistant: false,
+    ssoEnabled: false,
+    apiAccess: false,
     maxChannels: 1,
     maxMessagesPerMonth: 100,
+    maxWorkspaces: 1,
+    maxTeamMembers: 1, // Solo only
   },
   basic: {
-    // Basic paid plan
-    autoClassify: true,
-    basicAI: true, // Deep history, linking, calendar functions
-    aiDrafts: false, // NOT available
-    autoResponses: false, // NOT available
-    advancedSearch: false,
-    customPrompts: false,
-    unlimitedChannels: false,
-    teamWorkspaces: false,
-    voiceChat: false, // Voice Aiva - NOT available
-    maxChannels: 3,
-    maxMessagesPerMonth: 1000,
-  },
-  pro: {
-    // Professional plan
+    // Basic paid plan - $35/mo
+    // Unified inbox (up to 3 channels)
+    // AI-powered message classification
+    // Auto-organize by category & sentiment
+    // Deep history search
+    // Calendar event extraction
+    // Email & Slack integration
+    // 1 workspace
+    // Up to 1,000 messages/month
     autoClassify: true,
     basicAI: true,
-    aiDrafts: true, // Available
-    autoResponses: true, // Available
-    advancedSearch: true,
-    customPrompts: true,
-    unlimitedChannels: true,
-    teamWorkspaces: true,
-    voiceChat: true, // Voice Aiva - Available
-    maxChannels: -1, // Unlimited
-    maxMessagesPerMonth: -1, // Unlimited
+    aiDrafts: false, // NOT available - Pro feature
+    autoResponses: false, // NOT available - Pro feature
+    advancedSearch: false, // NOT available - Pro feature
+    customPrompts: false, // NOT available - Pro feature
+    unlimitedChannels: false,
+    teamWorkspaces: false, // Solo workspace only
+    voiceChat: false,
+    schedulingAssistant: false, // NOT available - Pro feature
+    ssoEnabled: false,
+    apiAccess: false,
+    maxChannels: 3,
+    maxMessagesPerMonth: 1000,
+    maxWorkspaces: 1, // Basic = 1 workspace only
+    maxTeamMembers: 1, // Solo workspace - no team members
   },
-  enterprise: {
-    // Enterprise plan - all features
+  pro: {
+    // Professional plan - $95/mo
+    // Everything in Basic PLUS:
+    // AI reply drafts & auto-responses
+    // Multiple tone variations
+    // Custom AI prompts
+    // Unlimited channels
+    // Intelligent scheduling assistant
+    // All integrations (Gmail, Outlook, Slack, WhatsApp)
+    // Team workspace (up to 5 members)
+    // Unlimited messages
+    // Priority support
+    // Advanced search & filters
     autoClassify: true,
     basicAI: true,
     aiDrafts: true,
@@ -92,9 +116,44 @@ export const PLAN_FEATURES = {
     customPrompts: true,
     unlimitedChannels: true,
     teamWorkspaces: true,
-    voiceChat: true, // Voice Aiva - Available
+    voiceChat: true,
+    schedulingAssistant: true,
+    ssoEnabled: false, // Enterprise only
+    apiAccess: false, // Enterprise only
+    maxChannels: -1, // Unlimited
+    maxMessagesPerMonth: -1, // Unlimited
+    maxWorkspaces: -1, // Unlimited
+    maxTeamMembers: 5, // Up to 5 team members
+  },
+  enterprise: {
+    // Enterprise plan - $239/mo
+    // Everything in Professional PLUS:
+    // Unlimited team members
+    // Dedicated account manager
+    // Custom integrations
+    // Advanced security & compliance
+    // SSO & advanced permissions
+    // 24/7 priority support
+    // Custom AI training
+    // API access
+    // White-label options
+    // SLA guarantee
+    autoClassify: true,
+    basicAI: true,
+    aiDrafts: true,
+    autoResponses: true,
+    advancedSearch: true,
+    customPrompts: true,
+    unlimitedChannels: true,
+    teamWorkspaces: true,
+    voiceChat: true,
+    schedulingAssistant: true,
+    ssoEnabled: true,
+    apiAccess: true,
     maxChannels: -1,
     maxMessagesPerMonth: -1,
+    maxWorkspaces: -1,
+    maxTeamMembers: -1, // Unlimited
   },
 } as const;
 

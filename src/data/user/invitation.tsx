@@ -24,6 +24,7 @@ import {
 } from "./notifications";
 import { getUserProfile } from "./user";
 import { getWorkspaceById } from "./workspaces";
+import { canWorkspaceAddMember } from "@/lib/entitlements-guard";
 
 // This function allows an application admin with service_role
 // to check if a user with a given email exists in the auth.users table
@@ -140,6 +141,12 @@ export const createInvitationAction = authActionClient
     async ({ parsedInput: { workspaceId, email, role }, ctx: { userId } }) => {
       const supabaseClient = await createSupabaseUserServerActionClient();
 
+      // TEAM MEMBER LIMIT CHECK: Verify workspace can add more members
+      const memberCheck = await canWorkspaceAddMember(workspaceId);
+      if (!memberCheck.allowed) {
+        throw new Error(memberCheck.reason || 'Team member limit reached. Please upgrade your plan.');
+      }
+
       // Check if organization exists
       const { data: workspace, error: workspaceError } = await supabaseClient
         .from("workspaces")
@@ -245,6 +252,29 @@ const acceptInvitationSchema = z.object({
 export const acceptInvitationAction = authActionClient
   .schema(acceptInvitationSchema)
   .action(async ({ parsedInput: { invitationId }, ctx: { userId } }) => {
+    // Get invitation details first to check workspace limits
+    const supabaseClient = await createSupabaseUserServerActionClient();
+    const { data: invitationData, error: invitationFetchError } = await supabaseClient
+      .from("workspace_invitations")
+      .select("workspace_id")
+      .eq("id", invitationId)
+      .eq("status", "active")
+      .single();
+
+    if (invitationFetchError || !invitationData) {
+      throw new Error("Invitation not found or already processed");
+    }
+
+    // TEAM MEMBER LIMIT CHECK: Verify workspace can still add members
+    // (in case limit was exceeded between invitation creation and acceptance)
+    const memberCheck = await canWorkspaceAddMember(invitationData.workspace_id);
+    if (!memberCheck.allowed) {
+      throw new Error(
+        `Cannot accept invitation: ${memberCheck.reason || 'Team member limit reached'}. ` +
+        'Please contact the workspace owner to upgrade their plan.'
+      );
+    }
+
     const invitation = await acceptWorkspaceInvitation({
       invitationId,
       userId,
@@ -412,10 +442,32 @@ const bulkSettleInvitationsSchema = z.object({
 export const bulkSettleInvitationsAction = authActionClient
   .schema(bulkSettleInvitationsSchema)
   .action(async ({ parsedInput: { invitationActions }, ctx: { userId } }) => {
+    const supabaseClient = await createSupabaseUserServerActionClient();
+
     const results = await Promise.all(
       invitationActions.map(async ({ invitationId, action }) => {
         try {
           if (action === "accepted") {
+            // Get workspace ID for member limit check
+            const { data: invitationData } = await supabaseClient
+              .from("workspace_invitations")
+              .select("workspace_id")
+              .eq("id", invitationId)
+              .eq("status", "active")
+              .single();
+
+            if (invitationData) {
+              // TEAM MEMBER LIMIT CHECK: Verify workspace can still add members
+              const memberCheck = await canWorkspaceAddMember(invitationData.workspace_id);
+              if (!memberCheck.allowed) {
+                return {
+                  invitationId,
+                  success: false,
+                  error: memberCheck.reason || 'Team member limit reached',
+                };
+              }
+            }
+
             await acceptWorkspaceInvitation({ invitationId, userId });
           } else {
             // we don't decline invitations in bulk since this is the onboarding flow

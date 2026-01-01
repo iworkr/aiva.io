@@ -67,6 +67,7 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
   const [maxChannels, setMaxChannels] = useState(-1); // -1 = unlimited
   const [planName, setPlanName] = useState('Free');
   const [messageUsage, setMessageUsage] = useState({ current: 0, limit: -1 });
+  const [hasAdvancedSearch, setHasAdvancedSearch] = useState(false);
   
   // Global sync status from context
   const { 
@@ -94,7 +95,10 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
         if (response.ok) {
           const data = await response.json();
           if (data.entitlement) {
+            const plan = data.plan?.toLowerCase() || 'free';
             setPlanName(data.plan?.charAt(0).toUpperCase() + data.plan?.slice(1) || 'Free');
+            // Advanced search is available for Pro and Enterprise plans
+            setHasAdvancedSearch(plan === 'pro' || plan === 'enterprise');
           }
         }
         
@@ -630,6 +634,7 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
           onCategoryFilterChange={setCategoryFilter}
           unreadCount={unreadCount}
           starredCount={starredCount}
+          hasAdvancedSearch={hasAdvancedSearch}
         />
 
         {/* Message List */}

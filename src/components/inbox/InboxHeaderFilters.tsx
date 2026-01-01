@@ -27,9 +27,12 @@ import {
   AlertTriangle,
   Clock,
   User,
+  Lock,
+  Crown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import type { MessagePriority, MessageCategory } from '@/utils/zod-schemas/aiva-schemas';
 
 export type SortOption = 'date_desc' | 'date_asc' | 'priority' | 'sender';
@@ -51,6 +54,8 @@ interface InboxHeaderFiltersProps {
   // Counts for badges
   unreadCount?: number;
   starredCount?: number;
+  // Advanced search feature access
+  hasAdvancedSearch?: boolean;
 }
 
 const PRIORITY_OPTIONS: { value: MessagePriority; label: string; icon: typeof Flame }[] = [
@@ -92,6 +97,7 @@ export function InboxHeaderFilters({
   onCategoryFilterChange,
   unreadCount = 0,
   starredCount = 0,
+  hasAdvancedSearch = false,
 }: InboxHeaderFiltersProps) {
   const hasActiveFilters = priorityFilter || categoryFilter;
 
@@ -152,72 +158,114 @@ export function InboxHeaderFilters({
 
       <div className="h-4 w-px bg-border mx-1" />
 
-      {/* Priority filter */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              'h-7 px-2 text-xs gap-1',
-              priorityFilter ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-            )}
-          >
-            Priority
-            {priorityFilter && <span className="text-[10px]">: {priorityFilter}</span>}
-            <ChevronDown className="h-3 w-3 opacity-50" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start">
-          <DropdownMenuLabel className="text-xs">Filter by priority</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          {PRIORITY_OPTIONS.map((option) => (
-            <DropdownMenuCheckboxItem
-              key={option.value}
-              checked={priorityFilter === option.value}
-              onCheckedChange={(checked) =>
-                onPriorityFilterChange(checked ? option.value : undefined)
-              }
+      {/* Priority filter - Pro+ only */}
+      {hasAdvancedSearch ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                'h-7 px-2 text-xs gap-1',
+                priorityFilter ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+              )}
             >
-              <option.icon className="mr-2 h-3.5 w-3.5" />
-              {option.label}
-            </DropdownMenuCheckboxItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+              Priority
+              {priorityFilter && <span className="text-[10px]">: {priorityFilter}</span>}
+              <ChevronDown className="h-3 w-3 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuLabel className="text-xs">Filter by priority</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {PRIORITY_OPTIONS.map((option) => (
+              <DropdownMenuCheckboxItem
+                key={option.value}
+                checked={priorityFilter === option.value}
+                onCheckedChange={(checked) =>
+                  onPriorityFilterChange(checked ? option.value : undefined)
+                }
+              >
+                <option.icon className="mr-2 h-3.5 w-3.5" />
+                {option.label}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled
+                className="h-7 px-2 text-xs gap-1 text-muted-foreground opacity-60"
+              >
+                <Lock className="h-3 w-3 mr-1" />
+                Priority
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Advanced filters require Pro plan</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
 
-      {/* Category filter */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              'h-7 px-2 text-xs gap-1',
-              categoryFilter ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-            )}
-          >
-            Category
-            {categoryFilter && <span className="text-[10px] max-w-[60px] truncate">: {categoryFilter.replace(/_/g, ' ')}</span>}
-            <ChevronDown className="h-3 w-3 opacity-50" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto">
-          <DropdownMenuLabel className="text-xs">Filter by category</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          {CATEGORY_OPTIONS.map((option) => (
-            <DropdownMenuCheckboxItem
-              key={option.value}
-              checked={categoryFilter === option.value}
-              onCheckedChange={(checked) =>
-                onCategoryFilterChange(checked ? option.value : undefined)
-              }
+      {/* Category filter - Pro+ only */}
+      {hasAdvancedSearch ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                'h-7 px-2 text-xs gap-1',
+                categoryFilter ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+              )}
             >
-              {option.label}
-            </DropdownMenuCheckboxItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+              Category
+              {categoryFilter && <span className="text-[10px] max-w-[60px] truncate">: {categoryFilter.replace(/_/g, ' ')}</span>}
+              <ChevronDown className="h-3 w-3 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto">
+            <DropdownMenuLabel className="text-xs">Filter by category</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {CATEGORY_OPTIONS.map((option) => (
+              <DropdownMenuCheckboxItem
+                key={option.value}
+                checked={categoryFilter === option.value}
+                onCheckedChange={(checked) =>
+                  onCategoryFilterChange(checked ? option.value : undefined)
+                }
+              >
+                {option.label}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled
+                className="h-7 px-2 text-xs gap-1 text-muted-foreground opacity-60"
+              >
+                <Lock className="h-3 w-3 mr-1" />
+                Category
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Advanced filters require Pro plan</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
 
       {/* Clear filters */}
       {hasActiveFilters && (
