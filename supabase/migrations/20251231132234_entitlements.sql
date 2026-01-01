@@ -166,9 +166,9 @@ CREATE TRIGGER shopify_billing_plans_updated_at
 
 INSERT INTO public.shopify_billing_plans (plan, shopify_plan_name_monthly, shopify_amount_monthly, shopify_plan_name_annual, shopify_amount_annual, trial_days, display_order, is_active)
 VALUES
-    ('basic', 'Aiva Basic', 35.00, 'Aiva Basic Annual', 350.00, 14, 1, true),
-    ('pro', 'Aiva Professional', 95.00, 'Aiva Professional Annual', 950.00, 14, 2, true),
-    ('enterprise', 'Aiva Enterprise', 239.00, 'Aiva Enterprise Annual', 2390.00, 14, 3, true)
+    ('basic', 'Aiva Basic', 35.00, 'Aiva Basic Annual', 350.00, 7, 1, true),
+    ('pro', 'Aiva Professional', 95.00, 'Aiva Professional Annual', 950.00, 7, 2, true),
+    ('enterprise', 'Aiva Enterprise', 239.00, 'Aiva Enterprise Annual', 2390.00, 7, 3, true)
 ON CONFLICT (plan) DO UPDATE SET
     shopify_plan_name_monthly = EXCLUDED.shopify_plan_name_monthly,
     shopify_amount_monthly = EXCLUDED.shopify_amount_monthly,

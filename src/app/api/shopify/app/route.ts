@@ -549,7 +549,7 @@ function renderDashboard(data: PageData): string {
           </div>
           
           ${actionButtonHtml}
-          <p class="note">${hasActiveSubscription ? 'Opens in a new tab for the full experience' : 'All plans include a 14-day free trial'}</p>
+          <p class="note">${hasActiveSubscription ? 'Opens in a new tab for the full experience' : 'All plans include a 7-day free trial'}</p>
         </div>
       </div>
     </div>
