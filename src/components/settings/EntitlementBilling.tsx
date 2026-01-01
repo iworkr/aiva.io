@@ -135,9 +135,9 @@ export function EntitlementBilling({ workspaceId }: EntitlementBillingProps) {
 
   const handleManageSubscription = () => {
     if (provider === 'shopify' && entitlement?.shop_domain) {
-      // Open Shopify admin billing page
+      // Open Shopify admin app subscriptions page
       const shopName = entitlement.shop_domain.replace('.myshopify.com', '');
-      window.open(`https://admin.shopify.com/store/${shopName}/settings/billing`, '_blank');
+      window.open(`https://admin.shopify.com/store/${shopName}/settings/plan/subscriptions`, '_blank');
     } else if (provider === 'stripe') {
       // TODO: Open Stripe customer portal
       window.open('/api/billing/portal', '_blank');
