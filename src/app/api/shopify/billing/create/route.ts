@@ -153,7 +153,22 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[Shopify Billing Create] Error:', error);
     
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    let errorMessage = 'Unknown error';
+    let errorDetails = '';
+    
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      errorDetails = error.stack || '';
+    }
+    
+    // Check for common issues
+    if (errorMessage.includes('Billing plan not found')) {
+      errorMessage = 'Billing plans not configured. Please contact support.';
+    } else if (errorMessage.includes('GraphQL error')) {
+      errorMessage = 'Failed to connect to Shopify. Please try again.';
+    }
+    
+    console.error('[Shopify Billing Create] Error details:', errorDetails);
     
     return NextResponse.json(
       { error: errorMessage },
