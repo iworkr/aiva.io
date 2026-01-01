@@ -163,11 +163,14 @@ interface PageData {
 function renderPage(type: 'auth_required' | 'dashboard', data: PageData): NextResponse {
   const { shop, host, apiKey, appUrl, shopName = shop.replace('.myshopify.com', '') } = data;
 
+  const currentPage = type === 'dashboard' ? 'home' : 'home';
+  
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="shopify-api-key" content="${apiKey}" />
   <title>Aiva - AI Inbox Assistant</title>
   <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
   <style>
@@ -348,6 +351,54 @@ function renderPage(type: 'auth_required' | 'dashboard', data: PageData): NextRe
   <script>
     const apiKey = '${apiKey}';
     const host = '${host}';
+    const shop = '${shop}';
+    const appUrl = '${appUrl}';
+    const currentPage = '${currentPage}';
+    
+    // Initialize App Bridge and Navigation Menu
+    (function initAppBridge() {
+      try {
+        const AppBridge = window['app-bridge'];
+        if (!AppBridge || !AppBridge.createApp) {
+          console.log('App Bridge not loaded yet, retrying...');
+          setTimeout(initAppBridge, 100);
+          return;
+        }
+        
+        const app = AppBridge.createApp({ apiKey, host });
+        
+        // Create navigation links for sidebar
+        const AppLink = AppBridge.actions.AppLink;
+        const NavigationMenu = AppBridge.actions.NavigationMenu;
+        
+        if (AppLink && NavigationMenu) {
+          const homeLink = AppLink.create(app, {
+            label: 'Home',
+            destination: '/api/shopify/app?shop=' + shop + '&host=' + host,
+          });
+          
+          const billingLink = AppLink.create(app, {
+            label: 'Billing',
+            destination: '/api/shopify/billing?shop=' + shop + '&host=' + host,
+          });
+          
+          const navMenu = NavigationMenu.create(app, {
+            items: [homeLink, billingLink],
+          });
+          
+          // Set active link based on current page
+          if (currentPage === 'home') {
+            navMenu.set({ active: homeLink });
+          } else if (currentPage === 'billing') {
+            navMenu.set({ active: billingLink });
+          }
+          
+          console.log('[App Bridge] Navigation menu created');
+        }
+      } catch (e) {
+        console.log('[App Bridge] Error initializing:', e);
+      }
+    })();
     
     function handleRedirect(url) {
       try {
@@ -368,7 +419,7 @@ function renderPage(type: 'auth_required' | 'dashboard', data: PageData): NextRe
     }
     
     function handleNavigate(path) {
-      const url = '${appUrl}' + path + '?shop=${shop}&host=${host}';
+      const url = appUrl + path + '?shop=' + shop + '&host=' + host;
       try {
         if (window['app-bridge'] && window['app-bridge'].createApp) {
           const AppBridge = window['app-bridge'];
