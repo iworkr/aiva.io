@@ -91,12 +91,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine if we're in test mode
+    // For dev stores, test mode must be true
     const isTestMode = process.env.NODE_ENV === 'development' || 
-      process.env.SHOPIFY_TEST_MODE === 'true';
+      process.env.SHOPIFY_TEST_MODE === 'true' ||
+      shop.includes('test') || // dev stores often have 'test' in name
+      true; // Always use test mode for now during development
 
     // Get the return URL (where Shopify redirects after approval)
-    const host = request.headers.get('x-shopify-host') || '';
+    const host = request.headers.get('x-shopify-host') || 
+                 request.headers.get('X-Shopify-Host') || '';
     const returnUrl = getSubscriptionReturnUrl(shop, host);
+
+    console.log('[Shopify Billing Create] Host header:', host);
 
     console.log('[Shopify Billing Create] Creating subscription:', {
       shop,

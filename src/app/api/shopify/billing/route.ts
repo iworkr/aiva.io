@@ -568,9 +568,14 @@ function renderBillingPage(data: BillingPageData): NextResponse {
       errorBanner.style.display = 'none';
       
       try {
-        const response = await fetch(appUrl + '/api/shopify/billing/create', {
+        // Use relative URL to avoid CORS issues
+        const response = await fetch('/api/shopify/billing/create', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-Shopify-Shop': shop,
+            'X-Shopify-Host': host,
+          },
           body: JSON.stringify({ shop, plan, interval: billingInterval }),
         });
         
