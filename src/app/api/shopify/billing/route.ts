@@ -600,24 +600,34 @@ function renderBillingPage(data: BillingPageData): NextResponse {
         if (data.confirmationUrl) {
           console.log('[Billing] Got confirmation URL:', data.confirmationUrl);
           
-          // Redirect to Shopify confirmation using App Bridge
+          // Method 1: Try using modern App Bridge (shopify global)
+          if (window.shopify && window.shopify.idToken) {
+            console.log('[Billing] Using modern Shopify App Bridge redirect');
+            // Modern App Bridge - redirect using top-level navigation
+            window.top.location.href = data.confirmationUrl;
+            return;
+          }
+          
+          // Method 2: Try legacy App Bridge Redirect action
           try {
             if (window['app-bridge'] && window['app-bridge'].createApp) {
               const AppBridge = window['app-bridge'];
               const app = AppBridge.createApp({ apiKey, host });
               const Redirect = AppBridge.actions.Redirect;
               if (Redirect) {
-                console.log('[Billing] Redirecting via App Bridge');
+                console.log('[Billing] Redirecting via legacy App Bridge');
                 const redirect = Redirect.create(app);
                 redirect.dispatch(Redirect.Action.REMOTE, data.confirmationUrl);
                 return;
               }
             }
           } catch (e) {
-            console.log('[Billing] App Bridge error:', e);
+            console.log('[Billing] Legacy App Bridge error:', e);
           }
-          console.log('[Billing] Fallback: redirecting via window.location');
-          window.location.href = data.confirmationUrl;
+          
+          // Method 3: Direct top-level redirect (works in iframe)
+          console.log('[Billing] Using top-level window redirect');
+          window.top.location.href = data.confirmationUrl;
         } else {
           throw new Error('No confirmation URL returned');
         }
