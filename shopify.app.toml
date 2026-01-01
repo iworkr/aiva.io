@@ -18,7 +18,7 @@ redirect_urls = [
 ]
 
 [webhooks]
-api_version = "2024-01"
+api_version = "2024-10"
 
 # App lifecycle webhooks
 [[webhooks.subscriptions]]
@@ -28,6 +28,11 @@ uri = "/api/shopify/webhooks"
 # Billing/subscription webhooks
 [[webhooks.subscriptions]]
 topics = ["app_subscriptions/update"]
+uri = "/api/shopify/webhooks"
+
+# MANDATORY: GDPR/Privacy compliance webhooks (uses compliance_topics, not topics)
+[[webhooks.subscriptions]]
+compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
 uri = "/api/shopify/webhooks"
 
 # Order update webhooks for real-time order status tracking
@@ -44,10 +49,6 @@ uri = "/api/shopify/webhooks"
 
 [pos]
 embedded = false
-
-# Note: Privacy compliance URLs (customer_data_request, customer_deletion, shop_deletion)
-# are configured in the Shopify Partner Dashboard, not in this file.
-# The webhook handlers are registered above and handled at /api/shopify/webhooks
 
 # Note: Shopify deprecated static sidebar navigation in 2024
 # Navigation is now handled via App Bridge in the app's header UI
