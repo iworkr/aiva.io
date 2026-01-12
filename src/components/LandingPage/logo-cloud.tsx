@@ -1,45 +1,68 @@
-import { logos } from "@/data/anon/logos";
+"use client";
 
+import { CHANNEL_LOGOS, CHANNEL_NAMES } from "@/constants/channel-logos";
 import Image from "next/image";
 import { Marquee } from "../magicui/marquee";
 
+// Integration logos to display
+const integrationLogos = [
+  { key: "gmail", logo: CHANNEL_LOGOS.gmail, name: CHANNEL_NAMES.gmail },
+  { key: "outlook", logo: CHANNEL_LOGOS.outlook, name: CHANNEL_NAMES.outlook },
+  { key: "slack", logo: CHANNEL_LOGOS.slack, name: CHANNEL_NAMES.slack },
+  { key: "teams", logo: CHANNEL_LOGOS.teams, name: CHANNEL_NAMES.teams },
+  { key: "whatsapp", logo: CHANNEL_LOGOS.whatsapp, name: CHANNEL_NAMES.whatsapp },
+  { key: "googleCalendar", logo: CHANNEL_LOGOS.googleCalendar, name: CHANNEL_NAMES.googleCalendar },
+];
+
+// Metrics - can be updated with real data later
+const metrics = [
+  { value: "50K+", label: "messages handled weekly" },
+  { value: "73%", label: "faster response time" },
+  { value: "8hrs", label: "saved per teammate/week" },
+];
+
 export default function LogoCloud() {
   return (
-    <section className="flex justify-center items-center text-center max-w-6xl mx-auto overflow-hidden py-8">
-      <div className="space-y-4">
-        <p className="text-muted-foreground text-lg font-semibold">
-          Trusted by professionals worldwide
+    <section className="py-12 lg:py-16 border-y bg-muted/30">
+      <div className="max-w-6xl mx-auto px-6 space-y-8">
+        {/* Headline */}
+        <p className="text-center text-muted-foreground font-medium">
+          Built for teams who can't afford missed messages.
         </p>
-        <div className="w-full">
-          <div className="mx-auto w-full px-4 md:px-8">
+
+        {/* Integration logos */}
+        <div className="flex flex-wrap justify-center items-center gap-6 lg:gap-10">
+          {integrationLogos.map((integration) => (
             <div
-              className="group relative mt-4 flex gap-8 overflow-hidden p-2 items-center"
-              style={{
-                maskImage:
-                  "linear-gradient(to left, transparent 0%, black 20%, black 80%, transparent 95%)",
-              }}
+              key={integration.key}
+              className="flex items-center gap-2 opacity-70 hover:opacity-100 transition-opacity"
             >
-              <Marquee pauseOnHover className="[--duration:25s]">
-                {logos.map((logo, key) => (
-                  <a 
-                    href={logo.website} 
-                    key={key} 
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center mx-4 hover:opacity-80 transition-opacity"
-                  >
-                    <Image
-                      width={120}
-                      height={36}
-                      src={logo.url}
-                      className="h-9 w-auto object-contain px-2 invert-[50%] brightness-200 grayscale-[100%] dark:grayscale-0 dark:invert-[50%]"
-                      alt={`${logo.name}`}
-                    />
-                  </a>
-                ))}
-              </Marquee>
+              <Image
+                src={integration.logo}
+                alt={integration.name}
+                width={32}
+                height={32}
+                className="object-contain"
+              />
+              <span className="text-sm font-medium text-muted-foreground hidden sm:block">
+                {integration.name}
+              </span>
             </div>
-          </div>
+          ))}
+        </div>
+
+        {/* Metrics */}
+        <div className="flex flex-wrap justify-center items-center gap-8 lg:gap-16 pt-4">
+          {metrics.map((metric, index) => (
+            <div key={index} className="text-center">
+              <p className="text-2xl lg:text-3xl font-bold text-foreground">
+                {metric.value}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {metric.label}
+              </p>
+            </div>
+          ))}
         </div>
       </div>
     </section>

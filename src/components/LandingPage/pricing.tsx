@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -7,134 +10,196 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { pricing } from "@/data/anon/pricing";
 import { cn } from "@/lib/utils";
-import { CheckCircle2Icon, DollarSign } from "lucide-react";
-import TitleBlock from "../title-block";
+import { Check, ArrowRight } from "lucide-react";
+import { Link } from "@/components/intl-link";
 
-const Pricing = () => {
+// Pricing plans
+const plans = [
+  {
+    id: "starter",
+    name: "Starter",
+    description: "For personal inbox control",
+    monthlyPrice: 29,
+    annualPrice: 290,
+    features: [
+      "Unified inbox (up to 3 channels)",
+      "AI priority scoring",
+      "Smart drafts",
+      "Basic scheduling",
+      "Task extraction",
+      "Email support",
+    ],
+    cta: "Start Free",
+    popular: false,
+  },
+  {
+    id: "team",
+    name: "Team",
+    description: "For client work + collaboration",
+    monthlyPrice: 79,
+    annualPrice: 790,
+    features: [
+      "Everything in Starter",
+      "Unlimited channels",
+      "Team workspace",
+      "Shared inboxes",
+      "Auto-send with approval",
+      "Advanced scheduling agent",
+      "Custom AI prompts",
+      "Priority support",
+    ],
+    cta: "Start Free",
+    popular: true,
+  },
+  {
+    id: "enterprise",
+    name: "Enterprise",
+    description: "SSO, audit logs, API, advanced controls",
+    monthlyPrice: null,
+    annualPrice: null,
+    features: [
+      "Everything in Team",
+      "Unlimited team members",
+      "SSO & SAML",
+      "Audit logs",
+      "API access",
+      "Custom integrations",
+      "Dedicated account manager",
+      "SLA guarantee",
+    ],
+    cta: "Contact Sales",
+    popular: false,
+  },
+];
+
+export default function Pricing() {
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
+
   return (
-    <section id="pricing" className="py-20 lg:py-28 max-w-6xl flex flex-col justify-center items-center mx-auto space-y-12 overflow-hidden px-6">
-      <TitleBlock
-        icon={<DollarSign size={16} />}
-        title="Simple, Transparent Pricing"
-        section="Pricing"
-        subtitle="Choose the plan that fits your needs. All plans include a 7-day free trial. No credit card required."
-      />
+    <section id="pricing" className="py-20 lg:py-28 px-6 bg-muted/30">
+      <div className="max-w-6xl mx-auto space-y-12">
+        {/* Header */}
+        <div className="text-center max-w-3xl mx-auto space-y-4">
+          <h2 className="text-3xl lg:text-4xl xl:text-5xl font-bold tracking-tight">
+            Simple pricing that scales with your workload.
+          </h2>
+        </div>
 
-      <Tabs
-        defaultValue="monthly"
-        className="flex justify-center w-full  items-center flex-col"
-      >
-        <TabsList className="mb-6 max-w-80 w-full">
-          <TabsTrigger className="w-full" value="monthly">
-            Monthly
-          </TabsTrigger>
-          <TabsTrigger className="w-full relative" value="annual">
-            Annual
-            <Badge variant="secondary" className="absolute -top-2 -right-2 text-[10px] px-1.5 py-0.5 bg-green-500 text-white border-0">
-              Save 20%
-            </Badge>
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="monthly" className="w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full ">
-            {pricing.map((item, i) => (
-              <PricingCard key={i} {...item} />
-            ))}
+        {/* Billing toggle */}
+        <div className="flex justify-center">
+          <div className="inline-flex items-center p-1 rounded-lg bg-muted border">
+            <button
+              onClick={() => setBillingPeriod("monthly")}
+              className={cn(
+                "px-4 py-2 rounded-md text-sm font-medium transition-all",
+                billingPeriod === "monthly"
+                  ? "bg-background shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setBillingPeriod("annual")}
+              className={cn(
+                "px-4 py-2 rounded-md text-sm font-medium transition-all relative",
+                billingPeriod === "annual"
+                  ? "bg-background shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Annual
+              <Badge className="absolute -top-2 -right-2 text-[10px] px-1.5 py-0 bg-green-500 hover:bg-green-500 border-0">
+                Save 20%
+              </Badge>
+            </button>
           </div>
-        </TabsContent>
-        <TabsContent value="annual" className="w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full ">
-            {pricing.map((item, i) => {
-              const monthly = Number(item.price);
-              const annualTotal = Number(item.annualPrice);
-              // Calculate realistic annual discount: 2 months free (10 months paid)
-              // This gives approximately 17% discount, which is realistic
-              const monthsPaid = 10; // 2 months free
-              const effectiveMonthly =
-                !Number.isNaN(monthly) && !Number.isNaN(annualTotal) && monthly > 0
-                  ? ((monthly * monthsPaid) / 12).toFixed(0)
-                  : item.annualPrice;
-              
-              // Calculate savings
-              const savings = monthly > 0 && annualTotal > 0
-                ? (monthly * 12 - Number(annualTotal)).toFixed(0)
-                : '0';
+        </div>
 
-              return (
-                <PricingCard
-                  key={i}
-                  {...item}
-                  price={effectiveMonthly}
-                  billingLabel={`${item.annualPrice} billed annually (save $${savings}/year)`}
-                />
-              );
-            })}
-          </div>
-        </TabsContent>
-      </Tabs>
+        {/* Pricing cards */}
+        <div className="grid md:grid-cols-3 gap-6 lg:gap-8">
+          {plans.map((plan) => {
+            const price = billingPeriod === "monthly" ? plan.monthlyPrice : plan.annualPrice;
+            const monthlyEquivalent = plan.annualPrice ? Math.round(plan.annualPrice / 12) : null;
+            
+            return (
+              <Card
+                key={plan.id}
+                className={cn(
+                  "relative flex flex-col",
+                  plan.popular && "border-primary shadow-lg shadow-primary/10"
+                )}
+              >
+                {plan.popular && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <Badge className="bg-primary hover:bg-primary">Most Popular</Badge>
+                  </div>
+                )}
+                
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-xl">{plan.name}</CardTitle>
+                  <CardDescription>{plan.description}</CardDescription>
+                  
+                  <div className="pt-4">
+                    {price !== null ? (
+                      <>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-4xl font-bold">
+                            ${billingPeriod === "annual" ? monthlyEquivalent : price}
+                          </span>
+                          <span className="text-muted-foreground">/month</span>
+                        </div>
+                        {billingPeriod === "annual" && plan.annualPrice && (
+                          <p className="text-sm text-green-600 mt-1">
+                            ${plan.annualPrice} billed annually
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-4xl font-bold">Custom</span>
+                      </div>
+                    )}
+                  </div>
+                </CardHeader>
+
+                <CardContent className="flex-1 flex flex-col">
+                  <Button
+                    className={cn(
+                      "w-full mb-6",
+                      plan.popular ? "" : "variant-outline"
+                    )}
+                    variant={plan.popular ? "default" : "outline"}
+                    asChild
+                  >
+                    <Link href={plan.id === "enterprise" ? "/contact" : "/sign-up"}>
+                      {plan.cta}
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Link>
+                  </Button>
+
+                  <div className="border-t pt-6">
+                    <ul className="space-y-3">
+                      {plan.features.map((feature, index) => (
+                        <li key={index} className="flex items-start gap-3">
+                          <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                          <span className="text-sm">{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* No credit card note */}
+        <p className="text-center text-sm text-muted-foreground">
+          No credit card required · 14-day free trial on all plans
+        </p>
+      </div>
     </section>
   );
-};
-
-const PricingCard = ({
-  title,
-  price,
-  features,
-  description,
-  isHighlighted = false,
-  billingLabel,
-}: {
-  title: string;
-  price: string;
-  features: string[];
-  description: string;
-  isHighlighted?: boolean;
-  billingLabel?: string;
-}) => {
-  return (
-    <Card
-      className={cn(`${isHighlighted ? "bg-secondary" : ""} ,
-     h-fit
-    `)}
-    >
-      <CardHeader className="space-y-1 p-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <CardTitle className="text-xl font-bold">{title}</CardTitle>
-            <CardDescription className="text-base">
-              {description}
-            </CardDescription>
-          </div>
-          {isHighlighted && <Badge>Most Popular</Badge>}
-        </div>
-        <div className="flex items-baseline gap-2 py-3">
-          <h3 className="text-4xl font-bold tracking-tighter">${price}</h3>
-          <span className="text-muted-foreground">/month</span>
-        </div>
-        {billingLabel && (
-          <p className="text-xs text-green-600 dark:text-green-400 font-medium -mt-2 mb-2">
-            {billingLabel}
-          </p>
-        )}
-        <Button className="w-full" size="lg" variant="default">Start Free Trial</Button>
-      </CardHeader>
-
-      <CardContent className="p-4">
-        <div className="h-[1px] bg-slate-200 dark:bg-slate-500 w-full "></div>
-        <ul className="space-y-3 pt-10">
-          {features.map((feature, i) => (
-            <li key={i} className="flex items-center">
-              <CheckCircle2Icon size={16} />
-              <span className="ml-2 text-sm font-medium">{feature}</span>
-            </li>
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
-  );
-};
-
-export default Pricing;
+}

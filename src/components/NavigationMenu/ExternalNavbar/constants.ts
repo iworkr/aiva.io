@@ -1,19 +1,7 @@
 export const navbarLinks = [
-  { name: "Docs", href: "/docs" },
-  {
-    name: "Community Support",
-    href: "/feedback",
-  },
-  {
-    name: "Blog",
-    href: "/blog",
-  },
-  {
-    name: "Changelog",
-    href: "/changelog",
-  },
-  {
-    name: "Roadmap",
-    href: "/roadmap",
-  },
+  { name: "Product", href: "/#features" },
+  { name: "How it works", href: "/#how-it-works" },
+  { name: "Integrations", href: "/#integrations" },
+  { name: "Pricing", href: "/#pricing" },
+  { name: "FAQ", href: "/#faq" },
 ];

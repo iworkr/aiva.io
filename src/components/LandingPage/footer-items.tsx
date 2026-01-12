@@ -15,18 +15,26 @@ export const footerItems: FooterItem[] = [
         url: "/#features",
       },
       {
+        name: "Integrations",
+        url: "/#integrations",
+      },
+      {
         name: "Pricing",
         url: "/#pricing",
       },
       {
-        name: "Documentation",
-        url: "/docs",
+        name: "Security",
+        url: "/#faq",
       },
     ],
   },
   {
     title: "Company",
     items: [
+      {
+        name: "About",
+        url: "/about",
+      },
       {
         name: "Blog",
         url: "/blog",
@@ -36,8 +44,8 @@ export const footerItems: FooterItem[] = [
         url: "/changelog",
       },
       {
-        name: "Roadmap",
-        url: "/roadmap",
+        name: "Contact",
+        url: "/contact",
       },
     ],
   },
@@ -45,22 +53,22 @@ export const footerItems: FooterItem[] = [
     title: "Legal",
     items: [
       {
-        name: "Privacy Policy",
+        name: "Privacy",
         url: "/privacy",
       },
       {
-        name: "Terms of Service",
+        name: "Terms",
         url: "/terms",
       },
     ],
   },
 ];
 
-// Social media links - Update these URLs when real Aiva.io profiles are created
+// Social media links
 export const footerSocialItems = [
   {
     name: "X (Twitter)",
-    url: "https://x.com/aivaio", // Update when real profile exists
+    url: "https://x.com/aivaio",
     icon: () => (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -76,7 +84,7 @@ export const footerSocialItems = [
   },
   {
     name: "LinkedIn",
-    url: "https://linkedin.com/company/aivaio", // Update when real profile exists
+    url: "https://linkedin.com/company/aivaio",
     icon: () => (
       <svg
         xmlns="http://www.w3.org/2000/svg"
