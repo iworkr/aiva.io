@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Link } from "@/components/intl-link";
 import { Suspense, useEffect, useState } from "react";
 import { LeftNav } from "./LeftNav";
-import { LoginCTAButton } from "./LoginCTAButton";
 import { MobileMenu } from "./MobileMenu";
 import { MobileMenuProvider } from "./MobileMenuContext";
 import { MobileMenuOpen } from "./MobileMenuOpen";
@@ -34,7 +33,7 @@ export function ExternalNavigation() {
       >
         <nav
           className={cn(
-            "flex items-center w-full md:container md:mx-auto justify-between px-6 md:px-8 transition-all duration-200",
+            "flex items-center max-w-7xl mx-auto justify-between px-6 transition-all duration-200",
             scrolled ? "h-[50px]" : "h-[58px]"
           )}
           aria-label="Global"

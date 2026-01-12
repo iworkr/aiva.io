@@ -8,7 +8,8 @@ import { HeroUIDemo } from "./HeroUIDemo";
 
 export default function HeroSection() {
   return (
-    <section className="py-16 lg:py-24 px-6 max-w-7xl mx-auto">
+    <section className="py-16 lg:py-24 px-6 w-full">
+      <div className="max-w-7xl mx-auto">
       <div className="flex flex-col gap-12 lg:gap-16 w-full">
         {/* Text content */}
         <div className="space-y-6 flex flex-col lg:items-center lg:text-center flex-1 max-w-4xl mx-auto">
@@ -77,6 +78,7 @@ export default function HeroSection() {
             <HeroUIDemo />
           </div>
         </div>
+      </div>
       </div>
     </section>
   );

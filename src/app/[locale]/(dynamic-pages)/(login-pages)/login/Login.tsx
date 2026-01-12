@@ -14,12 +14,14 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { CHANNEL_LOGOS } from "@/constants/channel-logos";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Image from "next/image";
 import { MagicLinkLoginForm } from "./MagicLinkLoginForm";
 import { PasswordLoginForm } from "./PasswordLoginForm";
+import { Shield, Sparkles, ArrowRight } from "lucide-react";
 
 export function Login({
   next,
@@ -71,63 +73,40 @@ export function Login({
   }
 
   return (
-    <Card className="w-full border-2 shadow-lg">
-      <CardHeader className="text-center space-y-4">
+    <Card className="w-full border shadow-xl bg-card/95 backdrop-blur-sm">
+      <CardHeader className="text-center space-y-4 pb-2">
         <div className="flex justify-center">
           <Image
             src="/logos/aiva-logo-dark.svg"
-            width={140}
-            height={40}
+            width={120}
+            height={32}
             alt="Aiva logo"
             className="block dark:hidden"
           />
           <Image
             src="/logos/aiva-logo-light.svg"
-            width={140}
-            height={40}
+            width={120}
+            height={32}
             alt="Aiva logo"
             className="hidden dark:block"
           />
         </div>
-        <div>
-          <CardTitle className="text-2xl">Log in to Aiva.io</CardTitle>
-          <CardDescription className="mt-1">
-            Access your unified AI inbox, messages, and calendar in one place.
+        <div className="space-y-2">
+          <CardTitle className="text-2xl font-bold tracking-tight">Welcome back</CardTitle>
+          <CardDescription className="text-base">
+            Log in to your unified AI inbox
           </CardDescription>
         </div>
       </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="password">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="password">Password</TabsTrigger>
-            <TabsTrigger value="magic-link">Magic Link</TabsTrigger>
-          </TabsList>
-          <TabsContent value="password">
-            <PasswordLoginForm
-              next={next}
-              redirectToDashboard={redirectToDashboard}
-              setRedirectInProgress={setRedirectInProgress}
-            />
-          </TabsContent>
-
-          <TabsContent value="magic-link">
-            <MagicLinkLoginForm
-              next={next}
-              setEmailSentSuccessMessage={setEmailSentSuccessMessage}
-            />
-          </TabsContent>
-        </Tabs>
-        <Separator className="my-4" />
+      <CardContent className="space-y-4 pt-4">
+        {/* OAuth buttons first for easier access */}
         <div className="space-y-3">
-          <div className="text-sm text-center text-muted-foreground">
-            Or sign in with your email provider
-          </div>
-          <div className="flex justify-between gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <Button
               variant="outline"
-              size="default"
+              size="lg"
               onClick={handleGoogleSignIn}
-              className="flex-1 bg-background text-foreground border h-10 border-input rounded-lg"
+              className="h-11 bg-background hover:bg-muted transition-colors"
             >
               <Image
                 src={CHANNEL_LOGOS.gmail}
@@ -136,13 +115,13 @@ export function Login({
                 alt="Google"
                 className="mr-2"
               />
-              <span>Google</span>
+              Google
             </Button>
             <Button
               variant="outline"
-              size="default"
+              size="lg"
               onClick={handleOutlookSignIn}
-              className="flex-1 bg-background text-foreground border h-10 border-input rounded-lg"
+              className="h-11 bg-background hover:bg-muted transition-colors"
             >
               <Image
                 src={CHANNEL_LOGOS.outlook}
@@ -151,17 +130,54 @@ export function Login({
                 alt="Outlook"
                 className="mr-2"
               />
-              <span>Outlook</span>
+              Outlook
             </Button>
           </div>
         </div>
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <Separator className="w-full" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-card px-2 text-muted-foreground">
+              Or continue with email
+            </span>
+          </div>
+        </div>
+
+        <Tabs defaultValue="password" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsTrigger value="password">Password</TabsTrigger>
+            <TabsTrigger value="magic-link">Magic Link</TabsTrigger>
+          </TabsList>
+          <TabsContent value="password" className="mt-0">
+            <PasswordLoginForm
+              next={next}
+              redirectToDashboard={redirectToDashboard}
+              setRedirectInProgress={setRedirectInProgress}
+            />
+          </TabsContent>
+
+          <TabsContent value="magic-link" className="mt-0">
+            <MagicLinkLoginForm
+              next={next}
+              setEmailSentSuccessMessage={setEmailSentSuccessMessage}
+            />
+          </TabsContent>
+        </Tabs>
       </CardContent>
-      <CardFooter className="flex flex-col gap-4">
-        <Link href="/sign-up" className="w-full">
-          <Button variant="outline" className="w-full">
-            Don&apos;t have an account? Start free trial
-          </Button>
-        </Link>
+      <CardFooter className="flex flex-col gap-4 pt-2">
+        <Button variant="ghost" className="w-full text-muted-foreground hover:text-foreground" asChild>
+          <Link href="/sign-up">
+            Don&apos;t have an account? <span className="ml-1 text-primary font-medium">Start free</span>
+            <ArrowRight className="w-4 h-4 ml-1" />
+          </Link>
+        </Button>
+        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+          <Shield className="w-3 h-3" />
+          <span>Secured with 256-bit encryption</span>
+        </div>
       </CardFooter>
     </Card>
   );

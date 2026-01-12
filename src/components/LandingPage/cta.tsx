@@ -6,8 +6,9 @@ import { ArrowRight, Play, Sparkles } from "lucide-react";
 
 export default function CTA() {
   return (
-    <section className="py-24 lg:py-32 px-6 bg-gradient-to-br from-primary/5 via-background to-primary/10">
-      <div className="max-w-4xl mx-auto text-center space-y-8">
+    <section className="py-24 lg:py-32 px-6 w-full bg-gradient-to-br from-primary/5 via-background to-primary/10">
+      <div className="max-w-7xl mx-auto">
+        <div className="max-w-4xl mx-auto text-center space-y-8">
         {/* Icon */}
         <div className="flex justify-center">
           <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
@@ -54,6 +55,7 @@ export default function CTA() {
         <p className="text-sm text-muted-foreground">
           No credit card required · Cancel anytime
         </p>
+        </div>
       </div>
     </section>
   );

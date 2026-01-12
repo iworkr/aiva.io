@@ -7,8 +7,8 @@ import { Shield, Lock } from "lucide-react";
 
 export function Footer() {
   return (
-    <footer className="bg-background border-t">
-      <div className="max-w-6xl mx-auto px-6 py-12 lg:py-16">
+    <footer className="bg-background border-t w-full">
+      <div className="max-w-7xl mx-auto px-6 py-12 lg:py-16">
         <div className="grid gap-8 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
           {/* Brand column */}
           <div className="space-y-4">

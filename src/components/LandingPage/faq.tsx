@@ -38,8 +38,9 @@ const faqItems = [
 
 export default function FAQ() {
   return (
-    <section id="faq" className="py-20 lg:py-28 px-6">
-      <div className="max-w-3xl mx-auto space-y-12">
+    <section id="faq" className="py-20 lg:py-28 px-6 w-full">
+      <div className="max-w-7xl mx-auto">
+        <div className="max-w-3xl mx-auto space-y-12">
         {/* Header */}
         <div className="text-center space-y-4">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border bg-muted">
@@ -71,6 +72,7 @@ export default function FAQ() {
             </AccordionItem>
           ))}
         </Accordion>
+        </div>
       </div>
     </section>
   );

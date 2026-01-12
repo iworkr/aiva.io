@@ -23,8 +23,8 @@ const metrics = [
 
 export default function LogoCloud() {
   return (
-    <section className="py-12 lg:py-16 border-y bg-muted/30">
-      <div className="max-w-6xl mx-auto px-6 space-y-8">
+    <section className="py-12 lg:py-16 border-y bg-muted/30 w-full">
+      <div className="max-w-7xl mx-auto px-6 space-y-8">
         {/* Headline */}
         <p className="text-center text-muted-foreground font-medium">
           Built for teams who can't afford missed messages.

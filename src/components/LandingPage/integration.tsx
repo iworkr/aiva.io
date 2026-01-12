@@ -68,8 +68,8 @@ const comingSoon = [
 
 export default function Integration() {
   return (
-    <section id="integrations" className="py-20 lg:py-28 px-6">
-      <div className="max-w-6xl mx-auto space-y-12">
+    <section id="integrations" className="py-20 lg:py-28 px-6 w-full">
+      <div className="max-w-7xl mx-auto space-y-12">
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto space-y-4">
           <h2 className="text-3xl lg:text-4xl xl:text-5xl font-bold tracking-tight">
