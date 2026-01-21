@@ -674,7 +674,7 @@ REMEMBER: Missing information handling:
     
     // Check if bills/invoices are excluded by user settings
     const isBillOrInvoice = message.category === 'bill' || message.category === 'invoice';
-    const isBillInvoiceExcluded = isBillOrInvoice && excludedCategories.includes(message.category.toLowerCase());
+    const isBillInvoiceExcluded = isBillOrInvoice && message.category && excludedCategories.includes(message.category.toLowerCase());
     
     // Categories that should always require human review (regardless of excluded settings)
     // Bills/invoices are NOT in this list - they can auto-send if not excluded and confidence is high
