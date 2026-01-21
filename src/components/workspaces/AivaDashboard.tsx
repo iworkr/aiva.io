@@ -480,13 +480,20 @@ export function AivaDashboard({ workspaceId, userId, userName }: AivaDashboardPr
             <InboxZeroState />
           ) : (
             <div className="space-y-3">
-              {attentionItems.map((item) => (
-                <AttentionItemCard 
-                  key={item.id} 
-                  item={item} 
-                  onDismiss={handleDismissItem}
-                />
-              ))}
+              {/* Ensure items are sorted by timestamp (most recent first) - client-side safety check */}
+              {[...attentionItems]
+                .sort((a, b) => {
+                  const aTime = new Date(a.timestamp).getTime();
+                  const bTime = new Date(b.timestamp).getTime();
+                  return bTime - aTime; // Most recent first
+                })
+                .map((item) => (
+                  <AttentionItemCard 
+                    key={item.id} 
+                    item={item} 
+                    onDismiss={handleDismissItem}
+                  />
+                ))}
             </div>
           )}
         </div>

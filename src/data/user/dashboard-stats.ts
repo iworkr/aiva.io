@@ -750,9 +750,35 @@ export async function getNeedsAttentionItems(
 
   // Sort by timestamp: most recent first (pure recency sort)
   // This ensures users see the newest items that need attention at the top
+  // CRITICAL: Sort must happen AFTER all items are added from all sources
+  console.log(`[Dashboard] Sorting ${items.length} items by timestamp (most recent first)...`);
   items.sort((a, b) => {
-    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+    const aTime = new Date(a.timestamp).getTime();
+    const bTime = new Date(b.timestamp).getTime();
+    
+    // Handle invalid dates
+    if (isNaN(aTime) || isNaN(bTime)) {
+      console.warn('[Dashboard] Invalid timestamp detected:', { 
+        a: { timestamp: a.timestamp, time: aTime }, 
+        b: { timestamp: b.timestamp, time: bTime } 
+      });
+      if (isNaN(aTime)) return 1; // Put invalid dates at end
+      if (isNaN(bTime)) return -1;
+    }
+    
+    // Most recent first (descending order: b - a)
+    const result = bTime - aTime;
+    return result;
   });
+
+  // Log the sorted order for debugging
+  console.log('[Dashboard] ✅ Items after sorting (first 10):', items.slice(0, 10).map((i, idx) => ({
+    index: idx,
+    subject: i.subject?.substring(0, 40),
+    timestamp: i.timestamp,
+    timestampMs: new Date(i.timestamp).getTime(),
+    dateObj: new Date(i.timestamp).toISOString(),
+  })));
 
   const finalItems = items.slice(0, limit);
   
