@@ -539,19 +539,30 @@ export async function getNeedsAttentionItems(
   }
 
   // Check which actionable messages are already in the auto-send queue
-  // If they're queued for auto-send, we don't need to show them (they'll be handled automatically)
+  // Only show queued messages if they're past their scheduled time and still not sent (stuck/failed)
+  // Messages queued for future sending should NOT appear - they'll be handled automatically
   const actionableMessageIds = (actionableItems || []).map((m: any) => m.id);
   let queuedMessageIds = new Set<string>();
+  let stuckQueuedMessageIds = new Set<string>(); // Messages past scheduled time but not sent
   if (actionableMessageIds.length > 0) {
+    const now = new Date().toISOString();
     const { data: queueItems } = await supabase
       .from('auto_send_queue')
-      .select('message_id, status')
+      .select('message_id, status, scheduled_send_at')
       .eq('workspace_id', workspaceId)
       .in('message_id', actionableMessageIds)
-      .eq('status', 'pending'); // Only check pending items (processing/sent/failed are handled)
+      .in('status', ['pending', 'processing']); // Check both pending and processing
     
-    queuedMessageIds = new Set((queueItems || []).map((q: any) => q.message_id));
-    console.log(`[Dashboard] Found ${queuedMessageIds.size} actionable messages already in auto-send queue`);
+    if (queueItems) {
+      queueItems.forEach((q: any) => {
+        queuedMessageIds.add(q.message_id);
+        // If scheduled time has passed but still pending/processing, it's stuck
+        if (q.scheduled_send_at && new Date(q.scheduled_send_at) <= new Date(now)) {
+          stuckQueuedMessageIds.add(q.message_id);
+        }
+      });
+    }
+    console.log(`[Dashboard] Found ${queuedMessageIds.size} actionable messages in auto-send queue (${stuckQueuedMessageIds.size} stuck past scheduled time)`);
   }
 
   // Process actionable messages (request, question, scheduling_intent)
@@ -579,12 +590,20 @@ export async function getNeedsAttentionItems(
       continue;
     }
     
-    // If queued for auto-send, show it so user knows it's pending (will be sent soon)
-    // Don't skip - user should see messages that are queued for auto-send
+    // Check if message is queued for auto-send
     const isQueuedForAutoSend = queuedMessageIds.has(msg.id);
-    if (isQueuedForAutoSend) {
-      console.log(`[Dashboard] Message ${msg.id} is queued for auto-send - showing in attention items`);
-      // Continue to show it - don't skip
+    const isStuckQueued = stuckQueuedMessageIds.has(msg.id);
+    
+    // Only show queued messages if they're stuck (past scheduled time but not sent)
+    // Messages queued for future sending should NOT appear - they'll be handled automatically
+    if (isQueuedForAutoSend && !isStuckQueued) {
+      console.log(`[Dashboard] Message ${msg.id} is queued for auto-send (future scheduled) - skipping (will be handled automatically)`);
+      continue; // Skip - it will be sent automatically
+    }
+    
+    if (isStuckQueued) {
+      console.log(`[Dashboard] Message ${msg.id} is queued for auto-send but past scheduled time (stuck) - showing in attention items`);
+      // Continue to show it - it's stuck and needs attention
     }
     
     // Now check if message should be excluded (categories, priority, age, etc.)
@@ -603,21 +622,22 @@ export async function getNeedsAttentionItems(
     
     // Show the message if:
     // - It has no draft at all (AI hasn't generated a response yet - needs human attention) - always show
-    // - It's queued for auto-send (user should see pending messages)
+    // - It's stuck in queue (past scheduled time but not sent) - needs attention
     // Don't show if it has an auto-sendable draft AND not queued (will be handled by auto-send cron)
     // Don't show if it was already auto-replied (already handled, no need for review)
+    // Don't show if it's queued for future sending (will be handled automatically)
     if (!hasAutoSendableDraft) {
       // No auto-sendable draft - needs human attention
       addMessageToItems(msg, 'unhandled');
     } else if (autoSentDraft) {
       // Was already auto-replied - don't show (already handled, regardless of age)
       console.log(`[Dashboard] Skipping actionable message ${msg.id} - was already auto-replied (handled)`);
-    } else if (isQueuedForAutoSend) {
-      // Queued for auto-send - show it so user knows it's pending
+    } else if (isStuckQueued) {
+      // Stuck in queue (past scheduled time but not sent) - show it so user knows it needs attention
       addMessageToItems(msg, 'unhandled');
-      console.log(`[Dashboard] Showing actionable message ${msg.id} - queued for auto-send (pending)`);
+      console.log(`[Dashboard] Showing actionable message ${msg.id} - stuck in auto-send queue (past scheduled time)`);
     } else {
-      // Has auto-sendable draft but not queued - will be handled by auto-send cron
+      // Has auto-sendable draft but not queued, or queued for future sending - will be handled by auto-send cron
       console.log(`[Dashboard] Skipping actionable message ${msg.id} - has auto-sendable draft (will be handled by auto-send cron)`);
     }
   }
@@ -728,25 +748,9 @@ export async function getNeedsAttentionItems(
     });
   }
 
-  // Sort by priority: review reason > priority > timestamp
-  // Review reasons that need urgent attention: calendar_mismatch, sensitive_topic
-  // Then by message priority: urgent > high > medium > low
-  // Finally by timestamp: most recent first
+  // Sort by timestamp: most recent first (pure recency sort)
+  // This ensures users see the newest items that need attention at the top
   items.sort((a, b) => {
-    // 1. Prioritize urgent review reasons
-    const urgentReasons = ['calendar_mismatch', 'sensitive_topic'];
-    const aIsUrgent = a.reviewReason && urgentReasons.includes(a.reviewReason);
-    const bIsUrgent = b.reviewReason && urgentReasons.includes(b.reviewReason);
-    if (aIsUrgent && !bIsUrgent) return -1;
-    if (!aIsUrgent && bIsUrgent) return 1;
-    
-    // 2. Then by message priority
-    const priorityOrder: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
-    const aPriority = priorityOrder[a.priority || 'low'] ?? 3;
-    const bPriority = priorityOrder[b.priority || 'low'] ?? 3;
-    if (aPriority !== bPriority) return aPriority - bPriority;
-    
-    // 3. Finally by timestamp (most recent first)
     return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
   });
 

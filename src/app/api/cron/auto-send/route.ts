@@ -199,6 +199,9 @@ export async function GET(request: NextRequest) {
         console.log(`   ✅ Draft found, body length: ${draft.body?.length || 0} chars`);
 
         // Check if draft is held for human review
+        // CRITICAL: The draft's hold_for_review is the source of truth - it was evaluated when queued
+        // If the draft is NOT held for review, we should send it regardless of message.requires_human_review
+        // (which might have been set by another process after queuing)
         if (draft.hold_for_review) {
           console.log(`   ⏸️ Draft held for human review: ${draft.review_reason || 'unspecified'}`);
           await updateQueueItemStatus(item.id, 'cancelled', {
@@ -237,11 +240,19 @@ export async function GET(request: NextRequest) {
         }
         console.log(`   ✅ Message found: "${message.subject?.substring(0, 40)}..." from ${message.sender_email}`);
 
-        // Check if message is flagged for human review
-        if (message.requires_human_review) {
-          console.log(`   ⏸️ Message requires human review: ${message.review_reason || 'unspecified'}`);
+        // NOTE: We no longer check message.requires_human_review here because:
+        // 1. The draft's hold_for_review is the source of truth (checked above)
+        // 2. If the draft is NOT held for review, it was evaluated as auto-sendable when queued
+        // 3. The message's requires_human_review flag might have been set by another process
+        //    (like re-classification) after the draft was queued, which shouldn't block sending
+        // 4. The draft evaluation at queue time is what matters - if it passed then, it should send now
+        // 
+        // Exception: We still respect thread_reply_limit_reached as that's a hard limit that applies
+        // regardless of draft status, but that's checked separately in the send logic below
+        if (message.requires_human_review && message.review_reason === 'thread_reply_limit_reached') {
+          console.log(`   ⏸️ Thread reply limit reached - cannot auto-send: ${message.review_reason}`);
           await updateQueueItemStatus(item.id, 'cancelled', {
-            errorMessage: `Message requires human review: ${message.review_reason || 'unspecified'}`,
+            errorMessage: `Thread reply limit reached: ${message.review_reason}`,
           });
           
           await supabase.from('auto_send_log').insert({
@@ -250,7 +261,7 @@ export async function GET(request: NextRequest) {
             draft_id: item.draft_id,
             action: 'held_for_review',
             confidence_score: item.confidence_score,
-            details: { reason: message.review_reason || 'message_requires_human_review' },
+            details: { reason: message.review_reason },
           });
 
           results.skipped++;
