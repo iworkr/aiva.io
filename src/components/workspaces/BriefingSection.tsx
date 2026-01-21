@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   ChevronDown,
   ChevronUp,
@@ -81,7 +81,59 @@ export function BriefingSection({ items, workspaceId, userId }: BriefingSectionP
   const router = useRouter();
   
   // Filter out dismissed items for instant UI update
-  const visibleItems = items.filter(item => !dismissedItems.has(item.id));
+  // CRITICAL: Sort by timestamp (most recent first) - client-side safety check
+  const visibleItems = useMemo(() => {
+    const filtered = items.filter(item => !dismissedItems.has(item.id));
+    
+    // Sort by timestamp (most recent first)
+    const sorted = [...filtered].sort((a, b) => {
+      if (!a.timestamp || !b.timestamp) return 0;
+      const aTime = new Date(a.timestamp).getTime();
+      const bTime = new Date(b.timestamp).getTime();
+      return bTime - aTime; // Most recent first
+    });
+    
+    // Log sorting for debugging
+    const needsSorting = sorted.some((item, idx) => {
+      const original = filtered[idx];
+      return !original || item.id !== original.id;
+    });
+    
+    if (needsSorting && sorted.length > 0) {
+      console.group('🔄 [BriefingSection] Client-side Sort Applied');
+      console.log('⚠️ Items were NOT sorted correctly from server!');
+      console.log('Original order:', filtered.map((i, idx) => ({
+        idx,
+        title: i.title?.substring(0, 40),
+        timestamp: i.timestamp,
+        timestampMs: i.timestamp ? new Date(i.timestamp).getTime() : null,
+      })));
+      console.log('✅ Sorted order:', sorted.map((i, idx) => ({
+        idx,
+        title: i.title?.substring(0, 40),
+        timestamp: i.timestamp,
+        timestampMs: i.timestamp ? new Date(i.timestamp).getTime() : null,
+      })));
+      console.groupEnd();
+    }
+    
+    // Always log the final order for debugging
+    console.group('🔍 [BriefingSection] Attention Items');
+    console.log('📊 Total items:', sorted.length);
+    console.table(sorted.map((i, idx) => ({
+      index: idx,
+      title: i.title?.substring(0, 50),
+      timestamp: i.timestamp,
+      timestampMs: i.timestamp ? new Date(i.timestamp).getTime() : null,
+      age: i.timestamp ? formatDistanceToNow(new Date(i.timestamp), { addSuffix: true }) : 'N/A',
+      type: i.type,
+      priority: i.priority,
+    })));
+    console.groupEnd();
+    
+    return sorted;
+  }, [items, dismissedItems]);
+  
   const topItems = visibleItems.slice(0, 3);
   const remainingItems = visibleItems.slice(3);
 
