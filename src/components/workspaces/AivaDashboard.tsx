@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -309,18 +309,21 @@ export function AivaDashboard({ workspaceId, userId, userName }: AivaDashboardPr
       setAttentionItems(itemsData);
       setBriefing(briefingData);
       
-      // Debug logging
-      console.log('[Dashboard] Loaded attention items:', {
-        count: itemsData.length,
-        items: itemsData.map(i => ({
-          messageId: i.messageId,
-          subject: i.subject,
-          hasDraft: i.hasDraft,
-          draftId: i.draftId,
-          reviewReason: i.reviewReason,
-          timestamp: i.timestamp,
-        })),
-      });
+      // Debug logging - Make it very visible
+      console.group('🔍 [Dashboard] Attention Items Debug');
+      console.log('📊 Total items:', itemsData.length);
+      console.table(itemsData.map((i, idx) => ({
+        index: idx,
+        subject: i.subject?.substring(0, 50),
+        timestamp: i.timestamp,
+        timestampMs: new Date(i.timestamp).getTime(),
+        age: new Date(i.timestamp).toISOString(),
+        messageId: i.messageId?.substring(0, 8),
+        hasDraft: i.hasDraft,
+        reviewReason: i.reviewReason,
+      })));
+      console.log('📋 Full items array:', itemsData);
+      console.groupEnd();
       
       // Check specifically for the Thursday email
       const thursdayEmail = itemsData.find(i => 
@@ -481,19 +484,45 @@ export function AivaDashboard({ workspaceId, userId, userName }: AivaDashboardPr
           ) : (
             <div className="space-y-3">
               {/* Ensure items are sorted by timestamp (most recent first) - client-side safety check */}
-              {[...attentionItems]
-                .sort((a, b) => {
+              {useMemo(() => {
+                const sorted = [...attentionItems].sort((a, b) => {
                   const aTime = new Date(a.timestamp).getTime();
                   const bTime = new Date(b.timestamp).getTime();
                   return bTime - aTime; // Most recent first
-                })
-                .map((item) => (
+                });
+                
+                // Log sorting comparison
+                const needsSorting = sorted.some((item, idx) => {
+                  const original = attentionItems[idx];
+                  return !original || item.id !== original.id;
+                });
+                
+                if (needsSorting && sorted.length > 0) {
+                  console.group('🔄 [Dashboard] Client-side Sort Applied');
+                  console.log('⚠️ Items were NOT sorted correctly from server!');
+                  console.log('Original order:', attentionItems.map((i, idx) => ({
+                    idx,
+                    subject: i.subject?.substring(0, 40),
+                    timestamp: i.timestamp,
+                    timestampMs: new Date(i.timestamp).getTime(),
+                  })));
+                  console.log('✅ Sorted order:', sorted.map((i, idx) => ({
+                    idx,
+                    subject: i.subject?.substring(0, 40),
+                    timestamp: i.timestamp,
+                    timestampMs: new Date(i.timestamp).getTime(),
+                  })));
+                  console.groupEnd();
+                }
+                
+                return sorted.map((item) => (
                   <AttentionItemCard 
                     key={item.id} 
                     item={item} 
                     onDismiss={handleDismissItem}
                   />
-                ))}
+                ));
+              }, [attentionItems, handleDismissItem])}
             </div>
           )}
         </div>
