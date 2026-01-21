@@ -659,13 +659,29 @@ REMEMBER: Missing information handling:
     // Check if message is a complaint - complaints should always require human review
     const isComplaint = message.category === 'customer_complaint';
     
-    // Check for categories that should always require human review
-    // These are business-critical or sensitive categories that need human judgment
+    // Get excluded categories from workspace settings
+    // Bills/invoices should only require review if they're in excluded categories
+    // Otherwise, they can auto-send if confidence is high (especially for Shopify orders with data)
+    const { data: wsSettingsForExcluded } = await supabase
+      .from('workspace_settings')
+      .select('auto_send_excluded_categories')
+      .eq('workspace_id', workspaceId)
+      .single();
+    
+    const excludedCategories = Array.isArray(wsSettingsForExcluded?.auto_send_excluded_categories)
+      ? wsSettingsForExcluded.auto_send_excluded_categories.map((c: string) => c.toLowerCase())
+      : [];
+    
+    // Check if bills/invoices are excluded by user settings
+    const isBillOrInvoice = message.category === 'bill' || message.category === 'invoice';
+    const isBillInvoiceExcluded = isBillOrInvoice && excludedCategories.includes(message.category.toLowerCase());
+    
+    // Categories that should always require human review (regardless of excluded settings)
+    // Bills/invoices are NOT in this list - they can auto-send if not excluded and confidence is high
     const alwaysReviewCategories = [
       'customer_complaint',  // Complaints need human handling
       'sales_lead',          // Business opportunities need human follow-up
-      'bill',                // Financial matters need verification
-      'invoice',             // Financial matters need verification
+      // REMOVED: 'bill' and 'invoice' - they can auto-send if not excluded and confidence is high
     ];
     const isAlwaysReviewCategory = message.category && alwaysReviewCategories.includes(message.category);
     
@@ -699,7 +715,13 @@ REMEMBER: Missing information handling:
     const hasCalendarMismatch = calendarContext && (!calendarContext.hasMatchingEvent || calendarContext.suggestedAction === 'ask_human');
     const shouldReviewForScheduling = reviewForScheduling && (needsHumanReview || hasCalendarMismatch);
     const shouldReviewForCommitments = reviewForCommitments && isCriticalMissingInfo;
-    const shouldReviewForSensitive = reviewForSensitive && (isComplaint || isAlwaysReviewCategory);
+    // Bills/invoices only require review if they're in excluded categories OR if review for sensitive is enabled
+    // Otherwise, they can auto-send if confidence is high (especially for Shopify orders with order data)
+    const shouldReviewForSensitive = reviewForSensitive && (
+      isComplaint || 
+      isAlwaysReviewCategory || 
+      (isBillOrInvoice && isBillInvoiceExcluded) // Only review bills/invoices if user excluded them
+    );
 
     // Check if message was marked for review due to thread reply limit
     const isThreadLimitReached = message.requires_human_review && 
@@ -715,9 +737,11 @@ REMEMBER: Missing information handling:
     // 5. Calendar mismatch detected (if review for scheduling enabled)
     // 6. Critical missing information (pricing, commitments, etc.) (if review for commitments enabled)
     // 7. Message is a complaint or sensitive category (if review for sensitive enabled)
-    // 8. Message is in a category that always requires review (sales_lead, bill, invoice)
-    // 9. AI marked as not auto-sendable (should always require review)
+    // 8. Message is in a category that always requires review (sales_lead, customer_complaint)
+    // 9. Bills/invoices that are in excluded categories (user chose to exclude them)
+    // 10. AI marked as not auto-sendable (should always require review)
     // Note: High priority messages can still auto-send if confidence is above threshold and auto-sendable
+    // Note: Bills/invoices can auto-send if NOT excluded and confidence is high (especially Shopify orders with data)
     // Note: Routine missing info (policy, shipping) with good confidence can still auto-send
     const isManualDraft = options.isManualDraft ?? false;
     const shouldHoldForReview = isManualDraft || // CRITICAL: Manual drafts should NEVER auto-send
@@ -729,6 +753,8 @@ REMEMBER: Missing information handling:
       shouldReviewForCommitments ||
       shouldReviewForSensitive ||
       isAlwaysReviewCategory ||
+      // Bills/invoices only require review if user excluded them in settings
+      (isBillOrInvoice && isBillInvoiceExcluded) ||
       // REMOVED: isHighPriority - high priority messages can auto-send if confidence is good
       shouldRequireReviewIfNotAutoSendable ||
       (hasMissingInfo && !result.isAutoSendable && result.confidenceScore < 0.70);
@@ -739,8 +765,9 @@ REMEMBER: Missing information handling:
        confidenceBelowThreshold ? `low_confidence_below_threshold_${Math.round(unifiedThreshold * 100)}%` :
        shouldReviewForScheduling ? 'scheduling_review_required' :
        shouldReviewForCommitments ? `missing_information_${missingInfoType}` :
-       shouldReviewForSensitive ? (isComplaint ? 'customer_complaint' : `${message.category}_requires_review`) :
+       shouldReviewForSensitive ? (isComplaint ? 'customer_complaint' : (isBillOrInvoice && isBillInvoiceExcluded ? `${message.category}_excluded_by_user` : `${message.category}_requires_review`)) :
        isAlwaysReviewCategory ? `${message.category}_requires_review` :
+       (isBillOrInvoice && isBillInvoiceExcluded) ? `${message.category}_excluded_by_user` :
        // REMOVED: isHighPriority - high priority messages can auto-send if confidence is good
        shouldRequireReviewIfNotAutoSendable ? 'not_auto_sendable' :
        hasMissingInfo && !result.isAutoSendable ? `missing_information_${missingInfoType}` :
