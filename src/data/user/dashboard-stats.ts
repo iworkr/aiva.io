@@ -7,6 +7,7 @@
 
 import { isWorkspaceMember } from '@/data/user/workspaces';
 import { createSupabaseUserServerActionClient } from '@/supabase-clients/user/createSupabaseUserServerActionClient';
+import { devLog } from '@/utils/dev-logger';
 
 export interface DashboardStats {
   messagesReceivedToday: number;
@@ -81,7 +82,7 @@ export async function getDashboardStats(
     .limit(1);
   
   if (!activeConnections || activeConnections.length === 0) {
-    console.log('[Dashboard] No active channel connections - returning zero stats');
+    devLog.log('[Dashboard] No active channel connections - returning zero stats');
     return {
       messagesReceivedToday: 0,
       messagesHandledToday: 0,
@@ -210,7 +211,7 @@ export async function getNeedsAttentionItems(
     .limit(1);
   
   if (!activeConnections || activeConnections.length === 0) {
-    console.log('[Dashboard] No active channel connections - returning empty attention items');
+    devLog.log('[Dashboard] No active channel connections - returning empty attention items');
     return [];
   }
   
@@ -225,7 +226,7 @@ export async function getNeedsAttentionItems(
     .single();
 
   const excludedCategories = (workspaceSettings?.auto_send_excluded_categories as string[]) || [];
-  console.log(`[Dashboard] Excluded categories from settings:`, excludedCategories);
+  devLog.log(`[Dashboard] Excluded categories from settings:`, excludedCategories);
 
   // Get workspace settings to check Zero Inbox (need this early for filtering)
   const { data: workspaceSettingsForZeroInbox } = await supabase
@@ -288,9 +289,9 @@ export async function getNeedsAttentionItems(
     .limit(limit * 2); // Get more to filter after
 
   if (reviewItemsError) {
-    console.error('[Dashboard] Error fetching review items:', reviewItemsError);
+    devLog.error('[Dashboard] Error fetching review items:', reviewItemsError);
   } else {
-    console.log(`[Dashboard] Found ${reviewItems?.length || 0} messages requiring review`);
+    devLog.log(`[Dashboard] Found ${reviewItems?.length || 0} messages requiring review`);
   }
 
   // Also get actionable messages (request, question, scheduling_intent) that are unhandled
@@ -352,9 +353,9 @@ export async function getNeedsAttentionItems(
     .limit(limit * 3); // Get more to filter after (we'll filter out those with auto-sendable drafts)
 
   if (actionableItemsError) {
-    console.error('[Dashboard] Error fetching actionable items:', actionableItemsError);
+    devLog.error('[Dashboard] Error fetching actionable items:', actionableItemsError);
   } else {
-    console.log(`[Dashboard] Found ${actionableItems?.length || 0} actionable messages`);
+    devLog.log(`[Dashboard] Found ${actionableItems?.length || 0} actionable messages`);
   }
 
   // Helper function to check if a message should be excluded
@@ -529,7 +530,7 @@ export async function getNeedsAttentionItems(
   const addMessageToItems = (msg: any, type: 'review' | 'unhandled' = 'review') => {
     // Skip messages in excluded categories - they should be auto-handled and not shown
     if (shouldExcludeMessage(msg)) {
-      console.log(`[Dashboard] Skipping message ${msg.id} - category "${msg.category}" is in excluded categories (should be auto-handled)`);
+      devLog.log(`[Dashboard] Skipping message ${msg.id} - category "${msg.category}" is in excluded categories (should be auto-handled)`);
       return;
     }
     
@@ -601,7 +602,7 @@ export async function getNeedsAttentionItems(
         }
       });
     }
-    console.log(`[Dashboard] Found ${queuedMessageIds.size} actionable messages in auto-send queue (${stuckQueuedMessageIds.size} stuck past scheduled time)`);
+    devLog.log(`[Dashboard] Found ${queuedMessageIds.size} actionable messages in auto-send queue (${stuckQueuedMessageIds.size} stuck past scheduled time)`);
   }
 
   // Process actionable messages (request, question, scheduling_intent)
@@ -636,26 +637,26 @@ export async function getNeedsAttentionItems(
     // Only show queued messages if they're stuck (past scheduled time but not sent)
     // Messages queued for future sending should NOT appear - they'll be handled automatically
     if (isQueuedForAutoSend && !isStuckQueued) {
-      console.log(`[Dashboard] Message ${msg.id} is queued for auto-send (future scheduled) - skipping (will be handled automatically)`);
+      devLog.log(`[Dashboard] Message ${msg.id} is queued for auto-send (future scheduled) - skipping (will be handled automatically)`);
       continue; // Skip - it will be sent automatically
     }
     
     if (isStuckQueued) {
-      console.log(`[Dashboard] Message ${msg.id} is queued for auto-send but past scheduled time (stuck) - showing in attention items`);
+      devLog.log(`[Dashboard] Message ${msg.id} is queued for auto-send but past scheduled time (stuck) - showing in attention items`);
       // Continue to show it - it's stuck and needs attention
     }
     
     // Now check if message should be excluded (categories, priority, age, etc.)
     // But only if it doesn't have a held draft (which we already handled above)
     if (shouldExcludeMessage(msg)) {
-      console.log(`[Dashboard] Skipping actionable message ${msg.id} - excluded by filter (category: ${msg.category}, priority: ${msg.priority}, age: ${msg.timestamp ? Math.round((Date.now() - new Date(msg.timestamp).getTime()) / (24 * 60 * 60 * 1000)) + ' days' : 'unknown'})`);
+      devLog.log(`[Dashboard] Skipping actionable message ${msg.id} - excluded by filter (category: ${msg.category}, priority: ${msg.priority}, age: ${msg.timestamp ? Math.round((Date.now() - new Date(msg.timestamp).getTime()) / (24 * 60 * 60 * 1000)) + ' days' : 'unknown'})`);
       continue;
     }
     
     // CRITICAL: With Zero Inbox enabled, don't show handled messages at all
     // They should have been filtered out in the query, but double-check here
     if (isZeroInboxEnabled && msg.handled_by_aiva) {
-      console.log(`[Dashboard] Skipping actionable message ${msg.id} - already handled (Zero Inbox enabled)`);
+      devLog.log(`[Dashboard] Skipping actionable message ${msg.id} - already handled (Zero Inbox enabled)`);
       continue;
     }
     
@@ -670,14 +671,14 @@ export async function getNeedsAttentionItems(
       addMessageToItems(msg, 'unhandled');
     } else if (autoSentDraft) {
       // Was already auto-replied - don't show (already handled, regardless of age)
-      console.log(`[Dashboard] Skipping actionable message ${msg.id} - was already auto-replied (handled)`);
+      devLog.log(`[Dashboard] Skipping actionable message ${msg.id} - was already auto-replied (handled)`);
     } else if (isStuckQueued) {
       // Stuck in queue (past scheduled time but not sent) - show it so user knows it needs attention
       addMessageToItems(msg, 'unhandled');
-      console.log(`[Dashboard] Showing actionable message ${msg.id} - stuck in auto-send queue (past scheduled time)`);
+      devLog.log(`[Dashboard] Showing actionable message ${msg.id} - stuck in auto-send queue (past scheduled time)`);
     } else {
       // Has auto-sendable draft but not queued, or queued for future sending - will be handled by auto-send cron
-      console.log(`[Dashboard] Skipping actionable message ${msg.id} - has auto-sendable draft (will be handled by auto-send cron)`);
+      devLog.log(`[Dashboard] Skipping actionable message ${msg.id} - has auto-sendable draft (will be handled by auto-send cron)`);
     }
   }
 
@@ -725,7 +726,7 @@ export async function getNeedsAttentionItems(
     .limit(limit * 2);
 
   if (heldDraftsError) {
-    console.error('[Dashboard] Error fetching held drafts:', heldDraftsError);
+    devLog.error('[Dashboard] Error fetching held drafts:', heldDraftsError);
   }
 
   const addedMessageIds = new Set(items.map(i => i.messageId));
@@ -742,7 +743,7 @@ export async function getNeedsAttentionItems(
     if (msg.category && excludedCategories.length > 0) {
       const categoryLower = msg.category.toLowerCase();
       if (excludedCategories.some(excluded => excluded.toLowerCase() === categoryLower)) {
-        console.log(`[Dashboard] Skipping held draft message ${msg.id} - category "${msg.category}" is in excluded categories`);
+        devLog.log(`[Dashboard] Skipping held draft message ${msg.id} - category "${msg.category}" is in excluded categories`);
         continue;
       }
     }
@@ -790,14 +791,14 @@ export async function getNeedsAttentionItems(
   // Sort by timestamp: most recent first (pure recency sort)
   // This ensures users see the newest items that need attention at the top
   // CRITICAL: Sort must happen AFTER all items are added from all sources
-  console.log(`[Dashboard] Sorting ${items.length} items by timestamp (most recent first)...`);
+  devLog.log(`[Dashboard] Sorting ${items.length} items by timestamp (most recent first)...`);
   items.sort((a, b) => {
     const aTime = new Date(a.timestamp).getTime();
     const bTime = new Date(b.timestamp).getTime();
     
     // Handle invalid dates
     if (isNaN(aTime) || isNaN(bTime)) {
-      console.warn('[Dashboard] Invalid timestamp detected:', { 
+      devLog.warn('[Dashboard] Invalid timestamp detected:', { 
         a: { timestamp: a.timestamp, time: aTime }, 
         b: { timestamp: b.timestamp, time: bTime } 
       });
@@ -811,7 +812,7 @@ export async function getNeedsAttentionItems(
   });
 
   // Log the sorted order for debugging
-  console.log('[Dashboard] ✅ Items after sorting (first 10):', items.slice(0, 10).map((i, idx) => ({
+  devLog.log('[Dashboard] ✅ Items after sorting (first 10):', items.slice(0, 10).map((i, idx) => ({
     index: idx,
     subject: i.subject?.substring(0, 40),
     timestamp: i.timestamp,
@@ -821,8 +822,8 @@ export async function getNeedsAttentionItems(
 
   const finalItems = items.slice(0, limit);
   
-  // Extensive logging for debugging
-  console.log(`[Dashboard] getNeedsAttentionItems result:`, {
+  // Extensive logging for debugging (dev only)
+  devLog.log(`[Dashboard] getNeedsAttentionItems result:`, {
     workspaceId,
     userId,
     excludedCategories,
@@ -840,38 +841,10 @@ export async function getNeedsAttentionItems(
       timestamp: i.timestamp,
     })),
   });
-  
-  // Check specifically for the Thursday email
-  const thursdayEmail = finalItems.find(i => 
-    i.messageId === '367735ec-3639-4d13-b867-48e701d7da58' ||
-    i.subject?.includes('Thursday')
-  );
-  if (thursdayEmail) {
-    console.log(`[Dashboard] ✅ Thursday email found in final items:`, {
-      messageId: thursdayEmail.messageId,
-      subject: thursdayEmail.subject,
-      hasDraft: thursdayEmail.hasDraft,
-      draftId: thursdayEmail.draftId,
-    });
-  } else {
-    console.log(`[Dashboard] ❌ Thursday email NOT in final items`);
-    const allMessageIds = finalItems.map(i => i.messageId);
-    console.log(`[Dashboard] Final message IDs:`, allMessageIds);
-    
-    // Check if it was in items before limit
-    const thursdayInAll = items.find(i => 
-      i.messageId === '367735ec-3639-4d13-b867-48e701d7da58' ||
-      i.subject?.includes('Thursday')
-    );
-    if (thursdayInAll) {
-      console.log(`[Dashboard] ⚠️ Thursday email was in items but got filtered out by limit`);
-      console.log(`[Dashboard] Thursday email index:`, items.findIndex(i => i.messageId === '367735ec-3639-4d13-b867-48e701d7da58'));
-    }
-  }
 
-  // Log the final count for debugging
-  console.log(`[Dashboard] Final attention items count: ${finalItems.length} (requested limit: ${limit})`);
-  console.log(`[Dashboard] Breakdown: ${finalItems.filter(i => i.type === 'review').length} review items, ${finalItems.filter(i => i.type === 'unhandled').length} unhandled items`);
+  // Log the final count for debugging (dev only)
+  devLog.log(`[Dashboard] Final attention items count: ${finalItems.length} (requested limit: ${limit})`);
+  devLog.log(`[Dashboard] Breakdown: ${finalItems.filter(i => i.type === 'review').length} review items, ${finalItems.filter(i => i.type === 'unhandled').length} unhandled items`);
   
   return finalItems;
 }

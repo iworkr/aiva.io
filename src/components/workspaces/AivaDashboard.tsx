@@ -6,6 +6,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import { devLog } from '@/utils/dev-logger';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -309,10 +310,10 @@ export function AivaDashboard({ workspaceId, userId, userName }: AivaDashboardPr
       setAttentionItems(itemsData);
       setBriefing(briefingData);
       
-      // Debug logging - Make it very visible
-      console.group('🔍 [Dashboard] Attention Items Debug');
-      console.log('📊 Total items:', itemsData.length);
-      console.table(itemsData.map((i, idx) => ({
+      // Debug logging - Make it very visible (dev only)
+      devLog.group('🔍 [Dashboard] Attention Items Debug');
+      devLog.log('📊 Total items:', itemsData.length);
+      devLog.table(itemsData.map((i, idx) => ({
         index: idx,
         subject: i.subject?.substring(0, 50),
         timestamp: i.timestamp,
@@ -322,20 +323,8 @@ export function AivaDashboard({ workspaceId, userId, userName }: AivaDashboardPr
         hasDraft: i.hasDraft,
         reviewReason: i.reviewReason,
       })));
-      console.log('📋 Full items array:', itemsData);
-      console.groupEnd();
-      
-      // Check specifically for the Thursday email
-      const thursdayEmail = itemsData.find(i => 
-        i.messageId === '367735ec-3639-4d13-b867-48e701d7da58' ||
-        i.subject?.includes('Thursday')
-      );
-      if (thursdayEmail) {
-        console.log('[Dashboard] ✅ Thursday email found in attention items:', thursdayEmail);
-      } else {
-        console.log('[Dashboard] ❌ Thursday email NOT found in attention items');
-        console.log('[Dashboard] All message IDs:', itemsData.map(i => i.messageId));
-      }
+      devLog.log('📋 Full items array:', itemsData);
+      devLog.groupEnd();
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
     } finally {
@@ -498,21 +487,21 @@ export function AivaDashboard({ workspaceId, userId, userName }: AivaDashboardPr
                 });
                 
                 if (needsSorting && sorted.length > 0) {
-                  console.group('🔄 [Dashboard] Client-side Sort Applied');
-                  console.log('⚠️ Items were NOT sorted correctly from server!');
-                  console.log('Original order:', attentionItems.map((i, idx) => ({
+                  devLog.group('🔄 [Dashboard] Client-side Sort Applied');
+                  devLog.log('⚠️ Items were NOT sorted correctly from server!');
+                  devLog.log('Original order:', attentionItems.map((i, idx) => ({
                     idx,
                     subject: i.subject?.substring(0, 40),
                     timestamp: i.timestamp,
                     timestampMs: new Date(i.timestamp).getTime(),
                   })));
-                  console.log('✅ Sorted order:', sorted.map((i, idx) => ({
+                  devLog.log('✅ Sorted order:', sorted.map((i, idx) => ({
                     idx,
                     subject: i.subject?.substring(0, 40),
                     timestamp: i.timestamp,
                     timestampMs: new Date(i.timestamp).getTime(),
                   })));
-                  console.groupEnd();
+                  devLog.groupEnd();
                 }
                 
                 return sorted.map((item) => (

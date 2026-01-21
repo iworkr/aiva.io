@@ -6,6 +6,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { devLog } from '@/utils/dev-logger';
 import {
   ChevronDown,
   ChevronUp,
@@ -100,27 +101,27 @@ export function BriefingSection({ items, workspaceId, userId }: BriefingSectionP
     });
     
     if (needsSorting && sorted.length > 0) {
-      console.group('🔄 [BriefingSection] Client-side Sort Applied');
-      console.log('⚠️ Items were NOT sorted correctly from server!');
-      console.log('Original order:', filtered.map((i, idx) => ({
+      devLog.group('🔄 [BriefingSection] Client-side Sort Applied');
+      devLog.log('⚠️ Items were NOT sorted correctly from server!');
+      devLog.log('Original order:', filtered.map((i, idx) => ({
         idx,
         title: i.title?.substring(0, 40),
         timestamp: i.timestamp,
         timestampMs: i.timestamp ? new Date(i.timestamp).getTime() : null,
       })));
-      console.log('✅ Sorted order:', sorted.map((i, idx) => ({
+      devLog.log('✅ Sorted order:', sorted.map((i, idx) => ({
         idx,
         title: i.title?.substring(0, 40),
         timestamp: i.timestamp,
         timestampMs: i.timestamp ? new Date(i.timestamp).getTime() : null,
       })));
-      console.groupEnd();
+      devLog.groupEnd();
     }
     
-    // Always log the final order for debugging
-    console.group('🔍 [BriefingSection] Attention Items');
-    console.log('📊 Total items:', sorted.length);
-    console.table(sorted.map((i, idx) => ({
+    // Always log the final order for debugging (dev only)
+    devLog.group('🔍 [BriefingSection] Attention Items');
+    devLog.log('📊 Total items:', sorted.length);
+    devLog.table(sorted.map((i, idx) => ({
       index: idx,
       title: i.title?.substring(0, 50),
       timestamp: i.timestamp,
@@ -129,7 +130,7 @@ export function BriefingSection({ items, workspaceId, userId }: BriefingSectionP
       type: i.type,
       priority: i.priority,
     })));
-    console.groupEnd();
+    devLog.groupEnd();
     
     return sorted;
   }, [items, dismissedItems]);

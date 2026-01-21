@@ -19,6 +19,10 @@ import { AivaChatInput } from './AivaChatInput';
 import { TodaysBriefingButton } from './TodaysBriefingButton';
 import { BriefingStats } from './BriefingStats';
 import { getNeedsAttentionItems, type AttentionItem } from '@/data/user/dashboard-stats';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Plus, Mail, MessageSquare } from 'lucide-react';
+import Link from 'next/link';
 
 function getGreeting(timezone?: string) {
   // Use Intl to get the hour in the user's timezone, with UTC fallback
@@ -404,32 +408,6 @@ export async function MorningBrief() {
     }
   }
 
-  // Server-side debug logging
-  console.log('[MorningBrief] Server-side render:', {
-    workspaceId,
-    userId,
-    isZeroInboxEnabled,
-    excludedCategories,
-    newMessages,
-    activeConversations,
-    attentionItemsCount: attentionItems?.length || 0,
-    briefingItemsCount: briefingItems.length,
-    deduplicatedItemsCount: deduplicatedItems.length,
-    unreadMessagesCount: unreadMessages?.length || 0,
-    activeConversationsResultCount: isZeroInboxEnabled 
-      ? (activeConversationsResult?.data?.length || 0)
-      : (activeConversationsResult && 'count' in activeConversationsResult ? (activeConversationsResult as { count: number | null }).count : 0),
-    hasThursdayEmail: deduplicatedItems.some(item => 
-      item.title?.includes('Thursday') || item.id === '367735ec-3639-4d13-b867-48e701d7da58'
-    ),
-    items: deduplicatedItems.map(item => ({
-      id: item.id,
-      messageId: item.messageId,
-      title: item.title,
-      type: item.type,
-    })),
-  });
-
   return (
     <div className="space-y-5">
       {/* Greeting and Summary */}
@@ -445,6 +423,41 @@ export async function MorningBrief() {
           itemCount={deduplicatedItems.length}
         />
       </div>
+
+      {/* No Channels CTA - Show when no active channels are connected */}
+      {!hasActiveChannels && (
+        <Card className="border-2 border-dashed border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+          <CardContent className="flex flex-col items-center justify-center py-12 px-6">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+              <Plus className="h-8 w-8 text-primary" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Connect Your First Channel</h3>
+            <p className="text-center text-muted-foreground mb-6 max-w-md">
+              Get started by connecting your email or messaging accounts. We'll sync your messages and help you manage them with AI.
+            </p>
+            <Button size="lg" asChild className="gap-2">
+              <Link href="/channels">
+                <Plus className="h-5 w-5" />
+                Connect Channel
+              </Link>
+            </Button>
+            <div className="mt-6 flex items-center gap-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <Mail className="h-4 w-4" />
+                <span>Gmail</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Mail className="h-4 w-4" />
+                <span>Outlook</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <MessageSquare className="h-4 w-4" />
+                <span>Slack</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Today's Briefing Button with AI typing animation */}
       {deduplicatedItems.length > 0 && (
