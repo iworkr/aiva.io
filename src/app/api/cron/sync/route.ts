@@ -446,7 +446,7 @@ export async function GET(request: NextRequest) {
           // - Any actionability type that might need a response (excluding 'none')
           // - No existing draft OR draft exists but is held for review (regenerate if needed)
           // - Include messages requiring human review (they still need drafts, just won't be auto-sent)
-          // - Recent (last 24 hours)
+          // - Recent (last 48 hours - extended to catch missed messages)
           // - CRITICAL: Only messages received by THIS connection (not other connections in the workspace)
           // - Include sender_email, category, provider_thread_id, labels for filtering
           const { data: actionableMessages } = await supabase
@@ -461,6 +461,7 @@ export async function GET(request: NextRequest) {
               provider_thread_id, 
               labels, 
               requires_human_review,
+              timestamp,
               message_drafts(id, hold_for_review, auto_sent)
             `)
             .eq('workspace_id', connection.workspace_id)
@@ -473,6 +474,27 @@ export async function GET(request: NextRequest) {
             .gte('timestamp', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
             .order('timestamp', { ascending: false })
             .limit(20); // Increased limit to catch more messages
+          
+          // Also check for messages that might not be classified yet but should be actionable
+          // This catches messages that were synced but classification failed or hasn't run yet
+          const { data: unclassifiedActionableMessages } = await supabase
+            .from('messages')
+            .select('id, subject, actionability, sender_email, timestamp')
+            .eq('workspace_id', connection.workspace_id)
+            .eq('channel_connection_id', connection.id)
+            .is('actionability', null)
+            .gte('timestamp', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
+            .order('timestamp', { ascending: false })
+            .limit(10);
+          
+          if (unclassifiedActionableMessages && unclassifiedActionableMessages.length > 0) {
+            console.log(`      ⚠️ Found ${unclassifiedActionableMessages.length} unclassified messages - they need classification before draft generation`);
+            console.log(`      📋 Unclassified messages:`, unclassifiedActionableMessages.map((m: any) => ({
+              subject: m.subject?.substring(0, 40),
+              sender: m.sender_email,
+              timestamp: m.timestamp,
+            })));
+          }
 
           if (actionableMessages && actionableMessages.length > 0) {
             // Filter out messages that already have non-held drafts
