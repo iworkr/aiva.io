@@ -444,30 +444,68 @@ export async function GET(request: NextRequest) {
         try {
           // Get messages that need drafts:
           // - Any actionability type that might need a response (excluding 'none')
-          // - No existing draft
+          // - No existing draft OR draft exists but is held for review (regenerate if needed)
           // - Include messages requiring human review (they still need drafts, just won't be auto-sent)
           // - Recent (last 24 hours)
           // - CRITICAL: Only messages received by THIS connection (not other connections in the workspace)
           // - Include sender_email, category, provider_thread_id, labels for filtering
           const { data: actionableMessages } = await supabase
             .from('messages')
-            .select('id, subject, actionability, has_draft_reply, sender_email, category, provider_thread_id, labels, requires_human_review')
+            .select(`
+              id, 
+              subject, 
+              actionability, 
+              has_draft_reply, 
+              sender_email, 
+              category, 
+              provider_thread_id, 
+              labels, 
+              requires_human_review,
+              message_drafts(id, hold_for_review, auto_sent)
+            `)
             .eq('workspace_id', connection.workspace_id)
             .eq('channel_connection_id', connection.id) // CRITICAL: Only process messages for THIS connection
             .in('actionability', ['question', 'request', 'fyi', 'scheduling_intent', 'task']) // All types except 'none'
-            .eq('has_draft_reply', false)
+            // Include messages without drafts OR messages with held drafts (may need regeneration)
+            .or('has_draft_reply.eq.false,has_draft_reply.is.null')
             // Include messages requiring human review - they still need drafts for user review
-            .gte('timestamp', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+            // Extended to 48 hours to catch messages that might have been missed
+            .gte('timestamp', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
             .order('timestamp', { ascending: false })
-            .limit(15); // Limit to avoid timeouts, increased slightly to account for filtering
+            .limit(20); // Increased limit to catch more messages
 
           if (actionableMessages && actionableMessages.length > 0) {
-            console.log(`      📝 Found ${actionableMessages.length} actionable messages without drafts`);
+            // Filter out messages that already have non-held drafts
+            const messagesNeedingDrafts = actionableMessages.filter((msg: any) => {
+              const drafts = (msg.message_drafts || []) as any[];
+              // If has draft but it's held for review or was auto-sent, we might want to regenerate
+              // For now, only process messages without any drafts
+              const needsDraft = drafts.length === 0;
+              
+              // Log messages that are being skipped due to existing drafts
+              if (!needsDraft) {
+                console.log(`      ⏭️ Skipping ${msg.subject?.substring(0, 30) || 'No subject'} - already has ${drafts.length} draft(s)`);
+              }
+              
+              return needsDraft;
+            });
+            
+            console.log(`      📝 Found ${actionableMessages.length} actionable messages (${messagesNeedingDrafts.length} without drafts)`);
+            
+            // Log all actionable messages for debugging
+            console.log(`      📋 Actionable messages breakdown:`, actionableMessages.map((m: any) => ({
+              subject: m.subject?.substring(0, 40),
+              actionability: m.actionability,
+              hasDraftReply: m.has_draft_reply,
+              draftCount: (m.message_drafts || []).length,
+              category: m.category,
+              requiresReview: m.requires_human_review,
+            })));
             
             let skippedByFilter = 0;
             const connectionEmailLower = (filterSettings.connectionEmail || '').toLowerCase();
             
-            for (const msg of actionableMessages) {
+            for (const msg of messagesNeedingDrafts) {
               try {
                 const senderEmailLower = (msg.sender_email || '').toLowerCase();
                 const labels = (msg.labels as string[]) || [];
