@@ -108,6 +108,17 @@ export async function MorningBrief() {
   const workspaceId = workspace.id;
   const userId = user.id;
 
+  // CRITICAL: Check if there are any active channel connections
+  // If no channels are connected, don't show messages/stats
+  const { data: activeConnections } = await supabase
+    .from('channel_connections')
+    .select('id')
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'active')
+    .limit(1);
+  
+  const hasActiveChannels = activeConnections && activeConnections.length > 0;
+
   // Get workspace settings for timezone, Zero Inbox, and excluded categories
   const { data: workspaceSettings } = await supabase
     .from('workspace_settings')
@@ -170,6 +181,7 @@ export async function MorningBrief() {
   }
 
   // Fetch crucial data - Use getNeedsAttentionItems for messages requiring human review
+  // If no active channels, skip message queries and return empty results
   const [
     attentionItems,
     { data: unreadMessages },
@@ -178,13 +190,16 @@ export async function MorningBrief() {
     { count: todayEventsCount },
   ] = await Promise.all([
     // Messages that need human attention (requires_human_review = true or actionable)
+    // If no channels, this will return empty array
     getNeedsAttentionItems(workspaceId, userId, 20),
     
     // Unread messages (need to filter by excluded categories in code)
-    unreadQuery,
+    // If no channels, return empty result
+    hasActiveChannels ? unreadQuery : Promise.resolve({ data: [] }),
     
     // Active conversations (need to filter by excluded categories in code)
-    activeConversationsQuery,
+    // If no channels, return empty result
+    hasActiveChannels ? activeConversationsQuery : Promise.resolve({ data: [], count: 0 }),
     
     // Upcoming events (today and tomorrow)
     supabase
@@ -208,10 +223,15 @@ export async function MorningBrief() {
   // Calculate new vs active conversations
   // With Zero Inbox enabled, these should match the actionable items count
   // Use attentionItems which already has all the filtering logic applied
+  // CRITICAL: If no active channels, always return 0
   let newMessages = 0;
   let activeConversations = 0;
   
-  if (isZeroInboxEnabled) {
+  if (!hasActiveChannels) {
+    // No channels = no messages = zero counts
+    newMessages = 0;
+    activeConversations = 0;
+  } else if (isZeroInboxEnabled) {
     // With Zero Inbox: count only actionable items that need attention
     // This matches what's shown in "What needs your attention"
     newMessages = attentionItems.length;

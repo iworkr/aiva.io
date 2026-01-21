@@ -70,6 +70,30 @@ export async function getDashboardStats(
   if (!isMember) throw new Error('Not a workspace member');
 
   const supabase = await createSupabaseUserServerActionClient();
+  
+  // CRITICAL: If no active channel connections, return zero stats
+  // No channels = no messages = no stats to show
+  const { data: activeConnections } = await supabase
+    .from('channel_connections')
+    .select('id')
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'active')
+    .limit(1);
+  
+  if (!activeConnections || activeConnections.length === 0) {
+    console.log('[Dashboard] No active channel connections - returning zero stats');
+    return {
+      messagesReceivedToday: 0,
+      messagesHandledToday: 0,
+      autoRepliesSentToday: 0,
+      reviewQueueCount: 0,
+      highPriorityUnhandled: 0,
+      timeSavedMinutes: 0,
+      inboxReductionPercent: 0,
+      activeConversations: 0,
+    };
+  }
+  
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayISO = today.toISOString();
@@ -175,6 +199,21 @@ export async function getNeedsAttentionItems(
   if (!isMember) throw new Error('Not a workspace member');
 
   const supabase = await createSupabaseUserServerActionClient();
+  
+  // CRITICAL: If no active channel connections, return empty array
+  // No channels = no messages = nothing needs attention
+  const { data: activeConnections } = await supabase
+    .from('channel_connections')
+    .select('id')
+    .eq('workspace_id', workspaceId)
+    .eq('status', 'active')
+    .limit(1);
+  
+  if (!activeConnections || activeConnections.length === 0) {
+    console.log('[Dashboard] No active channel connections - returning empty attention items');
+    return [];
+  }
+  
   const items: AttentionItem[] = [];
 
   // Get excluded categories from workspace settings
