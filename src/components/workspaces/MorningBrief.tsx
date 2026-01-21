@@ -19,7 +19,6 @@ import { AivaChatInput } from './AivaChatInput';
 import { TodaysBriefingButton } from './TodaysBriefingButton';
 import { BriefingStats } from './BriefingStats';
 import { getNeedsAttentionItems, type AttentionItem } from '@/data/user/dashboard-stats';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Mail, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
