@@ -53,64 +53,95 @@ export async function GET(request: NextRequest) {
     let entitlement = null;
 
     if (workspaceId) {
+      console.log(`[Entitlements API] Fetching entitlement for workspace: ${workspaceId}`);
+      
       // First try to find entitlement by workspace_id
-      const { data } = await supabaseAdminClient
+      const { data: workspaceEntitlement, error: workspaceError } = await supabaseAdminClient
         .from('entitlements')
         .select('*')
         .eq('workspace_id', workspaceId)
-        .single();
+        .maybeSingle();
       
-      if (data) {
-        entitlement = data;
+      if (workspaceEntitlement) {
+        console.log(`[Entitlements API] Found entitlement by workspace_id: ${workspaceEntitlement.id}, plan: ${workspaceEntitlement.plan}`);
+        entitlement = workspaceEntitlement;
       } else {
+        console.log(`[Entitlements API] No entitlement found by workspace_id, checking shop...`);
+        
         // Try to find via linked Shopify store
-        const { data: store } = await supabaseAdminClient
+        const { data: store, error: storeError } = await supabaseAdminClient
           .from('shopify_stores')
           .select('shop_domain')
           .eq('workspace_id', workspaceId)
           .eq('is_active', true)
-          .single();
+          .maybeSingle();
+
+        if (storeError) {
+          console.error(`[Entitlements API] Error fetching store:`, storeError);
+        }
 
         if (store?.shop_domain) {
-          const { data: shopEntitlement } = await supabaseAdminClient
+          console.log(`[Entitlements API] Found shop: ${store.shop_domain}, checking entitlement...`);
+          
+          const { data: shopEntitlement, error: shopEntitlementError } = await supabaseAdminClient
             .from('entitlements')
             .select('*')
             .eq('shop_domain', store.shop_domain)
-            .single();
+            .maybeSingle();
+          
+          if (shopEntitlementError) {
+            console.error(`[Entitlements API] Error fetching shop entitlement:`, shopEntitlementError);
+          }
           
           if (shopEntitlement) {
+            console.log(`[Entitlements API] Found entitlement by shop_domain: ${shopEntitlement.id}, plan: ${shopEntitlement.plan}, workspace_id: ${shopEntitlement.workspace_id || 'NULL'}`);
+            
             // Auto-fix: If entitlement exists but isn't linked to workspace, link it now
             if (!shopEntitlement.workspace_id) {
+              console.log(`[Entitlements API] Entitlement not linked to workspace, auto-linking...`);
               try {
                 const { ensureEntitlementsLinkedToWorkspace } = await import('@/lib/entitlements');
                 await ensureEntitlementsLinkedToWorkspace(store.shop_domain, workspaceId);
+                console.log(`[Entitlements API] Auto-link completed, re-fetching...`);
+                
                 // Re-fetch by workspace_id to get the properly linked entitlement
-                const { data: updatedEntitlement } = await supabaseAdminClient
+                const { data: updatedEntitlement, error: updateError } = await supabaseAdminClient
                   .from('entitlements')
                   .select('*')
                   .eq('workspace_id', workspaceId)
-                  .single();
+                  .maybeSingle();
+                
+                if (updateError) {
+                  console.error(`[Entitlements API] Error re-fetching after link:`, updateError);
+                }
                 
                 if (updatedEntitlement) {
                   entitlement = updatedEntitlement;
-                  console.log(`[Entitlements API] Auto-linked entitlement to workspace ${workspaceId} for shop ${store.shop_domain}`);
+                  console.log(`[Entitlements API] ✅ Auto-linked entitlement to workspace ${workspaceId} for shop ${store.shop_domain}, plan: ${updatedEntitlement.plan}`);
                 } else {
                   // Fallback: fetch by shop_domain if workspace_id query fails
+                  console.log(`[Entitlements API] Re-fetch by workspace_id failed, using fallback...`);
                   const { data: fallbackEntitlement } = await supabaseAdminClient
                     .from('entitlements')
                     .select('*')
                     .eq('shop_domain', store.shop_domain)
-                    .single();
+                    .maybeSingle();
                   entitlement = fallbackEntitlement || shopEntitlement;
+                  console.log(`[Entitlements API] Using fallback entitlement, plan: ${entitlement?.plan}`);
                 }
               } catch (linkError) {
-                console.warn('[Entitlements API] Failed to auto-link entitlement:', linkError);
+                console.error('[Entitlements API] ❌ Failed to auto-link entitlement:', linkError);
                 entitlement = shopEntitlement;
               }
             } else {
+              console.log(`[Entitlements API] Entitlement already linked to workspace`);
               entitlement = shopEntitlement;
             }
+          } else {
+            console.log(`[Entitlements API] No entitlement found for shop_domain: ${store.shop_domain}`);
           }
+        } else {
+          console.log(`[Entitlements API] No shop found for workspace: ${workspaceId}`);
         }
       }
     } else if (shopDomain) {
