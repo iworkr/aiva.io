@@ -172,6 +172,22 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Link entitlement to workspace if workspace is set
+    if (workspaceId) {
+      try {
+        const { linkEntitlementToWorkspace } = await import('@/lib/entitlements');
+        const linkedEntitlement = await linkEntitlementToWorkspace(shop, workspaceId);
+        if (linkedEntitlement) {
+          console.log(`[Shopify Link] Linked entitlement to workspace ${workspaceId}`);
+        } else {
+          console.log(`[Shopify Link] No entitlement found for shop ${shop} - will be created when subscription is activated`);
+        }
+      } catch (entitlementError) {
+        console.warn('[Shopify Link] Failed to link entitlement (non-blocking):', entitlementError);
+        // Don't fail the link if entitlement linking fails
+      }
+    }
+    
     // Trigger initial sync if workspace is set
     if (workspaceId) {
       try {
@@ -262,6 +278,22 @@ export async function GET(request: NextRequest) {
   if (updateError || !updatedShop) {
     console.error('Failed to link shop:', updateError);
     return NextResponse.redirect(new URL('/dashboard?error=link_failed', request.url));
+  }
+  
+  // Link entitlement to workspace if workspace is set
+  if (workspaceId) {
+    try {
+      const { linkEntitlementToWorkspace } = await import('@/lib/entitlements');
+      const linkedEntitlement = await linkEntitlementToWorkspace(shop, workspaceId);
+      if (linkedEntitlement) {
+        console.log(`[Shopify Link GET] Linked entitlement to workspace ${workspaceId}`);
+      } else {
+        console.log(`[Shopify Link GET] No entitlement found for shop ${shop} - will be created when subscription is activated`);
+      }
+    } catch (entitlementError) {
+      console.warn('[Shopify Link GET] Failed to link entitlement (non-blocking):', entitlementError);
+      // Don't fail the link if entitlement linking fails
+    }
   }
   
   // Trigger initial sync if workspace is set

@@ -75,6 +75,22 @@ export default async function ShopifyLinkCompletePage({ searchParams }: PageProp
     redirect('/en/dashboard?error=link_failed');
   }
   
+  // Link entitlement to workspace if workspace is set
+  if (workspaceId) {
+    try {
+      const { linkEntitlementToWorkspace } = await import('@/lib/entitlements');
+      const linkedEntitlement = await linkEntitlementToWorkspace(shopDomain, workspaceId);
+      if (linkedEntitlement) {
+        console.log(`[Shopify Link Complete] Linked entitlement to workspace ${workspaceId}`);
+      } else {
+        console.log(`[Shopify Link Complete] No entitlement found for shop ${shopDomain} - will be created when subscription is activated`);
+      }
+    } catch (entitlementError) {
+      console.warn('[Shopify Link Complete] Failed to link entitlement (non-blocking):', entitlementError);
+      // Don't fail the link if entitlement linking fails
+    }
+  }
+  
   // Trigger initial sync if workspace is set
   if (workspaceId) {
     try {

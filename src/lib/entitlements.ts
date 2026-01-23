@@ -375,8 +375,28 @@ export async function syncShopifySubscriptionToEntitlement(
     trialEndsAt = trialEnd.toISOString();
   }
 
-  return upsertEntitlement({
+  // Try to find workspace_id for this shop
+  let workspaceId: string | undefined;
+  try {
+    const { data: shop } = await supabaseAdminClient
+      .from('shopify_stores')
+      .select('workspace_id')
+      .eq('shop_domain', shopDomain)
+      .eq('is_active', true)
+      .single();
+    
+    if (shop?.workspace_id) {
+      workspaceId = shop.workspace_id;
+      console.log(`[Entitlements] Found workspace ${workspaceId} for shop ${shopDomain}`);
+    }
+  } catch (error) {
+    // Shop might not be linked yet - that's okay
+    console.log(`[Entitlements] No workspace found for shop ${shopDomain} (will be linked when shop is connected)`);
+  }
+
+  const entitlement = await upsertEntitlement({
     shop_domain: shopDomain,
+    workspace_id: workspaceId,
     plan,
     provider: 'shopify',
     status,
@@ -388,6 +408,8 @@ export async function syncShopifySubscriptionToEntitlement(
       is_test: subscription.test || false,
     },
   });
+
+  return entitlement;
 }
 
 // =====================================================
