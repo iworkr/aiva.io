@@ -47,6 +47,42 @@ export async function GET(request: NextRequest) {
           { status: 403 }
         );
       }
+
+      // Auto-fix: Check if user has shops that aren't linked to this workspace
+      // This handles the case where shop was created before workspace linking
+      try {
+        const { data: userShops } = await supabaseAdminClient
+          .from('shopify_stores')
+          .select('id, shop_domain, workspace_id, linked_user_id')
+          .eq('linked_user_id', user.id)
+          .eq('is_active', true);
+
+        if (userShops && userShops.length > 0) {
+          // Find shops that aren't linked to this workspace
+          const unlinkedShops = userShops.filter(shop => shop.workspace_id !== workspaceId);
+          
+          if (unlinkedShops.length > 0) {
+            console.log(`[Entitlements API] Found ${unlinkedShops.length} unlinked shops, auto-linking to workspace...`);
+            
+            // Link all unlinked shops to this workspace
+            for (const shop of unlinkedShops) {
+              await supabaseAdminClient
+                .from('shopify_stores')
+                .update({ workspace_id: workspaceId })
+                .eq('id', shop.id);
+              
+              console.log(`[Entitlements API] Auto-linked shop ${shop.shop_domain} to workspace ${workspaceId}`);
+              
+              // Also ensure entitlements are linked
+              const { ensureEntitlementsLinkedToWorkspace } = await import('@/lib/entitlements');
+              await ensureEntitlementsLinkedToWorkspace(shop.shop_domain, workspaceId);
+            }
+          }
+        }
+      } catch (autoFixError) {
+        console.warn('[Entitlements API] Failed to auto-link shops (non-blocking):', autoFixError);
+        // Don't fail the request if auto-fix fails
+      }
     }
 
     // Fetch entitlement
