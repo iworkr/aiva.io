@@ -144,6 +144,26 @@ export async function GET(request: NextRequest) {
         trialDays: targetSubscription.trialDays,
         test: targetSubscription.test,
       });
+
+      // Ensure entitlement is linked to workspace if shop is linked
+      if (entitlement && !entitlement.workspace_id) {
+        try {
+          const { data: shopData } = await supabaseAdminClient
+            .from('shopify_stores')
+            .select('workspace_id')
+            .eq('shop_domain', shop)
+            .eq('is_active', true)
+            .single();
+          
+          if (shopData?.workspace_id) {
+            const { ensureEntitlementsLinkedToWorkspace } = await import('@/lib/entitlements');
+            await ensureEntitlementsLinkedToWorkspace(shop, shopData.workspace_id);
+            console.log(`[Shopify Billing Verify] Auto-linked entitlement to workspace ${shopData.workspace_id}`);
+          }
+        } catch (linkError) {
+          console.warn('[Shopify Billing Verify] Failed to auto-link entitlement (non-blocking):', linkError);
+        }
+      }
     } catch (syncError) {
       console.error('[Shopify Billing Verify] Sync error:', syncError);
       return redirectToBilling(shop, host, false, 'Failed to save subscription');

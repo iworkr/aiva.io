@@ -221,6 +221,11 @@ export async function linkEntitlementToWorkspace(
     return null;
   }
 
+  // If already linked to this workspace, return as-is
+  if (entitlement.workspace_id === workspaceId) {
+    return entitlement;
+  }
+
   const { data, error } = await supabaseAdminClient
     .from('entitlements')
     .update({ workspace_id: workspaceId })
@@ -233,7 +238,40 @@ export async function linkEntitlementToWorkspace(
     throw new Error('Failed to link entitlement to workspace');
   }
 
+  console.log(`[Entitlements] Linked entitlement ${entitlement.id} to workspace ${workspaceId} for shop ${shopDomain}`);
   return data as Entitlement;
+}
+
+/**
+ * Ensure entitlements are linked to workspace when a shop is linked
+ * This should be called whenever a shop's workspace_id is set or updated
+ */
+export async function ensureEntitlementsLinkedToWorkspace(
+  shopDomain: string,
+  workspaceId: string | null
+): Promise<void> {
+  if (!workspaceId) {
+    // No workspace to link to
+    return;
+  }
+
+  try {
+    // Find entitlement by shop domain
+    const entitlement = await getEntitlementByShopDomain(shopDomain);
+    
+    if (entitlement) {
+      // Link it to the workspace if not already linked
+      if (entitlement.workspace_id !== workspaceId) {
+        await linkEntitlementToWorkspace(shopDomain, workspaceId);
+        console.log(`[Entitlements] Auto-linked entitlement to workspace ${workspaceId} for shop ${shopDomain}`);
+      }
+    } else {
+      console.log(`[Entitlements] No entitlement found for shop ${shopDomain} - will be created when subscription is activated`);
+    }
+  } catch (error) {
+    // Don't throw - this is a best-effort operation
+    console.warn(`[Entitlements] Failed to ensure entitlement linking for shop ${shopDomain}:`, error);
+  }
 }
 
 /**
@@ -408,6 +446,28 @@ export async function syncShopifySubscriptionToEntitlement(
       is_test: subscription.test || false,
     },
   });
+
+  // If workspace_id was found and linked, we're done
+  // If not, try to link it now (shop might have been linked after entitlement was created)
+  if (!entitlement.workspace_id && workspaceId) {
+    // This shouldn't happen, but just in case
+    try {
+      const { data: shop } = await supabaseAdminClient
+        .from('shopify_stores')
+        .select('workspace_id')
+        .eq('shop_domain', shopDomain)
+        .eq('is_active', true)
+        .single();
+      
+      if (shop?.workspace_id) {
+        await linkEntitlementToWorkspace(shopDomain, shop.workspace_id);
+        // Re-fetch to get updated entitlement
+        return await getEntitlementByShopDomain(shopDomain) || entitlement;
+      }
+    } catch (error) {
+      console.warn(`[Entitlements] Failed to link entitlement after sync:`, error);
+    }
+  }
 
   return entitlement;
 }

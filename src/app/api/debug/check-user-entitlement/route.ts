@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     // 2. Get user's workspaces
     const { data: workspaceMembers, error: membersError } = await supabaseAdminClient
       .from('workspace_members')
-      .select('workspace_id, role')
+      .select('workspace_id, workspace_member_role')
       .eq('workspace_member_id', user.id);
 
     const workspaceIds = workspaceMembers?.map(w => w.workspace_id) || [];
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
       },
       workspaces: workspaces.map(w => ({
         ...w,
-        member_role: workspaceMembers?.find(m => m.workspace_id === w.id)?.role,
+        member_role: workspaceMembers?.find(m => m.workspace_id === w.id)?.workspace_member_role,
       })),
       shopify_stores: shops || [],
       entitlements: {

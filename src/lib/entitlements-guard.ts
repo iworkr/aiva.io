@@ -122,6 +122,26 @@ export async function requireActiveEntitlement(
         // Check entitlement by shop domain
         const shopEntitlement = await getEntitlementByShopDomain(store.shop_domain);
         if (shopEntitlement && isEntitlementActive(shopEntitlement)) {
+          // Auto-fix: If entitlement exists but isn't linked to workspace, link it now
+          if (!shopEntitlement.workspace_id) {
+            try {
+              const { ensureEntitlementsLinkedToWorkspace } = await import('@/lib/entitlements');
+              await ensureEntitlementsLinkedToWorkspace(store.shop_domain, workspaceId);
+              // Re-fetch to get updated entitlement
+              const updatedEntitlement = await getEntitlementByShopDomain(store.shop_domain);
+              if (updatedEntitlement) {
+                return {
+                  isValid: true,
+                  entitlement: updatedEntitlement,
+                  planFeatures: getPlanFeaturesFromEntitlement(updatedEntitlement),
+                };
+              }
+            } catch (linkError) {
+              console.warn('[Entitlements Guard] Failed to auto-link entitlement:', linkError);
+              // Continue with original entitlement
+            }
+          }
+          
           return {
             isValid: true,
             entitlement: shopEntitlement,

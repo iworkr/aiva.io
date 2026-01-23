@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
-import { linkEntitlementToWorkspace } from '@/lib/entitlements';
+import { ensureEntitlementsLinkedToWorkspace } from '@/lib/entitlements';
 
 export const dynamic = 'force-dynamic';
 
@@ -135,50 +135,57 @@ async function fixEntitlementForUser(userId: string, email: string) {
     });
   }
 
-  // 6. Link entitlement to workspace
-  try {
-    const linkedEntitlement = await linkEntitlementToWorkspace(shopDomain, workspaceId);
-    
-    if (!linkedEntitlement) {
+    // 6. Ensure entitlement is linked to workspace (this handles both existing and future entitlements)
+    try {
+      // First ensure shop is linked to workspace
+      if (shop.workspace_id !== workspaceId) {
+        await supabaseAdminClient
+          .from('shopify_stores')
+          .update({ workspace_id: workspaceId })
+          .eq('id', shop.id);
+      }
+
+      // Then ensure entitlement is linked
+      await ensureEntitlementsLinkedToWorkspace(shopDomain, workspaceId);
+
+      // Re-fetch to get updated entitlement
+      const { data: updatedEntitlement, error: fetchError } = await supabaseAdminClient
+        .from('entitlements')
+        .select('*')
+        .eq('shop_domain', shopDomain)
+        .single();
+
+      if (fetchError || !updatedEntitlement) {
+        return NextResponse.json({
+          error: 'Failed to fetch updated entitlement',
+          details: fetchError?.message,
+        }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Entitlement successfully linked to workspace',
+        before: {
+          entitlement_id: entitlement.id,
+          plan: entitlement.plan,
+          status: entitlement.status,
+          workspace_id: entitlement.workspace_id,
+        },
+        after: {
+          entitlement_id: updatedEntitlement.id,
+          plan: updatedEntitlement.plan,
+          status: updatedEntitlement.status,
+          workspace_id: updatedEntitlement.workspace_id,
+        },
+        shop: {
+          shop_domain: shopDomain,
+          workspace_id: workspaceId,
+        },
+      });
+    } catch (linkError) {
       return NextResponse.json({
         error: 'Failed to link entitlement',
-        shopDomain,
-        workspaceId,
+        details: linkError instanceof Error ? linkError.message : 'Unknown error',
       }, { status: 500 });
     }
-
-    // 7. Also ensure shop is linked to workspace
-    if (shop.workspace_id !== workspaceId) {
-      await supabaseAdminClient
-        .from('shopify_stores')
-        .update({ workspace_id: workspaceId })
-        .eq('id', shop.id);
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Entitlement successfully linked to workspace',
-      before: {
-        entitlement_id: entitlement.id,
-        plan: entitlement.plan,
-        status: entitlement.status,
-        workspace_id: entitlement.workspace_id,
-      },
-      after: {
-        entitlement_id: linkedEntitlement.id,
-        plan: linkedEntitlement.plan,
-        status: linkedEntitlement.status,
-        workspace_id: linkedEntitlement.workspace_id,
-      },
-      shop: {
-        shop_domain: shopDomain,
-        workspace_id: workspaceId,
-      },
-    });
-  } catch (linkError) {
-    return NextResponse.json({
-      error: 'Failed to link entitlement',
-      details: linkError instanceof Error ? linkError.message : 'Unknown error',
-    }, { status: 500 });
-  }
 }

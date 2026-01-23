@@ -172,18 +172,13 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Link entitlement to workspace if workspace is set
+    // Ensure entitlements are linked to workspace (handles both existing and future entitlements)
     if (workspaceId) {
       try {
-        const { linkEntitlementToWorkspace } = await import('@/lib/entitlements');
-        const linkedEntitlement = await linkEntitlementToWorkspace(shop, workspaceId);
-        if (linkedEntitlement) {
-          console.log(`[Shopify Link] Linked entitlement to workspace ${workspaceId}`);
-        } else {
-          console.log(`[Shopify Link] No entitlement found for shop ${shop} - will be created when subscription is activated`);
-        }
+        const { ensureEntitlementsLinkedToWorkspace } = await import('@/lib/entitlements');
+        await ensureEntitlementsLinkedToWorkspace(shop, workspaceId);
       } catch (entitlementError) {
-        console.warn('[Shopify Link] Failed to link entitlement (non-blocking):', entitlementError);
+        console.warn('[Shopify Link] Failed to ensure entitlement linking (non-blocking):', entitlementError);
         // Don't fail the link if entitlement linking fails
       }
     }
@@ -280,18 +275,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard?error=link_failed', request.url));
   }
   
-  // Link entitlement to workspace if workspace is set
+  // Ensure entitlements are linked to workspace (handles both existing and future entitlements)
   if (workspaceId) {
     try {
-      const { linkEntitlementToWorkspace } = await import('@/lib/entitlements');
-      const linkedEntitlement = await linkEntitlementToWorkspace(shop, workspaceId);
-      if (linkedEntitlement) {
-        console.log(`[Shopify Link GET] Linked entitlement to workspace ${workspaceId}`);
-      } else {
-        console.log(`[Shopify Link GET] No entitlement found for shop ${shop} - will be created when subscription is activated`);
-      }
+      const { ensureEntitlementsLinkedToWorkspace } = await import('@/lib/entitlements');
+      await ensureEntitlementsLinkedToWorkspace(shop, workspaceId);
     } catch (entitlementError) {
-      console.warn('[Shopify Link GET] Failed to link entitlement (non-blocking):', entitlementError);
+      console.warn('[Shopify Link GET] Failed to ensure entitlement linking (non-blocking):', entitlementError);
       // Don't fail the link if entitlement linking fails
     }
   }

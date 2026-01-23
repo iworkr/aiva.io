@@ -220,6 +220,27 @@ async function handleAppSubscriptionUpdate(
       test: subscription.test,
     });
 
+    // Ensure entitlement is linked to workspace if shop is linked
+    // This handles the case where subscription webhook comes in after shop is linked
+    if (entitlement && !entitlement.workspace_id) {
+      try {
+        const { data: shop } = await supabaseAdminClient
+          .from('shopify_stores')
+          .select('workspace_id')
+          .eq('shop_domain', shopDomain)
+          .eq('is_active', true)
+          .single();
+        
+        if (shop?.workspace_id) {
+          const { ensureEntitlementsLinkedToWorkspace } = await import('@/lib/entitlements');
+          await ensureEntitlementsLinkedToWorkspace(shopDomain, shop.workspace_id);
+          console.log(`[Webhook] Auto-linked entitlement to workspace ${shop.workspace_id} for shop ${shopDomain}`);
+        }
+      } catch (linkError) {
+        console.warn('[Webhook] Failed to auto-link entitlement (non-blocking):', linkError);
+      }
+    }
+
     // Log the billing event
     await logBillingEvent(
       'subscription_updated',

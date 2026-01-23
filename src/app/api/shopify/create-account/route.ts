@@ -125,18 +125,13 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Link entitlement to workspace if workspace is set
+    // Ensure entitlements are linked to workspace (handles both existing and future entitlements)
     if (workspaceId) {
       try {
-        const { linkEntitlementToWorkspace } = await import('@/lib/entitlements');
-        const linkedEntitlement = await linkEntitlementToWorkspace(shopDomain, workspaceId);
-        if (linkedEntitlement) {
-          console.log(`[Shopify Create Account] Linked entitlement to workspace ${workspaceId}`);
-        } else {
-          console.log(`[Shopify Create Account] No entitlement found for shop ${shopDomain} - will be created when subscription is activated`);
-        }
+        const { ensureEntitlementsLinkedToWorkspace } = await import('@/lib/entitlements');
+        await ensureEntitlementsLinkedToWorkspace(shopDomain, workspaceId);
       } catch (entitlementError) {
-        console.warn('[Shopify Create Account] Failed to link entitlement (non-blocking):', entitlementError);
+        console.warn('[Shopify Create Account] Failed to ensure entitlement linking (non-blocking):', entitlementError);
         // Don't fail the account creation if entitlement linking fails
       }
     }
