@@ -198,6 +198,44 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
   
   // Check Pro subscription status
   const { hasPro, loading: loadingPro } = useProSubscription(workspaceId);
+  
+  // Fetch actual plan name from entitlements
+  const [planName, setPlanName] = useState<string>('Free');
+  const [planDescription, setPlanDescription] = useState<string>('Basic features for getting started');
+  const [loadingPlan, setLoadingPlan] = useState(true);
+
+  useEffect(() => {
+    async function fetchPlan() {
+      try {
+        const response = await fetch(`/api/entitlements?workspaceId=${workspaceId}`);
+        if (response.ok) {
+          const data = await response.json();
+          const plan = data.entitlement?.plan || 'free';
+          
+          // Capitalize first letter
+          const planDisplay = plan.charAt(0).toUpperCase() + plan.slice(1);
+          setPlanName(planDisplay + ' Plan');
+          
+          // Set description based on plan
+          if (plan === 'enterprise') {
+            setPlanDescription('Full features with dedicated support');
+          } else if (plan === 'pro' || plan === 'professional') {
+            setPlanDescription('Full access to all AI features');
+          } else if (plan === 'basic') {
+            setPlanDescription('Upgrade to Pro for AI drafts and auto-responses');
+          } else {
+            setPlanDescription('Basic features for getting started');
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching plan:', error);
+      } finally {
+        setLoadingPlan(false);
+      }
+    }
+
+    fetchPlan();
+  }, [workspaceId]);
 
   // Cache key for settings
   const cacheKey = useMemo(() => `settings-${workspaceId}-${userId}`, [workspaceId, userId]);
@@ -1044,12 +1082,10 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                   </div>
                   <div>
                     <p className="font-semibold">
-                      {hasPro ? 'Professional Plan' : 'Basic Plan'}
+                      {loadingPlan ? 'Loading...' : planName}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {hasPro
-                        ? 'Full access to all AI features'
-                        : 'Upgrade to Pro for AI drafts and auto-responses'}
+                      {loadingPlan ? 'Checking plan...' : planDescription}
                     </p>
                   </div>
                 </div>
