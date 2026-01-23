@@ -79,7 +79,37 @@ export async function GET(request: NextRequest) {
             .single();
           
           if (shopEntitlement) {
-            entitlement = shopEntitlement;
+            // Auto-fix: If entitlement exists but isn't linked to workspace, link it now
+            if (!shopEntitlement.workspace_id) {
+              try {
+                const { ensureEntitlementsLinkedToWorkspace } = await import('@/lib/entitlements');
+                await ensureEntitlementsLinkedToWorkspace(store.shop_domain, workspaceId);
+                // Re-fetch by workspace_id to get the properly linked entitlement
+                const { data: updatedEntitlement } = await supabaseAdminClient
+                  .from('entitlements')
+                  .select('*')
+                  .eq('workspace_id', workspaceId)
+                  .single();
+                
+                if (updatedEntitlement) {
+                  entitlement = updatedEntitlement;
+                  console.log(`[Entitlements API] Auto-linked entitlement to workspace ${workspaceId} for shop ${store.shop_domain}`);
+                } else {
+                  // Fallback: fetch by shop_domain if workspace_id query fails
+                  const { data: fallbackEntitlement } = await supabaseAdminClient
+                    .from('entitlements')
+                    .select('*')
+                    .eq('shop_domain', store.shop_domain)
+                    .single();
+                  entitlement = fallbackEntitlement || shopEntitlement;
+                }
+              } catch (linkError) {
+                console.warn('[Entitlements API] Failed to auto-link entitlement:', linkError);
+                entitlement = shopEntitlement;
+              }
+            } else {
+              entitlement = shopEntitlement;
+            }
           }
         }
       }

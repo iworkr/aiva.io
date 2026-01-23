@@ -70,7 +70,8 @@ export function EntitlementBilling({ workspaceId }: EntitlementBillingProps) {
   useEffect(() => {
     async function fetchEntitlement() {
       try {
-        const response = await fetch(`/api/entitlements?workspaceId=${workspaceId}`);
+        // Add cache-busting timestamp to ensure fresh data
+        const response = await fetch(`/api/entitlements?workspaceId=${workspaceId}&_=${Date.now()}`);
         if (!response.ok) {
           if (response.status === 404) {
             // No entitlement found - show free plan
@@ -81,6 +82,9 @@ export function EntitlementBilling({ workspaceId }: EntitlementBillingProps) {
         }
         const data = await response.json();
         setEntitlement(data.entitlement);
+        
+        // If we got an entitlement but it was just auto-fixed (no workspace_id before),
+        // the API will return the updated one, so we're good
       } catch (err) {
         console.error('Error fetching entitlement:', err);
         setError('Failed to load billing information');
