@@ -1375,7 +1375,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                 {!hasPro && (
                   <div className="rounded-lg border border-muted bg-muted/30 p-4">
                     <p className="text-sm text-muted-foreground">
-                      Upgrade to Professional plan to unlock:
+                      Upgrade to Pro plan to unlock:
                     </p>
                     <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
                       <li>• AI-powered reply drafts</li>
