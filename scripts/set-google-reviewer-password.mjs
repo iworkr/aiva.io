@@ -2,7 +2,7 @@
 
 /**
  * One-time script: Set password for Google verification reviewer account (junsnow.2024@gmail.com).
- * Run once so they can log in with email + password 123456 as well as SSO (Google).
+ * Run once so they can log in with email + password 12345678 (8 chars) as well as SSO (Google).
  *
  * Usage: node scripts/set-google-reviewer-password.mjs
  * Requires: .env.local with NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
@@ -16,16 +16,22 @@ import { dirname, join } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-dotenv.config({ path: join(__dirname, '..', '.env.local') });
+// Load .env.local from project root (script dir parent or cwd)
+const envPath = join(__dirname, '..', '.env.local');
+dotenv.config({ path: envPath });
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  dotenv.config({ path: join(process.cwd(), '.env.local') });
+}
 
 const GOOGLE_REVIEWER_EMAIL = 'junsnow.2024@gmail.com';
-const GOOGLE_REVIEWER_PASSWORD = '123456';
+const GOOGLE_REVIEWER_PASSWORD = '12345678';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+const supabaseServiceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local');
+  console.error('Tried loading from:', envPath);
   process.exit(1);
 }
 
@@ -36,7 +42,14 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 async function setPassword() {
   const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
   if (listError) {
-    console.error('Failed to list users:', listError);
+    console.error('Failed to list users:', listError.message);
+    if (listError.status === 401) {
+      console.error('\nInvalid API key. Check:');
+      console.error('  1. Supabase Dashboard → Project (lgyewlqzelxkpawnmiog) → Settings → API');
+      console.error('  2. Use the "service_role" key (secret), NOT the anon key');
+      console.error('  3. NEXT_PUBLIC_SUPABASE_URL must match this project (e.g. https://lgyewlqzelxkpawnmiog.supabase.co)');
+      console.error('  4. If you rotated the key, copy the new service_role key into .env.local');
+    }
     process.exit(1);
   }
   const user = users?.find((u) => u.email?.toLowerCase() === GOOGLE_REVIEWER_EMAIL.toLowerCase());

@@ -37,6 +37,48 @@ We do **not** use `https://mail.google.com/` (the "full mailbox" restricted scop
 
 ---
 
+## Where to add the redirect URLs (exact steps)
+
+### Gmail (Google)
+
+**Exact URL to open:**  
+**[https://console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials)**
+
+1. Open the link above (sign in to Google if needed).
+2. Make sure the correct **project** is selected (top-left dropdown — e.g. "aiva-io" or your Gmail project).
+3. Under **"OAuth 2.0 Client IDs"**, click the **name** of your Web application client (e.g. "Aiva.io Gmail" or "Web client 1").
+4. In the client details page, find **"Authorized redirect URIs"**.
+5. Click **"+ ADD URI"** and add **exactly** (copy-paste):
+   - **Production:** `https://www.tryaiva.io/api/auth/gmail/callback`
+   - **Local:** `http://localhost:3000/api/auth/gmail/callback`
+6. Under **"Authorized JavaScript origins"**, add if not already there:
+   - `https://www.tryaiva.io`
+   - `http://localhost:3000`
+7. Click **"SAVE"** at the bottom.
+
+---
+
+### Outlook (Microsoft / Azure)
+
+**Exact URL to open:**  
+**[https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade)**
+
+1. Open the link above (sign in to Microsoft if needed).
+2. Click your **Aiva** app (or whatever you named the Outlook integration app).
+3. In the left sidebar, click **"Authentication"** (under "Manage").
+4. Under **"Platform configurations"** → **"Web"**, you’ll see **"Redirect URIs"**.
+5. Click **"+ Add a platform"** if you don’t have "Web" yet → choose **Web** → then add the URI.  
+   If "Web" already exists, click **"Add URI"** in that section.
+6. Add **exactly** (copy-paste):
+   - **Production:** `https://www.tryaiva.io/api/auth/outlook/callback`
+   - **Local (optional):** `http://localhost:3000/api/auth/outlook/callback`
+7. Click **"Save"** at the top.
+
+**Direct link to Authentication (only works after you’ve opened the app once):**  
+In the app’s left menu: **Authentication** — or use the App registrations list link above, then click your app, then **Authentication**.
+
+---
+
 ## What you must do (explicit checklist)
 
 ### 1. Google (Gmail) – allow any Gmail user
@@ -137,6 +179,7 @@ App registration + redirect URIs + Graph permissions + client secret + env vars.
 2. **Outlook**
    - [ ] Create/configure Azure app, redirect URIs, permissions, client secret.
    - [ ] Set `MICROSOFT_CLIENT_ID` and `MICROSOFT_CLIENT_SECRET` in production and local.
+   - [ ] Add branding (logo, name, URLs) and optional publisher verification so "Connect Outlook" looks official → see [AZURE_OUTLOOK_BRANDING_AND_PUBLISHER.md](./AZURE_OUTLOOK_BRANDING_AND_PUBLISHER.md).
    - [ ] Test with a personal Outlook and (if possible) one work account.
 
 3. **Production**
