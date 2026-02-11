@@ -252,6 +252,65 @@ export async function requireActiveEntitlementForShop(
   }
 }
 
+/**
+ * Check if a user has at least one active entitlement (any of their workspaces).
+ * Used for app-wide subscription gate (e.g. redirect to billing when no subscription).
+ */
+export async function userHasActiveEntitlement(userId: string): Promise<boolean> {
+  try {
+    const { data: memberships } = await supabaseAdminClient
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('workspace_member_id', userId)
+      .limit(50);
+
+    if (!memberships?.length) return false;
+
+    const workspaceIds = memberships.map((m) => m.workspace_id);
+
+    const { data: entitlements } = await supabaseAdminClient
+      .from('entitlements')
+      .select('id, status, current_period_end')
+      .in('workspace_id', workspaceIds);
+
+    const hasActive = entitlements?.some((e) => {
+      if (e.status === 'active' || e.status === 'trialing') return true;
+      if (e.status === 'canceled' && e.current_period_end) {
+        return new Date(e.current_period_end) > new Date();
+      }
+      return false;
+    });
+    if (hasActive) return true;
+
+    const { data: stores } = await supabaseAdminClient
+      .from('shopify_stores')
+      .select('shop_domain')
+      .in('workspace_id', workspaceIds)
+      .eq('is_active', true);
+
+    if (stores?.length) {
+      const domains = stores.map((s) => s.shop_domain).filter(Boolean);
+      const { data: shopEntitlements } = await supabaseAdminClient
+        .from('entitlements')
+        .select('id, status, current_period_end')
+        .in('shop_domain', domains);
+      const hasShopActive = shopEntitlements?.some((e) => {
+        if (e.status === 'active' || e.status === 'trialing') return true;
+        if (e.status === 'canceled' && e.current_period_end) {
+          return new Date(e.current_period_end) > new Date();
+        }
+        return false;
+      });
+      if (hasShopActive) return true;
+    }
+
+    return false;
+  } catch (err) {
+    console.error('[Entitlements Guard] userHasActiveEntitlement error:', err);
+    return false;
+  }
+}
+
 // =====================================================
 // USAGE LIMITS
 // =====================================================

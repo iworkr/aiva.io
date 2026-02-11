@@ -6,7 +6,7 @@ import { Suspense } from "react";
 import { CustomerDetailsServer } from "./CustomerDetailsServer";
 import { OneTimeProductsServer } from "./OneTimeProductsServer";
 import { SubscriptionProductsServer } from "./SubscriptionProductsServer";
-import { CreditCard, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 
 export async function WorkspaceBilling({
   workspaceSlug,
@@ -15,7 +15,32 @@ export async function WorkspaceBilling({
   workspaceSlug: string;
   subscriptionRequiredMessage?: boolean;
 }) {
-  const workspace = await getCachedWorkspaceBySlug(workspaceSlug);
+  let workspace;
+  try {
+    workspace = await getCachedWorkspaceBySlug(workspaceSlug);
+  } catch (e) {
+    console.error("WorkspaceBilling: failed to load workspace", e);
+    return (
+      <div className="container mx-auto p-4 max-w-5xl">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-muted-foreground" />
+              Billing
+            </CardTitle>
+            <CardDescription>
+              We couldn’t load your workspace. Please try again or go to settings.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              If this keeps happening, refresh the page or contact support.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-4 space-y-8 max-w-5xl">

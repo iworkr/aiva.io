@@ -172,9 +172,9 @@ export const subscriptionMiddleware: MiddlewareConfig = {
           req.nextUrl.pathname,
         );
         
-        // Redirect to billing page
+        // Redirect to billing / subscriptions page
         return [
-          NextResponse.redirect(toSiteURL(withMaybeLocale(req, "/settings?tab=billing&reason=subscription_required"))),
+          NextResponse.redirect(toSiteURL(withMaybeLocale(req, "/settings/billing?error=subscription_required"))),
           maybeUser,
         ];
       }
@@ -252,7 +252,7 @@ export const subscriptionMiddleware: MiddlewareConfig = {
               
               // Redirect to billing page with upgrade message
               return [
-                NextResponse.redirect(toSiteURL(withMaybeLocale(req, "/settings?tab=billing&reason=workspace_limit_exceeded"))),
+                NextResponse.redirect(toSiteURL(withMaybeLocale(req, "/settings/billing?error=workspace_limit_exceeded"))),
                 maybeUser,
               ];
             }
