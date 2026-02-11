@@ -385,24 +385,25 @@ export const toggleCalendarVisibilityAction = authActionClient
 
     const supabase = await createSupabaseUserServerActionClient();
 
-    // Get current visibility status
-    const { data: current } = await supabase
+    // Get current visibility status (use maybeSingle so we can distinguish not-found from DB errors)
+    const { data: current, error: fetchError } = await supabase
       .from('calendar_connections')
-      .select('is_visible' as any)
+      .select('id, is_visible')
       .eq('id', id)
       .eq('workspace_id', workspaceId)
-      .single();
+      .maybeSingle();
 
-    if (!current) throw new Error('Calendar not found');
+    if (fetchError) throw new Error(fetchError.message);
+    if (!current) throw new Error('Calendar not found. It may have been removed or you may not have access.');
 
     // Toggle visibility
-    const currentVisible = (current as any)?.is_visible ?? true;
+    const currentVisible = current.is_visible ?? true;
     const { data, error } = await supabase
       .from('calendar_connections')
       .update({
         is_visible: !currentVisible,
         updated_at: new Date().toISOString(),
-      } as any)
+      })
       .eq('id', id)
       .eq('workspace_id', workspaceId)
       .select()

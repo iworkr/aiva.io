@@ -378,41 +378,6 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
               <div className="flex h-full items-center justify-center">
                 <CalendarIcon className="h-8 w-8 animate-pulse text-muted-foreground" />
               </div>
-            ) : getFilteredEvents().length === 0 ? (
-              <div className="flex h-full items-center justify-center">
-                <div className="text-center max-w-md px-6">
-                  <div className="mx-auto h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mb-6">
-                    <CalendarIcon className="h-10 w-10 text-primary" />
-                  </div>
-                  <h3 className="text-xl font-semibold mb-2">
-                    {searchQuery
-                      ? `No events found for "${searchQuery}"`
-                      : 'No events scheduled'}
-                  </h3>
-                  <p className="text-base text-muted-foreground mb-8">
-                    {searchQuery
-                      ? 'Try a different keyword or clear the search to see all events.'
-                      : 'Your calendar is empty. Create your first event to get started, or connect a calendar account to sync existing events.'}
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                    <Button 
-                      onClick={() => setShowCreateDialog(true)}
-                      className="shadow-md hover:shadow-lg transition-all h-10 px-5 font-medium bg-primary text-primary-foreground"
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      Create Event
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      onClick={() => setShowManageAccountsDialog(true)}
-                      className="h-10 px-5 border-2 hover:bg-muted/50 transition-all font-medium"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      Connect Calendar
-                    </Button>
-                  </div>
-                </div>
-              </div>
             ) : viewMode === 'month' ? (
               <MonthView
                 currentDate={currentDate}
