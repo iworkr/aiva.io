@@ -21,6 +21,9 @@ export async function getGoogleCalendarAuthUrl(workspaceId: string, userId: stri
   const redirectUri = `https://${siteUrl}/api/auth/google-calendar/callback`;
 
   const scopes = [
+    'openid',
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/userinfo.profile',
     'https://www.googleapis.com/auth/calendar.readonly',
     'https://www.googleapis.com/auth/calendar.events',
   ];
