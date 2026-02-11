@@ -413,7 +413,7 @@ export async function syncStripeSubscriptionToEntitlement(
   const plan = productNameToPlan(productName || '');
   const currentPeriodEnd = subscription.current_period_end
     ? new Date(subscription.current_period_end * 1000).toISOString()
-    : null;
+    : undefined;
 
   const existing = await getEntitlementByWorkspaceId(workspaceId);
   if (existing) {
@@ -441,7 +441,7 @@ export async function syncStripeSubscriptionToEntitlement(
     provider: 'stripe',
     status,
     provider_subscription_id: subscription.id,
-    current_period_end: currentPeriodEnd,
+    current_period_end: currentPeriodEnd ?? undefined,
   });
 }
 
