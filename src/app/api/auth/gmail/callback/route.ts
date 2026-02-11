@@ -259,7 +259,22 @@ export async function GET(request: NextRequest) {
 
     if (!result?.data?.data) {
       console.error('Failed to store Gmail connection:', result);
-      throw new Error('Failed to store connection');
+      const serverError = (result as { serverError?: string })?.serverError;
+      const message = typeof serverError === 'string' ? serverError : 'Failed to store connection';
+      const isSubscriptionRequired =
+        message.includes('No active subscription') ||
+        message.includes('subscribe to connect') ||
+        message.includes('Subscription has been canceled');
+
+      if (isSubscriptionRequired) {
+        return NextResponse.redirect(
+          toSiteURL(`${locale}/settings/billing?error=subscription_required&from=connect_channel`)
+        );
+      }
+
+      return NextResponse.redirect(
+        toSiteURL(`${locale}/inbox?error=${encodeURIComponent(message)}`)
+      );
     }
 
     console.log('Gmail connection stored successfully:', result.data.data.id);
@@ -276,8 +291,9 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Gmail OAuth callback error:', error);
     const locale = 'en';
+    const message = error instanceof Error ? error.message : 'connection_failed';
     return NextResponse.redirect(
-      toSiteURL(`${locale}/inbox?error=${encodeURIComponent(error instanceof Error ? error.message : 'connection_failed')}`)
+      toSiteURL(`${locale}/inbox?error=${encodeURIComponent(message)}`)
     );
   }
 }

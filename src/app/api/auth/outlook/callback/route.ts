@@ -145,24 +145,43 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    if (!result?.data) {
-      throw new Error('Failed to store connection');
+    const locale = 'en';
+
+    if (!result?.data?.data) {
+      console.error('Failed to store Outlook connection:', result);
+      const serverError = (result as { serverError?: string })?.serverError;
+      const message = typeof serverError === 'string' ? serverError : 'Failed to store connection';
+      const isSubscriptionRequired =
+        message.includes('No active subscription') ||
+        message.includes('subscribe to connect') ||
+        message.includes('Subscription has been canceled');
+
+      if (isSubscriptionRequired) {
+        return NextResponse.redirect(
+          toSiteURL(`${locale}/settings/billing?error=subscription_required&from=connect_channel`)
+        );
+      }
+
+      return NextResponse.redirect(
+        toSiteURL(`${locale}/channels?error=${encodeURIComponent(message)}`)
+      );
     }
 
     // Check if this was an auto-connect from sign-in flow
     const autoConnect = request.nextUrl.searchParams.get('auto_connect') === 'true';
-    const locale = 'en';
-    
+
     // Redirect to inbox if auto-connect, otherwise channels
     const redirectUrl = autoConnect
       ? toSiteURL(`${locale}/inbox?success=outlook_connected&auto_connect=true`)
       : toSiteURL(`${locale}/channels?success=outlook_connected`);
-    
+
     return NextResponse.redirect(redirectUrl);
   } catch (error) {
     console.error('Outlook OAuth callback error:', error);
+    const locale = 'en';
+    const message = error instanceof Error ? error.message : 'connection_failed';
     return NextResponse.redirect(
-      new URL('/channels?error=connection_failed', request.url)
+      toSiteURL(`${locale}/channels?error=${encodeURIComponent(message)}`)
     );
   }
 }

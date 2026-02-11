@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils';
 import type { MessageCategory, MessagePriority } from '@/utils/zod-schemas/aiva-schemas';
 import { Inbox as InboxIcon, Plus, RefreshCw, Search } from 'lucide-react';
 import { useAction } from 'next-safe-action/hooks';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { ChannelSidebar } from './ChannelSidebar';
@@ -47,6 +47,7 @@ interface InboxViewProps {
 
 export const InboxView = memo(function InboxView({ workspaceId, userId, filters }: InboxViewProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,6 +87,39 @@ export const InboxView = memo(function InboxView({ workspaceId, userId, filters 
   useEffect(() => {
     setWorkspaceId(workspaceId);
   }, [workspaceId, setWorkspaceId]);
+
+  // Show error toast when redirected with connection/store error (e.g. subscription required)
+  useEffect(() => {
+    const error = searchParams.get('error');
+    if (!error) return;
+    const decoded = decodeURIComponent(error);
+    const isSubscriptionRelated =
+      decoded.includes('No active subscription') ||
+      decoded.includes('subscribe to connect') ||
+      decoded.includes('Subscription has been canceled') ||
+      decoded === 'Failed to store connection';
+    const message = isSubscriptionRelated
+      ? 'An active subscription is required to connect channels.'
+      : decoded;
+    toast.error(message, {
+      duration: 8000,
+      action: isSubscriptionRelated
+        ? {
+            label: 'Go to billing',
+            onClick: () => {
+              const locale = pathname.split('/')[1] || 'en';
+              router.push(`/${locale}/settings/billing?error=subscription_required&from=connect_channel`);
+            },
+          }
+        : undefined,
+    });
+    // Clear error from URL
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete('error');
+    next.delete('details');
+    const q = next.toString();
+    router.replace(q ? `?${q}` : pathname, { scroll: false });
+  }, [searchParams, pathname, router]);
 
   // Fetch entitlement/usage data for channel limits
   useEffect(() => {
