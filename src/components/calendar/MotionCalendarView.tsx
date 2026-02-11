@@ -359,6 +359,16 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
                   Month
                 </Button>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowManageAccountsDialog(true)}
+                aria-label="Connect or manage calendar accounts"
+                className="h-9 px-4 font-medium"
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" aria-hidden="true" />
+                Connect Calendar
+              </Button>
               <Button 
                 onClick={() => setShowCreateDialog(true)}
                 aria-label="Create new calendar event"
@@ -712,20 +722,21 @@ function LeftSidebar({
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-sm font-semibold">My calendars</h3>
           <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-6 w-6"
+            variant="outline" 
+            size="sm" 
+            className="h-7 gap-1 px-2 text-xs font-medium"
             onClick={onManageAccounts}
-            title="Add calendar"
+            title="Connect or manage calendars"
           >
             <Plus className="h-3 w-3" />
+            Connect Calendar
           </Button>
         </div>
         <div className="space-y-1">
           {loadingCalendars ? (
             <div className="text-xs text-muted-foreground p-2">Loading...</div>
           ) : calendars.length === 0 ? (
-            <div className="text-xs text-muted-foreground p-2">No calendars</div>
+            <div className="text-xs text-muted-foreground p-2">No calendars connected yet. Use the button above to connect.</div>
           ) : (
             calendars.map((calendar) => (
               <div 
