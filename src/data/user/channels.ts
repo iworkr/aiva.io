@@ -45,7 +45,9 @@ export const createChannelConnectionAction = authActionClient
 
     const supabase = await createSupabaseUserServerActionClient();
 
-    // ENTITLEMENT CHECK: Verify workspace has active subscription
+    // ENTITLEMENT CHECK: Verify workspace has active subscription.
+    // Resubscription is allowed: if the workspace had a canceled (e.g. Shopify) entitlement, they can
+    // subscribe again via Stripe or direct (billing page) or manual grant; the entitlement is then updated to active.
     const entitlementCheck = await requireActiveEntitlement(workspaceId);
     if (!entitlementCheck.isValid) {
       throw new Error(`No active subscription: ${entitlementCheck.reason}. Please subscribe to connect channels.`);

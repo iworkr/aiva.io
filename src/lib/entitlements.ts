@@ -366,11 +366,92 @@ export async function workspaceHasActiveEntitlement(workspaceId: string): Promis
 }
 
 // =====================================================
+// STRIPE → ENTITLEMENTS SYNC (resubscription / new subscription)
+// =====================================================
+
+/**
+ * Map Stripe subscription status to entitlement status.
+ * When a customer resubscribes (e.g. after canceling Shopify or Stripe), we set status back to active.
+ */
+function stripeStatusToEntitlementStatus(
+  status: string
+): EntitlementStatus {
+  const s = status?.toLowerCase();
+  if (s === 'active') return 'active';
+  if (s === 'trialing') return 'trialing';
+  if (s === 'past_due') return 'past_due';
+  return 'canceled';
+}
+
+/**
+ * Map product name to plan (same logic as subscription display).
+ */
+function productNameToPlan(name: string): EntitlementPlan {
+  const n = (name || '').toLowerCase();
+  if (n.includes('enterprise')) return 'enterprise';
+  if (n.includes('professional') || n.includes('pro')) return 'pro';
+  if (n.includes('starter') || n.includes('basic')) return 'basic';
+  return 'basic';
+}
+
+/**
+ * Create or update entitlement from Stripe subscription.
+ * Call this from Stripe webhook (subscription created/updated/deleted) so that:
+ * - New Stripe subscriptions grant access (channel connection, etc.)
+ * - Resubscription after a canceled (Shopify or Stripe) entitlement is allowed and reactivates access.
+ */
+export async function syncStripeSubscriptionToEntitlement(
+  workspaceId: string,
+  subscription: {
+    id: string;
+    status: string;
+    current_period_end?: number; // Unix timestamp
+  },
+  productName?: string
+): Promise<Entitlement> {
+  const status = stripeStatusToEntitlementStatus(subscription.status);
+  const plan = productNameToPlan(productName || '');
+  const currentPeriodEnd = subscription.current_period_end
+    ? new Date(subscription.current_period_end * 1000).toISOString()
+    : null;
+
+  const existing = await getEntitlementByWorkspaceId(workspaceId);
+  if (existing) {
+    const updated = await supabaseAdminClient
+      .from('entitlements')
+      .update({
+        plan,
+        provider: 'stripe',
+        status,
+        provider_subscription_id: subscription.id,
+        current_period_end: currentPeriodEnd,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existing.id)
+      .select('*')
+      .single();
+    if (updated.error) throw new Error(updated.error.message);
+    console.log('[Entitlements] Updated entitlement from Stripe subscription', { workspaceId, status, plan });
+    return updated.data as Entitlement;
+  }
+
+  return upsertEntitlement({
+    workspace_id: workspaceId,
+    plan,
+    provider: 'stripe',
+    status,
+    provider_subscription_id: subscription.id,
+    current_period_end: currentPeriodEnd,
+  });
+}
+
+// =====================================================
 // SHOPIFY-SPECIFIC FUNCTIONS
 // =====================================================
 
 /**
- * Create or update entitlement from Shopify subscription data
+ * Create or update entitlement from Shopify subscription data.
+ * Resubscription (status ACTIVE after a previous CANCELLED) is supported and will set status back to active.
  */
 export async function syncShopifySubscriptionToEntitlement(
   shopDomain: string,

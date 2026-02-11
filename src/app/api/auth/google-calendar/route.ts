@@ -31,9 +31,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/en/login', baseUrl));
     }
 
-    // Check if Google OAuth credentials are configured
-    const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CALENDAR_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET;
+    // Use same client as Gmail by default (one OAuth client for both Gmail and Calendar)
+    const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CALENDAR_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_CALENDAR_CLIENT_SECRET;
 
     if (!clientId || !clientSecret) {
       return NextResponse.json(

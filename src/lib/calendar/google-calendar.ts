@@ -12,7 +12,8 @@ import { createCalendarConnectionAction } from '@/data/user/calendar';
  * Initiate Google Calendar OAuth
  */
 export async function getGoogleCalendarAuthUrl(workspaceId: string, userId: string): Promise<string> {
-  const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
+  // Use same client as Gmail by default so one OAuth client works for both (fewer 401 misconfigs)
+  const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CALENDAR_CLIENT_ID;
   if (!clientId) throw new Error('Google Calendar OAuth not configured');
   
   // Build redirect URI dynamically

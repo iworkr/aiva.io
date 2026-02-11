@@ -83,8 +83,10 @@ export function isEntitlementActive(entitlement: Entitlement | null): boolean {
 }
 
 /**
- * Require an active entitlement for a workspace
- * This is the main function to check subscription status
+ * Require an active entitlement for a workspace.
+ * This is the main function to check subscription status.
+ * A previously canceled entitlement (Shopify or Stripe) can be reactivated by resubscribing
+ * (Stripe webhook or manual grant); we do not block resubscription.
  */
 export async function requireActiveEntitlement(
   workspaceId: string

@@ -1,4 +1,5 @@
 import { getWorkspaceSlugById } from "@/data/user/workspaces";
+import { syncStripeSubscriptionToEntitlement } from "@/lib/entitlements";
 import { supabaseAdminClient } from "@/supabase-clients/admin/supabaseAdminClient";
 import { superAdminGetUserIdByEmail } from "@/supabase-clients/admin/user";
 import { superAdminGetWorkspaceAdmins } from "@/supabase-clients/admin/workspaces";
@@ -634,6 +635,33 @@ export class StripePaymentGateway implements PaymentGateway {
       );
 
     if (error) throw error;
+
+    // Sync to unified entitlements table so channel connection and app gates see active subscription.
+    // Supports resubscription: if workspace had a canceled (e.g. Shopify) entitlement, this reactivates it for Stripe.
+    try {
+      const customer = await this.db.getCustomerByCustomerId(stripeCustomerId);
+      if (customer?.workspace_id) {
+        const productId = typeof product === "string" ? product : product.id;
+        const { data: billingProduct } = await supabaseAdminClient
+          .from("billing_products")
+          .select("name")
+          .eq("gateway_name", this.getName())
+          .eq("gateway_product_id", productId)
+          .single();
+        await syncStripeSubscriptionToEntitlement(
+          customer.workspace_id,
+          {
+            id: subscription.id,
+            status: subscription.status,
+            current_period_end: subscription.current_period_end,
+          },
+          billingProduct?.name
+        );
+      }
+    } catch (entitlementError) {
+      console.error("[Stripe] Failed to sync subscription to entitlements:", entitlementError);
+      // Do not throw – billing_subscriptions is already updated; entitlement sync is best-effort
+    }
   }
 
   private async handleInvoiceChange(invoice: Stripe.Invoice) {

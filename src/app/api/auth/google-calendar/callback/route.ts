@@ -80,9 +80,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Exchange code for tokens
-    const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CALENDAR_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET;
+    // Must match the client used in getGoogleCalendarAuthUrl (same as Gmail by default)
+    const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CALENDAR_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_CALENDAR_CLIENT_SECRET;
 
     if (!clientId || !clientSecret) {
       return NextResponse.redirect(
