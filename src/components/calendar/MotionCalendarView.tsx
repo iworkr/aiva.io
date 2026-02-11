@@ -722,21 +722,20 @@ function LeftSidebar({
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-sm font-semibold">My calendars</h3>
           <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-7 gap-1 px-2 text-xs font-medium"
+            variant="ghost" 
+            size="icon" 
+            className="h-6 w-6"
             onClick={onManageAccounts}
             title="Connect or manage calendars"
           >
             <Plus className="h-3 w-3" />
-            Connect Calendar
           </Button>
         </div>
         <div className="space-y-1">
           {loadingCalendars ? (
             <div className="text-xs text-muted-foreground p-2">Loading...</div>
           ) : calendars.length === 0 ? (
-            <div className="text-xs text-muted-foreground p-2">No calendars connected yet. Use the button above to connect.</div>
+            <div className="text-xs text-muted-foreground p-2">No calendars</div>
           ) : (
             calendars.map((calendar) => (
               <div 
