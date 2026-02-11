@@ -21,7 +21,8 @@ export async function OneTimeProductsServer({
       />
     );
   } catch (error) {
-    console.error("OneTimeProductsServer error:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("OneTimeProductsServer error:", message, error);
     return (
       <Card>
         <CardHeader>

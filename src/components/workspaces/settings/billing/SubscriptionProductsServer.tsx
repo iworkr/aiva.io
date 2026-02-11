@@ -22,7 +22,8 @@ export async function SubscriptionProductsServer({
       />
     );
   } catch (error) {
-    console.error("SubscriptionProductsServer error:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("SubscriptionProductsServer error:", message, error);
     return (
       <Card>
         <CardHeader>

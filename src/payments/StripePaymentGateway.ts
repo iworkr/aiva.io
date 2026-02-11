@@ -839,7 +839,7 @@ export class StripePaymentGateway implements PaymentGateway {
     listAllSubscriptionProducts: async (): Promise<
       Dictionary<ProductAndPrice[]>
     > => {
-      const { data: products, error } = await supabaseAnonClient
+      const { data: products, error } = await supabaseAdminClient
         .from("billing_products")
         .select("*, billing_prices(*)")
         .eq("gateway_name", this.getName())
@@ -871,7 +871,7 @@ export class StripePaymentGateway implements PaymentGateway {
      * List all one-time products that are visible to the user.
      */
     listAllOneTimeProducts: async (): Promise<ProductAndPrice[]> => {
-      const { data: products, error } = await supabaseAnonClient
+      const { data: products, error } = await supabaseAdminClient
         .from("billing_products")
         .select("*, billing_prices(*)")
         .eq("billing_prices.recurring_interval", "one-time")

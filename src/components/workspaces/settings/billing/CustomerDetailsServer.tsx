@@ -58,9 +58,15 @@ export async function CustomerDetailsServer({
 }) {
   try {
     const stripePaymentGateway = new StripePaymentGateway();
-    await stripePaymentGateway.userScope.getWorkspaceDatabaseCustomer(
-      workspace.id,
-    );
+    // New workspaces may not have a billing customer yet; don't fail the whole section
+    try {
+      await stripePaymentGateway.userScope.getWorkspaceDatabaseCustomer(
+        workspace.id,
+      );
+    } catch (customerError) {
+      // PGRST116 = no rows; or missing Stripe config – continue with empty data
+      console.warn("Billing: no customer for workspace yet", workspace.id, customerError);
+    }
 
     const [invoices, oneTimePurchases, subscriptions] = await Promise.all([
       getInvoices(workspace.id),
