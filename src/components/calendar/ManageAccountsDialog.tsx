@@ -267,13 +267,10 @@ export function ManageAccountsDialog({
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <button
-                className="group flex flex-col items-center gap-3 p-6 border border-border rounded-lg hover:bg-primary/5 hover:border-primary/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={() => {
-                  toast.info('Google Calendar integration coming soon. You can create events directly in Aiva for now.');
-                }}
-                disabled
-                aria-label="Connect Google Calendar (coming soon)"
+              <a
+                href={`/api/auth/google-calendar?workspace_id=${workspaceId}`}
+                className="group flex flex-col items-center gap-3 p-6 border border-border rounded-lg hover:bg-primary/5 hover:border-primary/30 transition-all"
+                aria-label="Connect Google Calendar"
               >
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-muted group-hover:bg-background transition-colors">
                   <Image
@@ -285,8 +282,7 @@ export function ManageAccountsDialog({
                   />
                 </div>
                 <span className="text-sm font-medium">Connect Google Calendar</span>
-                <span className="text-xs text-muted-foreground">Coming soon</span>
-              </button>
+              </a>
               <button
                 className="group flex flex-col items-center gap-3 p-6 border border-border rounded-lg hover:bg-primary/5 hover:border-primary/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => {
