@@ -90,18 +90,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Build redirect URI
+    // Build redirect URI — must match exactly what was used in the authorization request (see getGoogleCalendarAuthUrl)
     const origin = request.nextUrl.origin;
     const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1');
-    
+    const path = '/api/auth/google-calendar/callback';
     let redirectUri: string;
     if (isLocalhost) {
-      redirectUri = `${origin}/api/auth/calendar/google/callback`;
+      redirectUri = `${origin}${path}`;
     } else if (process.env.NEXT_PUBLIC_SITE_URL) {
-      let siteUrl = process.env.NEXT_PUBLIC_SITE_URL.trim().replace(/\/+$/, '').replace(/^https?:\/\//, '');
-      redirectUri = `https://${siteUrl}/api/auth/calendar/google/callback`;
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL.trim().replace(/\/+$/, '').replace(/^https?:\/\//, '');
+      redirectUri = `https://${siteUrl}${path}`;
     } else {
-      redirectUri = `${origin}/api/auth/calendar/google/callback`;
+      redirectUri = `${origin}${path}`;
     }
 
     // Exchange authorization code for access token

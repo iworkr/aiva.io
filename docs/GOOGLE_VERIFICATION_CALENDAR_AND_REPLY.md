@@ -58,6 +58,31 @@ So reviewers can complete the **Calendar API** OAuth consent, the same OAuth cli
 
 ---
 
+## 3b. "Error 401: invalid_client" / "The OAuth client was not found"
+
+If you see **Access blocked: Authorization Error** with **The OAuth client was not found** when connecting Google Calendar:
+
+1. **Use the same OAuth client as Gmail**  
+   The app uses **GOOGLE_CLIENT_ID** (or GOOGLE_CALENDAR_CLIENT_ID if set) for Calendar. Use the same OAuth 2.0 Client ID that works for Gmail:
+   - In [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials), open your **Web application** OAuth client.
+   - Copy the **Client ID** and set it in your env as `GOOGLE_CLIENT_ID`. Do **not** set `GOOGLE_CALENDAR_CLIENT_ID` to a different or old value, or Google will not recognize it.
+
+2. **Redirect URI**  
+   That same client must list the Calendar callback as an **Authorized redirect URI**:
+   - `https://www.tryaiva.io/api/auth/google-calendar/callback`
+   - For local: `http://localhost:3000/api/auth/google-calendar/callback`
+
+3. **Env**  
+   In `.env.local` / Vercel, set:
+   - `GOOGLE_CLIENT_ID=<your Web application client ID>`
+   - `GOOGLE_CLIENT_SECRET=<that client’s secret>`
+   No need for `GOOGLE_CALENDAR_*` unless you intentionally use a separate Calendar-only client (same steps: valid client, redirect URI, env).
+
+4. **If you use a separate Calendar client**  
+   Create a **Web application** OAuth client in the same project, add the redirect URIs above, then set `GOOGLE_CALENDAR_CLIENT_ID` and `GOOGLE_CALENDAR_CLIENT_SECRET`. The 401 means the Client ID you’re sending is not a valid client in that project (typo, deleted client, or wrong project).
+
+---
+
 ## 4. Reply to Google (draft)
 
 You can send something like this (adjust if your app URL or test account differ):
