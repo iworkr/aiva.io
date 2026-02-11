@@ -396,14 +396,14 @@ export const toggleCalendarVisibilityAction = authActionClient
     if (fetchError) throw new Error(fetchError.message);
     if (!current) throw new Error('Calendar not found. It may have been removed or you may not have access.');
 
-    // Toggle visibility
-    const currentVisible = current.is_visible ?? true;
+    // Toggle visibility (is_visible added in migration 20260129200000)
+    const currentVisible = (current as { is_visible?: boolean }).is_visible ?? true;
     const { data, error } = await supabase
       .from('calendar_connections')
       .update({
         is_visible: !currentVisible,
         updated_at: new Date().toISOString(),
-      })
+      } as Record<string, unknown>)
       .eq('id', id)
       .eq('workspace_id', workspaceId)
       .select()
