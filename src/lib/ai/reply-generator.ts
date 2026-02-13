@@ -430,6 +430,14 @@ ${workspaceAIContext || workspaceAIRules ? `\n\n⚠️ CRITICAL INSTRUCTIONS:
 ${workspaceAIContext ? `- REFER TO WORKSPACE CONTEXT above to understand your role, the business, products, and context before replying.` : ''}
 ${workspaceAIRules ? `- FOLLOW WORKSPACE RULES above STRICTLY. These rules override default behavior.` : ''}
 ` : ''}
+${calendarContext ? `
+📅 CALENDAR CONTEXT (scheduling – follow strictly):
+${calendarContext.hasMatchingEvent
+  ? `- The person emailing (${message.sender_name || message.sender_email}) IS the attendee of the matching event. Confirm clearly that the meeting/plan is still on with them (e.g. "Yes, we're still on for Tuesday 3pm" or "Yes, I have it on with you"). They can cancel or reschedule if they need to. You may reference the event specifically.`
+  : calendarContext.hasEventInRangeButNotWithSender
+    ? `- You have an event in this time range but the person emailing is NOT the attendee. Do NOT disclose who the meeting is with or any details. Reply vaguely that you have plans / are not available (e.g. "I have something on then", "I'm not available", "I have plans"). Never reveal the other person's name or that it's a meeting with someone else.`
+    : `- No matching event with this sender. ${calendarContext.context}`}
+` : ''}
 
 REQUIREMENTS:
 1. Tone: ${tone} (${tone === "formal" ? "Professional language, avoid contractions" : tone === "casual" ? "Friendly, conversational" : tone === "friendly" ? "Warm and approachable" : "Professional but approachable"})
@@ -830,6 +838,7 @@ REMEMBER: Missing information handling:
       review_reason: finalReviewReason || null,
       calendar_context: calendarContext ? {
         hasMatchingEvent: calendarContext.hasMatchingEvent,
+        hasEventInRangeButNotWithSender: calendarContext.hasEventInRangeButNotWithSender,
         matchedEventTitle: calendarContext.matchedEvent?.title,
         suggestedAction: calendarContext.suggestedAction,
         context: calendarContext.context,

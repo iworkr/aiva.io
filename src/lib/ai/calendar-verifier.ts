@@ -37,6 +37,8 @@ export interface CalendarEvent {
 
 export interface CalendarVerificationResult {
   hasMatchingEvent: boolean;
+  /** True when there are events in the searched range but none match the sender (so inquirer is not the attendee). Use to reply vaguely without disclosing details. */
+  hasEventInRangeButNotWithSender?: boolean;
   matchedEvent?: CalendarEvent;
   possibleMatches: CalendarEvent[];
   suggestedAction: 'confirm' | 'decline' | 'ask_human' | 'no_calendar';
@@ -311,6 +313,7 @@ export async function verifySchedulingConfirmation(
   if (msgError || !message) {
     return {
       hasMatchingEvent: false,
+      hasEventInRangeButNotWithSender: false,
       possibleMatches: [],
       suggestedAction: 'ask_human',
       context: 'Could not retrieve message for calendar verification',
@@ -330,6 +333,7 @@ export async function verifySchedulingConfirmation(
   if (!calendarConnections || calendarConnections.length === 0) {
     return {
       hasMatchingEvent: false,
+      hasEventInRangeButNotWithSender: false,
       possibleMatches: [],
       suggestedAction: 'no_calendar',
       context: 'No calendar connected. Cannot verify scheduling confirmation.',
@@ -360,6 +364,7 @@ export async function verifySchedulingConfirmation(
     if (matchingEvents.length === 0) {
       return {
         hasMatchingEvent: false,
+        hasEventInRangeButNotWithSender: events.length > 0,
         possibleMatches: events.slice(0, 5),
         suggestedAction: 'ask_human',
         context: `No events found with ${senderName || senderEmail} in the next 7 days. Human should verify if plans exist.`,
@@ -370,6 +375,7 @@ export async function verifySchedulingConfirmation(
 
     return {
       hasMatchingEvent: true,
+      hasEventInRangeButNotWithSender: false,
       matchedEvent: matchingEvents[0],
       possibleMatches: matchingEvents,
       suggestedAction: 'confirm',
@@ -417,6 +423,7 @@ export async function verifySchedulingConfirmation(
   if (bestMatch && bestMatch.score >= threshold) {
     return {
       hasMatchingEvent: true,
+      hasEventInRangeButNotWithSender: false,
       matchedEvent: bestMatch.event,
       possibleMatches: scoredEvents.filter(s => s.score >= 0.3).map(s => s.event),
       suggestedAction: bestMatch.score >= 0.7 ? 'confirm' : 'ask_human',
@@ -426,9 +433,11 @@ export async function verifySchedulingConfirmation(
     };
   }
 
+  const possibleMatchesList = scoredEvents.slice(0, 5).map(s => s.event);
   return {
     hasMatchingEvent: false,
-    possibleMatches: scoredEvents.slice(0, 5).map(s => s.event),
+    hasEventInRangeButNotWithSender: possibleMatchesList.length > 0,
+    possibleMatches: possibleMatchesList,
     suggestedAction: 'ask_human',
     context: `No matching event found for "${dateTimeInfo.dateReferences.join(', ')}" with ${senderName || senderEmail}. Human should verify.`,
     searchedDateRange: { start: searchStart.toISOString(), end: searchEnd.toISOString() },
