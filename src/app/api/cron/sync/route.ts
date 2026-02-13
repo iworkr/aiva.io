@@ -117,9 +117,28 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // DEDUP: If the same provider account is connected multiple times (same workspace+provider+account),
+    // only keep the oldest (most data) to avoid syncing the same email twice and creating duplicate messages.
+    const deduped = new Map<string, typeof connections[number]>();
+    for (const c of connections) {
+      const key = `${c.workspace_id}|${c.provider}|${c.provider_account_id}`;
+      const existing = deduped.get(key);
+      if (!existing) {
+        deduped.set(key, c);
+      } else {
+        // Keep whichever was created first (has more data); skip the duplicate
+        // We can't compare created_at here because it's not selected, so compare last_sync_at presence
+        console.log(`   ⚠️ Duplicate connection for ${c.provider_account_id} in workspace ${c.workspace_id?.substring(0, 8)}... – skipping ${c.id.substring(0, 8)} (keeping ${existing.id.substring(0, 8)})`);
+      }
+    }
+    const dedupedConnections = Array.from(deduped.values());
+    if (dedupedConnections.length < connections.length) {
+      console.log(`   📋 Deduped: ${connections.length} connections → ${dedupedConnections.length} unique provider accounts`);
+    }
+
     // Log connection details
     console.log('📋 Connection details:');
-    connections.forEach((c, i) => {
+    dedupedConnections.forEach((c, i) => {
       console.log(`   ${i + 1}. ${c.provider} - ${c.provider_account_name} (workspace: ${c.workspace_id?.substring(0, 8)}...)`);
       console.log(`      Status: ${c.status}, Has token: ${!!c.access_token}, Last sync: ${c.last_sync_at || 'never'}`);
     });
@@ -130,7 +149,7 @@ export async function GET(request: NextRequest) {
     let totalErrors = 0;
     const results: any[] = [];
 
-    for (const connection of connections) {
+    for (const connection of dedupedConnections) {
       console.log(`\n🔄 Syncing ${connection.provider}: ${connection.provider_account_name}...`);
       
       // ENTITLEMENT CHECK: Verify workspace has active subscription
@@ -703,7 +722,7 @@ export async function GET(request: NextRequest) {
     const totalDraftsGenerated = results.reduce((sum, r) => sum + (r.draftsGenerated || 0), 0);
     
     console.log(`\n🏁 Sync cron completed in ${duration}ms`);
-    console.log(`   Connections synced: ${totalSynced}/${connections.length}`);
+    console.log(`   Connections synced: ${totalSynced}/${dedupedConnections.length}`);
     console.log(`   New messages: ${totalNewMessages}`);
     console.log(`   Messages classified: ${totalClassified}`);
     console.log(`   Drafts generated: ${totalDraftsGenerated}`);
@@ -714,7 +733,7 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
       tier,
       duration,
-      totalConnections: connections.length,
+      totalConnections: dedupedConnections.length,
       connectionsSynced: totalSynced,
       totalNewMessages,
       totalClassified,

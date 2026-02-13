@@ -229,10 +229,12 @@ export async function syncGmailMessages(
           continue;
         }
 
-        // Store message in database directly (no need to check exists - we already did above)
+        // Store message in database using upsert to handle race conditions
+        // (two concurrent syncs could both pass the existingIds check and try to insert)
+        // onConflict uses the unique index on (channel_connection_id, provider_message_id)
         const { data: inserted, error: insertError } = await supabase
           .from("messages")
-          .insert({
+          .upsert({
             workspace_id: workspaceId,
             channel_connection_id: connectionId,
             provider_message_id: parsed.providerMessageId,
@@ -248,7 +250,7 @@ export async function syncGmailMessages(
             labels: parsed.labels,
             // Cast to any to satisfy Supabase Json type
             raw_data: parsed.rawData as any,
-          })
+          }, { onConflict: 'channel_connection_id,provider_message_id', ignoreDuplicates: true })
           .select("id")
           .single();
 
