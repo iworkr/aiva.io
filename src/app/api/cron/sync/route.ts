@@ -566,8 +566,7 @@ export async function GET(request: NextRequest) {
                 }
                 
                 // *** FULL SMART FILTER CHECK ***
-                // Check if this message should receive an auto-reply
-                // Note: Messages requiring human review still get drafts (for user review), but won't be auto-sent
+                // Determines whether this message would be auto-sent (eligible) or held for review. We always generate a draft either way.
                 const filterResult = await checkAutoReplyEligibility(
                   {
                     id: msg.id,
@@ -579,58 +578,30 @@ export async function GET(request: NextRequest) {
                   filterSettings
                 );
 
-                // If message requires human review, still generate draft (user needs to review it)
-                // But log that it was filtered for auto-send
-                // CRITICAL: Thread reply limit reached messages should still get drafts for human review
                 const isThreadLimitReached = !filterResult.eligible && filterResult.reason?.includes('Thread reply limit');
-                
-                if (!filterResult.eligible) {
-                  if (msg.requires_human_review || isThreadLimitReached) {
-                    // Thread limit reached or already marked for review - still generate draft
-                    if (isThreadLimitReached) {
-                      console.log(`      ⚠️ Thread reply limit reached - generating draft for human review: ${filterResult.reason}`);
-                      // Mark message as requiring human review so it appears in review queue
-                      await supabase
-                        .from('messages')
-                        .update({
-                          requires_human_review: true,
-                          review_reason: 'thread_reply_limit_reached',
-                          review_context: {
-                            reason: filterResult.reason,
-                            details: filterResult.details,
-                            markedAt: new Date().toISOString(),
-                          },
-                        })
-                        .eq('id', msg.id);
-                    } else {
-                      console.log(`      ⚠️ Message requires human review but filtered for auto-send: ${filterResult.reason}`);
-                    }
-                    console.log(`      ✍️ Still generating draft for human review...`);
-                    // Continue to draft generation below
-                  } else {
-                    skippedByFilter++;
-                    console.log(`      ⏭️ SKIPPED: ${msg.subject?.substring(0, 30) || 'No subject'}`);
-                    console.log(`         Reason: ${filterResult.reason}`);
-                    
-                    // Log to auto_send_log for transparency
-                    await supabase.from('auto_send_log').insert({
-                      workspace_id: connection.workspace_id,
-                      message_id: msg.id,
-                      action: 'skipped',
-                      skip_reason: filterResult.reason,
-                      details: filterResult.details as any,
-                    });
-                    
-                    continue;
-                  }
+                if (isThreadLimitReached) {
+                  console.log(`      ⚠️ Thread reply limit reached - generating draft for human review: ${filterResult.reason}`);
+                  await supabase
+                    .from('messages')
+                    .update({
+                      requires_human_review: true,
+                      review_reason: 'thread_reply_limit_reached',
+                      review_context: {
+                        reason: filterResult.reason,
+                        details: filterResult.details,
+                        markedAt: new Date().toISOString(),
+                      },
+                    })
+                    .eq('id', msg.id);
+                } else if (!filterResult.eligible) {
+                  console.log(`      ℹ️ Not eligible for auto-send (${filterResult.reason ?? 'filter'}) - will still generate draft for your review`);
                 }
+
+                // Always generate a draft for every actionable message (SENT/self already skipped above).
+                // Eligibility only affects whether we queue for auto-send; user can always see and send the draft.
+                console.log(`      ✍️ Generating draft for: ${msg.subject?.substring(0, 40) || 'No subject'}...`);
                 
-                // Generate draft (for both eligible messages and messages requiring human review)
-                // Also generate for thread limit reached messages (they need human review)
-                if (filterResult.eligible || msg.requires_human_review || isThreadLimitReached) {
-                  console.log(`      ✍️ Generating draft for: ${msg.subject?.substring(0, 40) || 'No subject'}...`);
-                  
-                  const draftResult = await generateReplyDraft(
+                const draftResult = await generateReplyDraft(
                     msg.id,
                     connection.workspace_id,
                     {
@@ -647,7 +618,6 @@ export async function GET(request: NextRequest) {
                   } else if (draftResult.error) {
                     console.log(`         ⚠️ Draft error: ${draftResult.error}`);
                   }
-                }
               } catch (draftErr) {
                 console.error(`         ❌ Failed to generate draft:`, draftErr instanceof Error ? draftErr.message : draftErr);
               }
