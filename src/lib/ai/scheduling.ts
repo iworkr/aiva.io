@@ -10,6 +10,7 @@ import { createEventAction } from '@/data/user/calendar';
 import { createGoogleCalendarEvent } from '@/lib/calendar/google-calendar';
 import { getGoogleCalendarAccessToken } from '@/lib/calendar/google-calendar';
 import { createSupabaseUserServerActionClient } from '@/supabase-clients/user/createSupabaseUserServerActionClient';
+import { supabaseAdminClient } from '@/supabase-clients/admin/supabaseAdminClient';
 import { extractDateTimeReferences } from './calendar-verifier';
 import { parseISO, startOfDay, endOfDay, addMinutes } from 'date-fns';
 import { TZDate } from '@date-fns/tz';
@@ -191,20 +192,23 @@ export async function createCalendarEventFromSentEmail(
   messageId: string,
   draftId: string,
   workspaceId: string,
-  userId: string
+  userId: string,
+  options?: { useAdminClient?: boolean }
 ): Promise<{ success: boolean; eventId?: string; message?: string }> {
   try {
     // SCHEDULING ASSISTANT CHECK: Require Pro+ plan
     const { hasFeatureAccess } = await import('@/lib/entitlements-guard');
     const hasSchedulingAssistant = await hasFeatureAccess(workspaceId, 'schedulingAssistant');
     if (!hasSchedulingAssistant) {
-      return {
-        success: false,
-        message: 'Calendar event creation from emails requires a Professional plan. Please upgrade.',
-      };
+      const msg = 'Calendar event creation from emails requires a Professional plan. Please upgrade.';
+      console.log('[Calendar Event] Skipped:', msg);
+      return { success: false, message: msg };
     }
 
-    const supabase = await createSupabaseUserServerActionClient();
+    // Cron has no user session; use admin client so RLS doesn't block reads/insert
+    const supabase = options?.useAdminClient
+      ? supabaseAdminClient
+      : await createSupabaseUserServerActionClient();
 
     // Get message and draft
     const { data: message, error: msgError } = await supabase
@@ -214,8 +218,8 @@ export async function createCalendarEventFromSentEmail(
       .single();
 
     if (msgError || !message) {
-      console.log('[Calendar Event] Message not found:', msgError?.message);
-      return { success: false, message: 'Message not found' };
+      console.log('[Calendar Event] Message not found:', msgError?.message, 'messageId:', messageId);
+      return { success: false, message: msgError?.message || 'Message not found' };
     }
 
     const { data: draft, error: draftError } = await supabase
@@ -225,8 +229,8 @@ export async function createCalendarEventFromSentEmail(
       .single();
 
     if (draftError || !draft) {
-      console.log('[Calendar Event] Draft not found:', draftError?.message);
-      return { success: false, message: 'Draft not found' };
+      console.log('[Calendar Event] Draft not found:', draftError?.message, 'draftId:', draftId);
+      return { success: false, message: draftError?.message || 'Draft not found' };
     }
 
     // Workspace timezone so "Tuesday 3pm" is in the user's local time
@@ -279,8 +283,9 @@ export async function createCalendarEventFromSentEmail(
 
     // Check if we have date/time information
     if (!dateTimeInfo.hasDateTime && dateTimeInfo.parsedDates.length === 0) {
-      console.log('[Calendar Event] No date/time found in message or draft');
-      return { success: false, message: 'No date/time information found in the message. Please specify a date.' };
+      const msg = 'No date/time information found in the message or draft.';
+      console.log('[Calendar Event]', msg);
+      return { success: false, message: msg };
     }
 
     // Find calendar connection
@@ -293,8 +298,9 @@ export async function createCalendarEventFromSentEmail(
       .single();
 
     if (!calendarConnection) {
-      console.log('[Calendar Event] No calendar connection found');
-      return { success: false, message: 'No calendar connection found' };
+      const msg = 'No active calendar connection for this workspace. Connect a calendar in Calendar → Connect Calendar.';
+      console.log('[Calendar Event]', msg);
+      return { success: false, message: msg };
     }
 
     // Determine event date/time in the user's timezone (so "Tuesday 3pm" is correct locally)

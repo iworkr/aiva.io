@@ -398,18 +398,19 @@ export async function GET(request: NextRequest) {
               .single();
 
             if (workspaceMember?.workspace_member_id) {
-              console.log(`   📅 Attempting to create calendar event...`);
+              console.log(`   📅 Attempting to create calendar event (message=${item.message_id}, draft=${item.draft_id})...`);
               const eventResult = await createCalendarEventFromSentEmail(
                 item.message_id,
                 item.draft_id,
                 item.workspace_id,
-                workspaceMember.workspace_member_id
+                workspaceMember.workspace_member_id,
+                { useAdminClient: true }
               );
               
               if (eventResult.success) {
                 console.log(`   ✅ Calendar event created: ${eventResult.eventId}`);
               } else {
-                console.log(`   ℹ️ Calendar event not created: ${eventResult.message}`);
+                console.log(`   ℹ️ Calendar event not created: ${eventResult.message ?? 'unknown'}`);
               }
             } else {
               console.log(`   ⚠️ No workspace member found for calendar event creation`);
