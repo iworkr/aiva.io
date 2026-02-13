@@ -3588,6 +3588,7 @@ export type Database = {
           auto_send_sender_cooldown_minutes: number | null
           auto_send_time_end: string | null
           auto_send_time_start: string | null
+          auto_schedule_meeting_requests: boolean | null
           daily_digest_email_addresses: string[] | null
           daily_digest_enabled: boolean | null
           daily_digest_time: string | null
@@ -3624,6 +3625,7 @@ export type Database = {
           auto_send_sender_cooldown_minutes?: number | null
           auto_send_time_end?: string | null
           auto_send_time_start?: string | null
+          auto_schedule_meeting_requests?: boolean | null
           daily_digest_email_addresses?: string[] | null
           daily_digest_enabled?: boolean | null
           daily_digest_time?: string | null
@@ -3660,6 +3662,7 @@ export type Database = {
           auto_send_sender_cooldown_minutes?: number | null
           auto_send_time_end?: string | null
           auto_send_time_start?: string | null
+          auto_schedule_meeting_requests?: boolean | null
           daily_digest_email_addresses?: string[] | null
           daily_digest_enabled?: boolean | null
           daily_digest_time?: string | null
