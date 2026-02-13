@@ -432,8 +432,8 @@ ${workspaceAIRules ? `- FOLLOW WORKSPACE RULES above STRICTLY. These rules overr
 ` : ''}
 ${calendarContext ? (() => {
   const e = calendarContext.matchedEvent;
-  const timeStr = e?.start_time
-    ? `${new Date(e.start_time).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} – ${new Date(e.end_time).toLocaleString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+  const timeStr = e?.startTime
+    ? `${new Date(e.startTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} – ${new Date(e.endTime).toLocaleString('en-US', { hour: 'numeric', minute: '2-digit' })}`
     : '';
   return `
 📅 CALENDAR CONTEXT (scheduling – follow strictly):
