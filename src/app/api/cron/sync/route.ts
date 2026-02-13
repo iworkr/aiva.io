@@ -443,60 +443,52 @@ export async function GET(request: NextRequest) {
         
         try {
           // Get messages that need drafts:
-          // - Any actionability type that might need a response (excluding 'none')
-          // - No existing draft OR draft exists but is held for review (regenerate if needed)
-          // - Include messages requiring human review (they still need drafts, just won't be auto-sent)
-          // - Recent (last 48 hours - extended to catch missed messages)
-          // - CRITICAL: Only messages received by THIS connection (not other connections in the workspace)
-          // - Include sender_email, category, provider_thread_id, labels for filtering
-          const { data: actionableMessages } = await supabase
-            .from('messages')
-            .select(`
-              id, 
-              subject, 
-              actionability, 
-              has_draft_reply, 
-              sender_email, 
-              category, 
-              provider_thread_id, 
-              labels, 
-              requires_human_review,
-              timestamp,
-              message_drafts(id, hold_for_review, auto_sent)
-            `)
-            .eq('workspace_id', connection.workspace_id)
-            .eq('channel_connection_id', connection.id) // CRITICAL: Only process messages for THIS connection
-            .in('actionability', ['question', 'request', 'fyi', 'scheduling_intent', 'task']) // All types except 'none'
-            // Include messages without drafts OR messages with held drafts (may need regeneration)
-            .or('has_draft_reply.eq.false,has_draft_reply.is.null')
-            // Include messages requiring human review - they still need drafts for user review
-            // Extended to 48 hours to catch messages that might have been missed
-            .gte('timestamp', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
-            .order('timestamp', { ascending: false })
-            .limit(20); // Increased limit to catch more messages
-          
-          // Also check for messages that might not be classified yet but should be actionable
-          // This catches messages that were synced but classification failed or hasn't run yet
-          const { data: unclassifiedActionableMessages } = await supabase
-            .from('messages')
-            .select('id, subject, actionability, sender_email, timestamp')
-            .eq('workspace_id', connection.workspace_id)
-            .eq('channel_connection_id', connection.id)
-            .is('actionability', null)
-            .gte('timestamp', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
-            .order('timestamp', { ascending: false })
-            .limit(10);
-          
-          if (unclassifiedActionableMessages && unclassifiedActionableMessages.length > 0) {
-            console.log(`      ⚠️ Found ${unclassifiedActionableMessages.length} unclassified messages - they need classification before draft generation`);
-            console.log(`      📋 Unclassified messages:`, unclassifiedActionableMessages.map((m: any) => ({
-              subject: m.subject?.substring(0, 40),
-              sender: m.sender_email,
-              timestamp: m.timestamp,
-            })));
+          // - Actionability in (question, request, fyi, scheduling_intent, task) OR actionability IS NULL
+          //   (null = classification failed or not run yet – we'll classify on the fly and skip only if 'none')
+          // - No existing draft; recent (48h); THIS connection only
+          const ts48hAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+          const baseSelect = `
+            id, subject, actionability, has_draft_reply, sender_email, category,
+            provider_thread_id, labels, requires_human_review, timestamp,
+            message_drafts(id, hold_for_review, auto_sent)
+          `;
+
+          const [{ data: actionableList }, { data: nullActionabilityList }] = await Promise.all([
+            supabase.from('messages').select(baseSelect)
+              .eq('workspace_id', connection.workspace_id)
+              .eq('channel_connection_id', connection.id)
+              .in('actionability', ['question', 'request', 'fyi', 'scheduling_intent', 'task'])
+              .or('has_draft_reply.eq.false,has_draft_reply.is.null')
+              .gte('timestamp', ts48hAgo)
+              .order('timestamp', { ascending: false })
+              .limit(20),
+            supabase.from('messages').select(baseSelect)
+              .eq('workspace_id', connection.workspace_id)
+              .eq('channel_connection_id', connection.id)
+              .is('actionability', null)
+              .or('has_draft_reply.eq.false,has_draft_reply.is.null')
+              .gte('timestamp', ts48hAgo)
+              .order('timestamp', { ascending: false })
+              .limit(10),
+          ]);
+
+          // Merge and dedupe by id, keep most recent first, cap at 20
+          const seenIds = new Set<string>();
+          const actionableMessages: any[] = [];
+          for (const m of [...(actionableList || []), ...(nullActionabilityList || [])]) {
+            if (m?.id && !seenIds.has(m.id)) {
+              seenIds.add(m.id);
+              actionableMessages.push(m);
+            }
+          }
+          actionableMessages.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+          actionableMessages.splice(20);
+
+          if (actionableMessages.length > 0 && (nullActionabilityList?.length ?? 0) > 0) {
+            console.log(`      📋 Including ${nullActionabilityList!.length} unclassified message(s) for draft attempt (will classify on the fly)`);
           }
 
-          if (actionableMessages && actionableMessages.length > 0) {
+          if (actionableMessages.length > 0) {
             // Filter out messages that already have non-held drafts
             const messagesNeedingDrafts = actionableMessages.filter((msg: any) => {
               const drafts = (msg.message_drafts || []) as any[];
@@ -562,6 +554,23 @@ export async function GET(request: NextRequest) {
                     skippedByFilter++;
                     console.log(`      ⏭️ SKIPPED (username match): ${msg.subject?.substring(0, 30) || 'No subject'}`);
                     continue;
+                  }
+                }
+
+                // If actionability is null (classification failed or not run), classify now.
+                // Skip draft only if classifier explicitly returns 'none' (no response needed).
+                if (msg.actionability == null) {
+                  try {
+                    const result = await classifyMessage(msg.id, connection.workspace_id, { useAdminClient: true });
+                    if (result.actionability === 'none') {
+                      console.log(`      ⏭️ SKIPPED (classifier returned actionability=none): ${msg.subject?.substring(0, 30) || 'No subject'}`);
+                      skippedByFilter++;
+                      continue;
+                    }
+                    // Refresh msg so we have updated actionability for logging
+                    msg.actionability = result.actionability;
+                  } catch (classifyErr) {
+                    console.warn(`      ⚠️ On-the-fly classification failed for ${msg.id}, will still try draft:`, classifyErr instanceof Error ? classifyErr.message : classifyErr);
                   }
                 }
                 
@@ -647,7 +656,7 @@ export async function GET(request: NextRequest) {
             
             console.log(`   📊 Generated ${draftsGenerated}/${actionableMessages.length} drafts (${skippedByFilter} skipped by filters)`);
           } else {
-            console.log(`      ℹ️ No actionable messages without drafts found`);
+            console.log(`      ℹ️ No actionable or unclassified messages without drafts (so no draft generated for this connection)`);
           }
         } catch (draftError) {
           console.error(`   ❌ Draft generation error:`, draftError);

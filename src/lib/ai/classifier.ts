@@ -255,9 +255,10 @@ ACTIONABILITY:
 - question: Directly asking for information
 - request: Asking for action/response
 - fyi: Information only, no response needed
-- scheduling_intent: About meetings/scheduling
+- scheduling_intent: About meetings/scheduling (meet, book, schedule, call, 3pm Tuesday, etc.)
 - task: Contains clear task/to-do
-- none: No action needed (confirmations, notifications)
+- none: No action needed (confirmations, notifications, pure FYI with no ask)
+CRITICAL: Any message that proposes or asks about a meeting (e.g. "meet Tuesday 3pm", "can we schedule", "book a call", "free for a call?") must be scheduling_intent or request, never none. Short test emails about meeting times are still scheduling_intent or request.
 
 CONFIDENCE SCORE CALCULATION (be realistic and varied):
 Calculate based on these factors:
