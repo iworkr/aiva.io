@@ -280,13 +280,24 @@ export const deleteEventAction = authActionClient
 
     const supabase = await createSupabaseUserServerActionClient();
 
-    const { error } = await supabase
+    // Log for Vercel/debugging: we only ever delete one row by id
+    console.log('[Calendar] Delete event request:', { eventId: id, workspaceId });
+
+    const { data, error } = await supabase
       .from('events')
       .delete()
       .eq('id', id)
-      .eq('workspace_id', workspaceId);
+      .eq('workspace_id', workspaceId)
+      .select('id');
 
     if (error) throw new Error(error.message);
+
+    const deletedCount = data?.length ?? 0;
+    if (deletedCount !== 1) {
+      console.warn('[Calendar] Delete affected', deletedCount, 'row(s) for id:', id);
+    } else {
+      console.log('[Calendar] Deleted event id:', id);
+    }
 
     revalidatePath(`/workspace/${workspaceId}/calendar`);
     revalidatePath(`/calendar`);
