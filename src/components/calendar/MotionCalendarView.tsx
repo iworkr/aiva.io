@@ -90,6 +90,8 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
     calendars: string[];
     categories: string[];
   }>({ calendars: [], categories: [] });
+  // Optimistic delete: hide event immediately, clear when refetch completes
+  const [optimisticallyDeletedIds, setOptimisticallyDeletedIds] = useState<Set<string>>(new Set());
 
   // Calculate date range based on view mode
   const dateRange = useMemo(() => {
@@ -143,8 +145,13 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
     }
   );
 
-  // Default to empty array if null
-  const eventsList = events || [];
+  // Default to empty array if null; hide optimistically deleted events so UI updates immediately
+  const eventsList = (events || []).filter((e: any) => !optimisticallyDeletedIds.has(e.id));
+
+  // Clear optimistic deletes when events data updates (after refetch)
+  useEffect(() => {
+    setOptimisticallyDeletedIds((prev) => (prev.size === 0 ? prev : new Set()));
+  }, [events]);
 
   // Create event
   const { execute: createEvent } = useAction(createEventAction, {
@@ -172,10 +179,11 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
 
   // Delete event
   const { execute: deleteEvent } = useAction(deleteEventAction, {
-    onSuccess: () => {
+    onSuccess: ({ input }) => {
       toast.success('Event deleted successfully');
       setShowEventModal(false);
-      // Invalidate all calendar caches so navigating away and back doesn't show stale events
+      // Optimistic update: remove from list immediately so it disappears without refresh
+      if (input?.id) setOptimisticallyDeletedIds((prev) => new Set([...prev, input.id]));
       invalidateCache(/^calendar-events-/);
       refreshEvents();
     },

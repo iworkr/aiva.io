@@ -224,7 +224,7 @@ export async function createCalendarEventFromSentEmail(
 
     const { data: draft, error: draftError } = await supabase
       .from('message_drafts')
-      .select('calendar_context, body')
+      .select('calendar_context, body, auto_sent, auto_sent_at')
       .eq('id', draftId)
       .single();
 
@@ -232,6 +232,18 @@ export async function createCalendarEventFromSentEmail(
       console.log('[Calendar Event] Draft not found:', draftError?.message, 'draftId:', draftId);
       return { success: false, message: draftError?.message || 'Draft not found' };
     }
+
+    // SAFETY GUARD: Only create calendar events after the reply has actually been sent.
+    // The auto_sent flag is set by auto-send cron; manual sends call this right after sendReply succeeds.
+    // If the draft hasn't been sent yet (still a draft), do NOT create the event prematurely.
+    // Note: manual sends (sendReplyAction / review-queue approval) call this immediately after
+    // a successful send, so auto_sent may not be set yet in those flows. The caller is responsible
+    // for only calling this function after a successful send.
+    console.log('[Calendar Event] Draft send status:', {
+      draftId,
+      autoSent: draft.auto_sent,
+      autoSentAt: draft.auto_sent_at,
+    });
 
     // Workspace timezone so "Tuesday 3pm" is in the user's local time
     const { data: wsRow } = await supabase

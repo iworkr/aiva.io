@@ -271,14 +271,18 @@ export async function generateReplyDraft(
       console.log('[AI Reply] Message flagged for human review:', reviewReason);
     }
 
-    // Check for scheduling confirmation (even if not flagged by classifier)
+    // Check for scheduling confirmation OR proposal (even if not flagged by classifier)
     const schedulingCheck = await isSchedulingConfirmation(
       message.subject || '',
       message.body || ''
     );
 
     if (schedulingCheck.isConfirmation && schedulingCheck.confidence >= 0.6) {
-      console.log('[AI Reply] Detected scheduling confirmation, verifying calendar...');
+      const isNewProposal = schedulingCheck.isProposal;
+      console.log('[AI Reply] Detected scheduling message:', {
+        isNewProposal,
+        confidence: schedulingCheck.confidence,
+      });
       
       try {
         calendarContext = await verifySchedulingConfirmation(
@@ -291,26 +295,41 @@ export async function generateReplyDraft(
 
         console.log('[AI Reply] Calendar verification result:', {
           hasMatchingEvent: calendarContext.hasMatchingEvent,
+          hasEventInRangeButNotWithSender: calendarContext.hasEventInRangeButNotWithSender,
           suggestedAction: calendarContext.suggestedAction,
           confidence: calendarContext.confidence,
+          isNewProposal,
         });
 
-        // If no matching event found, require human review
-        if (!calendarContext.hasMatchingEvent || calendarContext.suggestedAction === 'ask_human') {
-          needsHumanReview = true;
-          reviewReason = 'calendar_mismatch';
-          aiUncertaintyNotes = calendarContext.context;
-        } else if (calendarContext.suggestedAction === 'no_calendar') {
+        if (calendarContext.suggestedAction === 'no_calendar') {
+          // No calendar connected at all → hold for review
           needsHumanReview = true;
           reviewReason = 'no_calendar_connected';
-          aiUncertaintyNotes = 'No calendar connected to verify this scheduling confirmation';
+          aiUncertaintyNotes = 'No calendar connected to verify this scheduling message';
+        } else if (isNewProposal) {
+          // NEW PROPOSAL: someone is asking to schedule a meeting.
+          // No matching event is EXPECTED (it doesn't exist yet).
+          // Calendar context is still passed to the AI for conflict detection
+          // (hasEventInRangeButNotWithSender → the AI prompt will decline / suggest alternative).
+          // Do NOT hold for review – let it auto-send so the calendar event is created after send.
+          console.log('[AI Reply] New scheduling proposal – will NOT hold for calendar mismatch.',
+            calendarContext.hasEventInRangeButNotWithSender
+              ? 'Conflict detected – AI will decline/suggest alternative.'
+              : 'No conflict – AI will confirm.');
+        } else {
+          // CONFIRMATION about an existing meeting
+          if (!calendarContext.hasMatchingEvent || calendarContext.suggestedAction === 'ask_human') {
+            needsHumanReview = true;
+            reviewReason = 'calendar_mismatch';
+            aiUncertaintyNotes = calendarContext.context;
+          }
         }
       } catch (calError) {
         console.error('[AI Reply] Calendar verification error:', calError);
         // Don't block on calendar errors, just flag for review
         needsHumanReview = true;
         reviewReason = 'calendar_check_failed';
-        aiUncertaintyNotes = 'Could not verify calendar for scheduling confirmation';
+        aiUncertaintyNotes = 'Could not verify calendar for scheduling message';
       }
     }
     // ============================================
@@ -435,6 +454,7 @@ ${calendarContext ? (() => {
   const timeStr = e?.startTime
     ? `${new Date(e.startTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} – ${new Date(e.endTime).toLocaleString('en-US', { hour: 'numeric', minute: '2-digit' })}`
     : '';
+  const isProposal = schedulingCheck.isConfirmation && schedulingCheck.isProposal;
   return `
 📅 CALENDAR CONTEXT (scheduling – follow strictly):
 ${calendarContext.hasMatchingEvent && e
@@ -445,8 +465,13 @@ ${calendarContext.hasMatchingEvent && e
   : calendarContext.hasEventInRangeButNotWithSender
     ? `- You already have an event in this time range; the person emailing is NOT the attendee. Do NOT disclose who the meeting is with.
 - If they are asking to SCHEDULE or BOOK a meeting at this time: do NOT accept. Say you are not available then and optionally suggest another time (e.g. "I have something then – would [other time] work?"). Never double-book.
-- If they are just asking generally: reply vaguely (e.g. "I have something on then", "I'm not available").`
-    : `- No matching event with this sender. ${calendarContext.context}`}
+- If they are just asking generally: reply vaguely (e.g. "I have something on then", "I'm not available").
+- Set "isAutoSendable" to true – this is a clear response.`
+    : isProposal
+      ? `- This is a NEW meeting proposal. The calendar is free at the proposed time – no conflicts.
+- Confirm the meeting warmly (e.g. "That works for me! I've got us down for 3pm Tuesday." or "Sounds great, Tuesday at 3 works perfectly.").
+- Set "isAutoSendable" to true and "confidenceScore" to 0.90 or higher – this is a straightforward scheduling confirmation.`
+      : `- No matching event with this sender. ${calendarContext.context}`}
 `;
 })() : ''}
 
@@ -730,10 +755,13 @@ REMEMBER: Missing information handling:
     const confidenceBelowThreshold = result.confidenceScore < unifiedThreshold;
 
     // Check review triggers based on workspace settings
-    // Calendar mismatch = no matching event found OR low confidence match (suggestedAction is 'ask_human')
-    // Only "Scheduling Confirmations" toggle controls this: when ON we hold scheduling replies for review; when OFF they can auto-send (subject to confidence etc.)
-    const hasCalendarMismatch = calendarContext && (!calendarContext.hasMatchingEvent || calendarContext.suggestedAction === 'ask_human');
-    const shouldReviewForScheduling = reviewForScheduling && (needsHumanReview || hasCalendarMismatch);
+    // Calendar mismatch only applies to CONFIRMATIONS where we can't find the event.
+    // For NEW proposals (isProposal), no matching event is expected – not a "mismatch".
+    const isProposalMessage = schedulingCheck.isConfirmation && schedulingCheck.isProposal;
+    const hasCalendarMismatch = calendarContext
+      && !isProposalMessage // Proposals don't have a "mismatch" – there's nothing to match yet
+      && (!calendarContext.hasMatchingEvent || calendarContext.suggestedAction === 'ask_human');
+    const shouldReviewForScheduling = reviewForScheduling && (hasCalendarMismatch || (needsHumanReview && reviewReason === 'calendar_mismatch'));
     const shouldReviewForCommitments = reviewForCommitments && isCriticalMissingInfo;
     // Bills/invoices only require review if they're in excluded categories OR if review for sensitive is enabled
     // Otherwise, they can auto-send if confidence is high (especially for Shopify orders with order data)

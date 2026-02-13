@@ -447,15 +447,17 @@ export async function verifySchedulingConfirmation(
 
 /**
  * Quick check if a message is asking to confirm an existing plan
+ * OR proposing a new meeting. Returns `isProposal: true` for NEW
+ * meeting requests so the caller can skip the "calendar mismatch" hold.
  * (lighter weight than full verification)
  */
 export async function isSchedulingConfirmation(
   subject: string,
   body: string
-): Promise<{ isConfirmation: boolean; confidence: number }> {
+): Promise<{ isConfirmation: boolean; isProposal: boolean; confidence: number }> {
   const text = `${subject} ${body}`.toLowerCase();
 
-  // Phrases that indicate confirmation request
+  // --- 1. Phrases that indicate confirmation of an EXISTING plan ---
   const confirmationPhrases = [
     'are we still on',
     'still on for',
@@ -473,11 +475,11 @@ export async function isSchedulingConfirmation(
 
   for (const phrase of confirmationPhrases) {
     if (text.includes(phrase)) {
-      return { isConfirmation: true, confidence: 0.85 };
+      return { isConfirmation: true, isProposal: false, confidence: 0.85 };
     }
   }
 
-  // Check for question about existing plans
+  // --- 2. Question about existing plans ---
   const questionPatterns = [
     /we (still )?meeting/i,
     /our (meeting|call|lunch|dinner|appointment|booking)/i,
@@ -490,11 +492,11 @@ export async function isSchedulingConfirmation(
 
   for (const pattern of questionPatterns) {
     if (pattern.test(text)) {
-      return { isConfirmation: true, confidence: 0.70 };
+      return { isConfirmation: true, isProposal: false, confidence: 0.70 };
     }
   }
 
-  // Proposing a new meeting time (need calendar check to avoid double-book)
+  // --- 3. Proposing a NEW meeting time (need calendar conflict check only) ---
   const proposalPhrases = [
     'book you in for',
     'book in for',
@@ -503,18 +505,32 @@ export async function isSchedulingConfirmation(
     'meet on',
     'meet tuesday',
     'meet wednesday',
+    'meet thursday',
+    'meet friday',
+    'meet monday',
     'can we meet',
     'book a time',
     'schedule a meeting',
+    'schedule a call',
+    'set up a meeting',
+    'set up a call',
+    'make a meeting',
+    'meeting at',
     '30 minutes at',
     'an hour at',
+    'let\'s meet',
+    'want to meet',
+    'like to meet',
+    'catch up at',
+    'catch up on',
   ];
   for (const phrase of proposalPhrases) {
     if (text.includes(phrase)) {
-      return { isConfirmation: true, confidence: 0.65 };
+      // isProposal = true → caller knows this is a NEW meeting, not a confirmation
+      return { isConfirmation: true, isProposal: true, confidence: 0.65 };
     }
   }
 
-  return { isConfirmation: false, confidence: 0 };
+  return { isConfirmation: false, isProposal: false, confidence: 0 };
 }
 
