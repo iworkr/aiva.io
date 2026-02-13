@@ -184,6 +184,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
 
   // Human review settings state (review triggers only, threshold is now unified)
   const [humanReviewForScheduling, setHumanReviewForScheduling] = useState(true);
+  const [autoScheduleMeetingRequests, setAutoScheduleMeetingRequests] = useState(false);
   const [humanReviewForCommitments, setHumanReviewForCommitments] = useState(true);
   const [humanReviewForSensitive, setHumanReviewForSensitive] = useState(true);
   
@@ -362,6 +363,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
           humanReviewForScheduling?: boolean;
           humanReviewForCommitments?: boolean;
           humanReviewForSensitive?: boolean;
+          autoScheduleMeetingRequests?: boolean;
         };
         if (autoSend) {
           setAutoSendEnabled(autoSend.autoSendEnabled ?? false);
@@ -375,6 +377,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
           setHumanReviewForScheduling(autoSend.humanReviewForScheduling ?? true);
           setHumanReviewForCommitments(autoSend.humanReviewForCommitments ?? true);
           setHumanReviewForSensitive(autoSend.humanReviewForSensitive ?? true);
+          setAutoScheduleMeetingRequests(autoSend.autoScheduleMeetingRequests ?? false);
         }
 
         // Set auto-send filter settings
@@ -856,6 +859,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
     humanReviewForScheduling: boolean;
     humanReviewForCommitments: boolean;
     humanReviewForSensitive: boolean;
+    autoScheduleMeetingRequests?: boolean;
   }>) => {
     if (!hasInitializedRef.current) return;
     
@@ -1000,6 +1004,11 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
     triggerAutoSendSave({ 
       humanReviewForSensitive: value 
     });
+  };
+
+  const handleAutoScheduleMeetingRequestsChange = (value: boolean) => {
+    setAutoScheduleMeetingRequests(value);
+    triggerAutoSendSave({ autoScheduleMeetingRequests: value });
   };
 
   // Mark as initialized after first data load
@@ -1540,7 +1549,7 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                                 <div>
                                   <p className="text-sm font-medium">Scheduling Confirmations</p>
                                   <p className="text-xs text-muted-foreground">
-                                    "Are we still on for lunch?" - Verifies calendar first
+                                    When ON: replies like &quot;Are we still on for lunch?&quot; are held for review so you can approve before sending. Aiva checks your calendar first to suggest the reply.
                                   </p>
                                 </div>
                               </div>
@@ -1579,6 +1588,22 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
                               <Switch
                                 checked={humanReviewForSensitive}
                                 onCheckedChange={handleHumanReviewForSensitiveChange}
+                              />
+                            </div>
+
+                            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                              <div className="flex items-center gap-3">
+                                <Calendar className="h-4 w-4 text-emerald-500" />
+                                <div>
+                                  <p className="text-sm font-medium">Allow auto-schedule for meeting requests</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    When ON and confidence is high, scheduling/booking replies can auto-send; event is added to your calendar after send.
+                                  </p>
+                                </div>
+                              </div>
+                              <Switch
+                                checked={autoScheduleMeetingRequests}
+                                onCheckedChange={handleAutoScheduleMeetingRequestsChange}
                               />
                             </div>
                           </div>

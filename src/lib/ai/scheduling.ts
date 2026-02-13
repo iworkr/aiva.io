@@ -12,6 +12,7 @@ import { getGoogleCalendarAccessToken } from '@/lib/calendar/google-calendar';
 import { createSupabaseUserServerActionClient } from '@/supabase-clients/user/createSupabaseUserServerActionClient';
 import { extractDateTimeReferences } from './calendar-verifier';
 import { parseISO, startOfDay, endOfDay, addMinutes } from 'date-fns';
+import { TZDate } from '@date-fns/tz';
 
 /**
  * Auto-create calendar event from message scheduling intent
@@ -228,15 +229,29 @@ export async function createCalendarEventFromSentEmail(
       return { success: false, message: 'Draft not found' };
     }
 
-    // Extract date/time from the ORIGINAL incoming message
+    // Workspace timezone so "Tuesday 3pm" is in the user's local time
+    const { data: wsRow } = await supabase
+      .from('workspace_settings')
+      .select('workspace_settings')
+      .eq('workspace_id', workspaceId)
+      .single();
+    const wsSettings = (wsRow?.workspace_settings || {}) as Record<string, unknown>;
+    const userTimeZone =
+      typeof wsSettings?.timezone === 'string' && wsSettings.timezone.length > 0
+        ? (wsSettings.timezone as string)
+        : Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    // Extract date/time from the ORIGINAL incoming message (with timezone for correct "Tuesday" etc.)
     console.log('[Calendar Event] Extracting dates from message:', {
       subject: message.subject,
       bodyLength: message.body?.length || 0,
+      userTimeZone,
     });
-    
+
     let dateTimeInfo = await extractDateTimeReferences(
       message.subject || '',
-      message.body || ''
+      message.body || '',
+      userTimeZone
     );
 
     console.log('[Calendar Event] Date extraction from original message:', {
@@ -252,9 +267,10 @@ export async function createCalendarEventFromSentEmail(
       console.log('[Calendar Event] No dates in original message, trying draft body...');
       const draftDateInfo = await extractDateTimeReferences(
         message.subject || '',
-        draft.body
+        draft.body,
+        userTimeZone
       );
-      
+
       if (draftDateInfo.parsedDates.length > 0) {
         console.log('[Calendar Event] Found dates in draft:', draftDateInfo.parsedDates);
         dateTimeInfo = draftDateInfo;
@@ -281,87 +297,62 @@ export async function createCalendarEventFromSentEmail(
       return { success: false, message: 'No calendar connection found' };
     }
 
-    // Determine event date/time
-    let eventDate: Date;
+    // Determine event date/time in the user's timezone (so "Tuesday 3pm" is correct locally)
     let isAllDay = true;
     let startTime: string;
     let endTime: string;
-    let duration = 60; // Default 60 minutes
+    const duration = 60; // Default 60 minutes
 
-    if (dateTimeInfo.parsedDates.length > 0) {
-      // Use the first parsed date
-      eventDate = parseISO(dateTimeInfo.parsedDates[0]);
-      console.log('[Calendar Event] Using parsed date:', eventDate.toISOString());
-    } else {
-      // No parsed dates - this shouldn't happen since we check above, but handle gracefully
-      // IMPORTANT: Do NOT use searchedDateRange.start as that's the search START (usually today),
-      // not the date mentioned in the email!
-      console.log('[Calendar Event] Warning: No parsed dates, defaulting to next business day');
-      
-      // Default to next business day
-      eventDate = new Date();
-      const dayOfWeek = eventDate.getDay();
-      
-      // If Friday, Saturday, or Sunday, go to next Monday
-      if (dayOfWeek === 5) {
-        eventDate.setDate(eventDate.getDate() + 3); // Friday -> Monday
-      } else if (dayOfWeek === 6) {
-        eventDate.setDate(eventDate.getDate() + 2); // Saturday -> Monday
-      } else if (dayOfWeek === 0) {
-        eventDate.setDate(eventDate.getDate() + 1); // Sunday -> Monday
-      } else {
-        eventDate.setDate(eventDate.getDate() + 1); // Next day
-      }
-      
-      console.log('[Calendar Event] Defaulted to:', eventDate.toISOString());
+    const parsedDateStr = dateTimeInfo.parsedDates[0];
+    let dateOnly = parsedDateStr ? parseISO(parsedDateStr) : null;
+    if (!dateOnly || Number.isNaN(dateOnly.getTime())) {
+      const d = new Date();
+      const dayOfWeek = d.getDay();
+      if (dayOfWeek === 5) d.setDate(d.getDate() + 3);
+      else if (dayOfWeek === 6) d.setDate(d.getDate() + 2);
+      else if (dayOfWeek === 0) d.setDate(d.getDate() + 1);
+      else d.setDate(d.getDate() + 1);
+      dateOnly = d;
     }
 
-    // Check if time is specified
-    if (dateTimeInfo.timeReferences.length > 0) {
-      isAllDay = false;
-      
-      // Try to parse time from time references
+    const year = dateOnly.getFullYear();
+    const monthIndex = dateOnly.getMonth();
+    const day = dateOnly.getDate();
+
+    const getHourMinute = (): { hour: number; minute: number } => {
+      if (dateTimeInfo.timeReferences.length === 0) return { hour: 0, minute: 0 };
       const timeRef = dateTimeInfo.timeReferences[0].toLowerCase();
-      
-      // Parse common time formats
       const timeMatch = timeRef.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
       if (timeMatch) {
         let hour = parseInt(timeMatch[1]);
         const minute = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
         const ampm = timeMatch[3]?.toLowerCase();
-        
         if (ampm === 'pm' && hour < 12) hour += 12;
         if (ampm === 'am' && hour === 12) hour = 0;
-        
-        eventDate.setHours(hour, minute, 0, 0);
-        startTime = eventDate.toISOString();
-        endTime = addMinutes(eventDate, duration).toISOString();
-      } else {
-        // Handle common time expressions
-        if (timeRef.includes('lunch')) {
-          eventDate.setHours(12, 0, 0, 0);
-        } else if (timeRef.includes('breakfast')) {
-          eventDate.setHours(8, 0, 0, 0);
-        } else if (timeRef.includes('dinner') || timeRef.includes('evening')) {
-          eventDate.setHours(19, 0, 0, 0);
-        } else if (timeRef.includes('afternoon')) {
-          eventDate.setHours(14, 0, 0, 0); // 2pm for afternoon
-        } else if (timeRef.includes('morning')) {
-          eventDate.setHours(10, 0, 0, 0); // 10am for morning
-        } else {
-          // Default to 2pm if time reference but can't parse (common meeting time)
-          eventDate.setHours(14, 0, 0, 0);
-        }
-        console.log('[Calendar Event] Parsed time reference:', timeRef, '-> hour:', eventDate.getHours());
-        startTime = eventDate.toISOString();
-        endTime = addMinutes(eventDate, duration).toISOString();
+        return { hour, minute };
       }
+      if (timeRef.includes('lunch')) return { hour: 12, minute: 0 };
+      if (timeRef.includes('breakfast')) return { hour: 8, minute: 0 };
+      if (timeRef.includes('dinner') || timeRef.includes('evening')) return { hour: 19, minute: 0 };
+      if (timeRef.includes('afternoon')) return { hour: 14, minute: 0 };
+      if (timeRef.includes('morning')) return { hour: 10, minute: 0 };
+      return { hour: 14, minute: 0 };
+    };
+
+    if (dateTimeInfo.timeReferences.length > 0) {
+      isAllDay = false;
+      const { hour, minute } = getHourMinute();
+      // Build start in user's timezone then convert to UTC for storage
+      const tzStart = new TZDate(year, monthIndex, day, hour, minute, 0, 0, userTimeZone);
+      startTime = tzStart.toISOString();
+      endTime = addMinutes(new Date(tzStart.getTime()), duration).toISOString();
+      console.log('[Calendar Event] Using user timezone:', userTimeZone, '-> start:', startTime);
     } else {
-      // All-day event
-      const startOfEvent = startOfDay(eventDate);
-      const endOfEvent = endOfDay(eventDate);
-      startTime = startOfEvent.toISOString();
-      endTime = endOfEvent.toISOString();
+      // All-day event: 00:00–23:59 in user's timezone
+      const tzStart = new TZDate(year, monthIndex, day, 0, 0, 0, 0, userTimeZone);
+      const tzEnd = new TZDate(year, monthIndex, day, 23, 59, 59, 999, userTimeZone);
+      startTime = tzStart.toISOString();
+      endTime = tzEnd.toISOString();
     }
 
     // Create event title
@@ -378,7 +369,7 @@ export async function createCalendarEventFromSentEmail(
         description: `Created from email reply to ${message.sender_email}`,
         start_time: startTime,
         end_time: endTime,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        timezone: userTimeZone || 'UTC',
         is_all_day: isAllDay,
         organizer: { 
           email: calendarConnection.provider_account_email || '', 

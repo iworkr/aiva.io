@@ -64,6 +64,7 @@ const updateAutoSendSettingsSchema = z.object({
   humanReviewForScheduling: z.boolean().optional(),
   humanReviewForCommitments: z.boolean().optional(),
   humanReviewForSensitive: z.boolean().optional(),
+  autoScheduleMeetingRequests: z.boolean().optional(),
 });
 
 const pauseAutoSendSchema = z.object({
@@ -753,6 +754,9 @@ export const updateAutoSendSettingsAction = authActionClient
     if (settings.humanReviewForSensitive !== undefined) {
       updateData.human_review_for_sensitive = settings.humanReviewForSensitive;
     }
+    if (settings.autoScheduleMeetingRequests !== undefined) {
+      updateData.auto_schedule_meeting_requests = settings.autoScheduleMeetingRequests;
+    }
 
     // If enabling, ensure paused is false
     if (settings.autoSendEnabled === true) {
@@ -1061,7 +1065,8 @@ export async function getAutoSendSettings(workspaceId: string, userId: string) {
       auto_send_paused_at,
       human_review_for_scheduling,
       human_review_for_commitments,
-      human_review_for_sensitive
+      human_review_for_sensitive,
+      auto_schedule_meeting_requests
     `)
     .eq('workspace_id', workspaceId)
     .single();
@@ -1084,6 +1089,7 @@ export async function getAutoSendSettings(workspaceId: string, userId: string) {
     humanReviewForScheduling: data?.human_review_for_scheduling ?? true,
     humanReviewForCommitments: data?.human_review_for_commitments ?? true,
     humanReviewForSensitive: data?.human_review_for_sensitive ?? true,
+    autoScheduleMeetingRequests: data?.auto_schedule_meeting_requests ?? false,
   };
 }
 

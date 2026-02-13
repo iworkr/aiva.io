@@ -58,10 +58,12 @@ interface DateTimeExtraction {
 
 /**
  * Extract date/time references from message using AI
+ * @param timeZone - IANA timezone (e.g. "Australia/Sydney") so "Tuesday" and "3pm" are resolved in user's local context
  */
 export async function extractDateTimeReferences(
   subject: string,
-  body: string
+  body: string,
+  timeZone?: string
 ): Promise<DateTimeExtraction> {
   const openai = getOpenAIClient();
   
@@ -76,9 +78,17 @@ export async function extractDateTimeReferences(
   }
 
   const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  const weekdayStr = timeZone
+    ? today.toLocaleDateString('en-US', { weekday: 'long', timeZone })
+    : today.toLocaleDateString('en-US', { weekday: 'long' });
+  const timeZoneNote = timeZone
+    ? ` Use timezone "${timeZone}" for "today" and for resolving relative dates like "Tuesday" or "next week" to the correct calendar date.`
+    : '';
+
   const prompt = `Extract date and time references from this message.
 
-Today is: ${today.toISOString().split('T')[0]} (${today.toLocaleDateString('en-US', { weekday: 'long' })})
+Today is: ${todayStr} (${weekdayStr}).${timeZoneNote}
 
 Subject: ${subject || '(no subject)'}
 Body: ${body?.substring(0, 500) || ''}
@@ -86,7 +96,7 @@ Body: ${body?.substring(0, 500) || ''}
 Extract:
 1. Date references (e.g., "Thursday", "next week", "tomorrow", "the 15th")
 2. Time references (e.g., "3pm", "lunch", "morning", "after work")
-3. Parse relative dates to ISO format based on today's date
+3. Parse relative dates to ISO YYYY-MM-DD. For "Tuesday" use the upcoming Tuesday (or the one clearly referred to). Be precise.
 
 Respond with JSON:
 {
