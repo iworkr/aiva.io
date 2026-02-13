@@ -32,7 +32,6 @@ import {
   emailIntegrations,
   messagingIntegrations,
   socialIntegrations,
-  calendarIntegrations,
   type Integration,
 } from '@/lib/integrations/config';
 import { getUserChannelConnections } from '@/data/user/channels';
@@ -245,7 +244,6 @@ export function ConnectChannelDialog({
             <CategorySection title="Email" integrations={emailIntegrations} />
             <CategorySection title="Messaging" integrations={messagingIntegrations} />
             <CategorySection title="Social" integrations={socialIntegrations} />
-            <CategorySection title="Calendar" integrations={calendarIntegrations} />
           </div>
         </DialogContent>
       </Dialog>
