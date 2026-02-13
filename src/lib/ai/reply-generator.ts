@@ -706,7 +706,7 @@ REMEMBER: Missing information handling:
     // This determines both auto-send eligibility and review requirements
     const { data: wsSettings } = await supabase
       .from('workspace_settings')
-      .select('auto_send_enabled, auto_send_confidence_threshold, human_review_for_scheduling, human_review_for_commitments, human_review_for_sensitive, auto_schedule_meeting_requests')
+      .select('auto_send_enabled, auto_send_confidence_threshold, human_review_for_scheduling, human_review_for_commitments, human_review_for_sensitive')
       .eq('workspace_id', workspaceId)
       .single();
 
@@ -715,17 +715,15 @@ REMEMBER: Missing information handling:
     const reviewForScheduling = wsSettings?.human_review_for_scheduling ?? true;
     const reviewForCommitments = wsSettings?.human_review_for_commitments ?? true;
     const reviewForSensitive = wsSettings?.human_review_for_sensitive ?? true;
-    const autoScheduleMeetingRequests = wsSettings?.auto_schedule_meeting_requests ?? false;
 
     // Check if confidence is below unified threshold (always hold for review if below)
     const confidenceBelowThreshold = result.confidenceScore < unifiedThreshold;
 
     // Check review triggers based on workspace settings
     // Calendar mismatch = no matching event found OR low confidence match (suggestedAction is 'ask_human')
+    // Only "Scheduling Confirmations" toggle controls this: when ON we hold scheduling replies for review; when OFF they can auto-send (subject to confidence etc.)
     const hasCalendarMismatch = calendarContext && (!calendarContext.hasMatchingEvent || calendarContext.suggestedAction === 'ask_human');
-    // When "Allow auto-schedule" is on and confidence is high, scheduling/booking drafts can auto-send; event is created after send (cron or sendReplyAction)
-    const allowAutoScheduleForThisDraft = autoScheduleMeetingRequests && result.confidenceScore >= unifiedThreshold;
-    const shouldReviewForScheduling = reviewForScheduling && (needsHumanReview || hasCalendarMismatch) && !allowAutoScheduleForThisDraft;
+    const shouldReviewForScheduling = reviewForScheduling && (needsHumanReview || hasCalendarMismatch);
     const shouldReviewForCommitments = reviewForCommitments && isCriticalMissingInfo;
     // Bills/invoices only require review if they're in excluded categories OR if review for sensitive is enabled
     // Otherwise, they can auto-send if confidence is high (especially for Shopify orders with order data)
