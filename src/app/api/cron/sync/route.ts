@@ -595,6 +595,7 @@ export async function GET(request: NextRequest) {
                 
                 // *** FULL SMART FILTER CHECK ***
                 // Determines whether this message would be auto-sent (eligible) or held for review. We always generate a draft either way.
+                console.log(`      🔍 Running eligibility check for ${msg.id.substring(0, 8)}...`);
                 const filterResult = await checkAutoReplyEligibility(
                   {
                     id: msg.id,
@@ -628,10 +629,12 @@ export async function GET(request: NextRequest) {
                 // Always generate a draft for every actionable message (SENT/self already skipped above).
                 // Eligibility only affects whether we queue for auto-send; user can always see and send the draft.
                 
+                console.log(`      🔍 PRE-CLAIM: msg=${msg.id.substring(0, 8)}, has_draft_reply=${msg.has_draft_reply}, subject="${msg.subject?.substring(0, 30)}"`);
+                
                 // ATOMIC CLAIM: Prevent duplicate drafts from concurrent cron runs
                 // (e.g. during Vercel deployments, both old and new deployments can fire the cron)
                 // Only one process can successfully flip has_draft_reply from false/null → true.
-                const { data: claimed } = await supabase
+                const { data: claimed, error: claimError } = await supabase
                   .from('messages')
                   .update({ has_draft_reply: true, updated_at: new Date().toISOString() })
                   .eq('id', msg.id)
@@ -639,12 +642,16 @@ export async function GET(request: NextRequest) {
                   .select('id')
                   .single();
                 
+                if (claimError) {
+                  console.log(`      ⚠️ CLAIM ERROR for ${msg.id.substring(0, 8)}: ${claimError.message} (code: ${claimError.code})`);
+                }
+                
                 if (!claimed) {
                   console.log(`      ⏭️ SKIPPED (already claimed by another sync): ${msg.subject?.substring(0, 30) || 'No subject'}`);
                   continue;
                 }
                 
-                console.log(`      ✍️ Generating draft for: ${msg.subject?.substring(0, 40) || 'No subject'}...`);
+                console.log(`      ✍️ Generating draft for: ${msg.subject?.substring(0, 40) || 'No subject'} (msg=${msg.id.substring(0, 8)})...`);
                 
                 const draftResult = await generateReplyDraft(
                     msg.id,
@@ -655,6 +662,8 @@ export async function GET(request: NextRequest) {
                     }
                   );
                   
+                  console.log(`      📋 DRAFT RESULT for ${msg.id.substring(0, 8)}: hasBody=${!!draftResult.body}, error=${draftResult.error || 'none'}, confidence=${draftResult.confidenceScore}`);
+                  
                   if (draftResult.body && !draftResult.error) {
                     draftsGenerated++;
                     // Track AI draft usage
@@ -662,9 +671,12 @@ export async function GET(request: NextRequest) {
                     console.log(`         ✅ Draft generated (confidence: ${draftResult.confidenceScore})`);
                   } else if (draftResult.error) {
                     console.log(`         ⚠️ Draft error: ${draftResult.error}`);
+                  } else {
+                    console.log(`         ⚠️ Draft returned empty body with no error for ${msg.id.substring(0, 8)}`);
                   }
               } catch (draftErr) {
-                console.error(`         ❌ Failed to generate draft:`, draftErr instanceof Error ? draftErr.message : draftErr);
+                console.error(`         ❌ Failed to generate draft for ${msg.id}:`, draftErr instanceof Error ? draftErr.message : draftErr);
+                console.error(`         ❌ Stack:`, draftErr instanceof Error ? draftErr.stack?.substring(0, 300) : 'no stack');
                 // Release the claim so the message can be retried on the next sync
                 await supabase
                   .from('messages')
