@@ -433,7 +433,8 @@ ${workspaceAIRules ? `- FOLLOW WORKSPACE RULES above STRICTLY. These rules overr
 ${calendarContext ? `
 📅 CALENDAR CONTEXT (scheduling – follow strictly):
 ${calendarContext.hasMatchingEvent
-  ? `- The person emailing (${message.sender_name || message.sender_email}) IS the attendee of the matching event. Confirm clearly that the meeting/plan is still on with them (e.g. "Yes, we're still on for Tuesday 3pm" or "Yes, I have it on with you"). They can cancel or reschedule if they need to. You may reference the event specifically.`
+  ? `- The person emailing (${message.sender_name || message.sender_email}) IS the attendee of the matching event. Confirm clearly that the meeting/plan is still on with them (e.g. "Yes, we're still on for Tuesday 3pm" or "Yes, I have it on with you"). They can cancel or reschedule if they need to. You may reference the event specifically.
+- For this case set "isAutoSendable" to true (so the reply can be auto-sent) when your confidence is high (e.g. >= 0.85).`
   : calendarContext.hasEventInRangeButNotWithSender
     ? `- You have an event in this time range but the person emailing is NOT the attendee. Do NOT disclose who the meeting is with or any details. Reply vaguely that you have plans / are not available (e.g. "I have something on then", "I'm not available", "I have plans"). Never reveal the other person's name or that it's a meeting with someone else.`
     : `- No matching event with this sender. ${calendarContext.context}`}
@@ -798,6 +799,12 @@ REMEMBER: Missing information handling:
        hasMissingInfo && !result.isAutoSendable ? `AI is missing information (${missingInfoType}) and marked as not auto-sendable` :
        undefined);
 
+    // Single line for Vercel/log search: why draft was held or will be queued
+    const holdOrQueueReason = shouldHoldForReview
+      ? `HELD: ${finalReviewReason || 'draft_held_for_review'} (confidence=${result.confidenceScore} threshold=${unifiedThreshold} isAutoSendable=${result.isAutoSendable})`
+      : `QUEUED: will auto-send (confidence=${result.confidenceScore})`;
+    console.log('[AI Reply]', holdOrQueueReason);
+
     console.log('[AI Reply] Human review check:', {
       needsHumanReview,
       reviewReason: finalReviewReason,
@@ -966,7 +973,7 @@ REMEMBER: Missing information handling:
           (result.isAutoSendable || result.confidenceScore >= 0.80);
 
         if (shouldHoldForReview) {
-          console.log('[AI Reply] Draft held for human review, not auto-sending:', finalReviewReason);
+          console.log('[AI Reply] Draft held for human review, not auto-sending. Reason:', finalReviewReason);
         } else if (shouldQueue) {
           const { queueAutoSend } = await import('@/lib/workers/auto-send-worker');
           const queueResult = await queueAutoSend(
