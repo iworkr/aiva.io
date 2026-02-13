@@ -599,6 +599,23 @@ export async function GET(request: NextRequest) {
 
                 // Always generate a draft for every actionable message (SENT/self already skipped above).
                 // Eligibility only affects whether we queue for auto-send; user can always see and send the draft.
+                
+                // ATOMIC CLAIM: Prevent duplicate drafts from concurrent cron runs
+                // (e.g. during Vercel deployments, both old and new deployments can fire the cron)
+                // Only one process can successfully flip has_draft_reply from false/null → true.
+                const { data: claimed } = await supabase
+                  .from('messages')
+                  .update({ has_draft_reply: true, updated_at: new Date().toISOString() })
+                  .eq('id', msg.id)
+                  .or('has_draft_reply.eq.false,has_draft_reply.is.null')
+                  .select('id')
+                  .single();
+                
+                if (!claimed) {
+                  console.log(`      ⏭️ SKIPPED (already claimed by another sync): ${msg.subject?.substring(0, 30) || 'No subject'}`);
+                  continue;
+                }
+                
                 console.log(`      ✍️ Generating draft for: ${msg.subject?.substring(0, 40) || 'No subject'}...`);
                 
                 const draftResult = await generateReplyDraft(
@@ -620,6 +637,11 @@ export async function GET(request: NextRequest) {
                   }
               } catch (draftErr) {
                 console.error(`         ❌ Failed to generate draft:`, draftErr instanceof Error ? draftErr.message : draftErr);
+                // Release the claim so the message can be retried on the next sync
+                await supabase
+                  .from('messages')
+                  .update({ has_draft_reply: false })
+                  .eq('id', msg.id);
               }
             }
             
