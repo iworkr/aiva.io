@@ -144,6 +144,22 @@ export const createEventAction = authActionClient
       }
     }
 
+    // Prevent overlapping bookings: check for existing events in this workspace that overlap
+    const { data: overlapping } = await supabase
+      .from('events')
+      .select('id, title, start_time, end_time')
+      .eq('workspace_id', workspaceId)
+      .lt('start_time', eventData.endTime)
+      .gt('end_time', eventData.startTime)
+      .limit(1);
+
+    if (overlapping && overlapping.length > 0) {
+      const other = overlapping[0];
+      throw new Error(
+        `You already have an event at this time: "${other.title}" (${new Date(other.start_time).toLocaleString()} – ${new Date(other.end_time).toLocaleString()}). Please choose a different time or remove the overlapping event.`
+      );
+    }
+
     // Convert camelCase to snake_case for database
     const { data, error } = await supabase
       .from('events')

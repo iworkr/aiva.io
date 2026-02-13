@@ -430,15 +430,25 @@ ${workspaceAIContext || workspaceAIRules ? `\n\n⚠️ CRITICAL INSTRUCTIONS:
 ${workspaceAIContext ? `- REFER TO WORKSPACE CONTEXT above to understand your role, the business, products, and context before replying.` : ''}
 ${workspaceAIRules ? `- FOLLOW WORKSPACE RULES above STRICTLY. These rules override default behavior.` : ''}
 ` : ''}
-${calendarContext ? `
+${calendarContext ? (() => {
+  const e = calendarContext.matchedEvent;
+  const timeStr = e?.start_time
+    ? `${new Date(e.start_time).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} – ${new Date(e.end_time).toLocaleString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+    : '';
+  return `
 📅 CALENDAR CONTEXT (scheduling – follow strictly):
-${calendarContext.hasMatchingEvent
-  ? `- The person emailing (${message.sender_name || message.sender_email}) IS the attendee of the matching event. Confirm clearly that the meeting/plan is still on with them (e.g. "Yes, we're still on for Tuesday 3pm" or "Yes, I have it on with you"). They can cancel or reschedule if they need to. You may reference the event specifically.
-- For this case set "isAutoSendable" to true (so the reply can be auto-sent) when your confidence is high (e.g. >= 0.85).`
+${calendarContext.hasMatchingEvent && e
+  ? `- The person emailing (${message.sender_name || message.sender_email}) IS the attendee of the matching event. You HAVE the event details – use them.
+- Event: "${e.title}" at ${timeStr || 'the time you have in calendar'}. When they ask what time, tell them the time (e.g. "We're on for Tuesday at 3pm" or "${timeStr}").
+- Confirm clearly that the meeting is still on; they can cancel or reschedule if needed. Do NOT say you don't have the time – you do (see above).
+- For this case set "isAutoSendable" to true when your confidence is high (e.g. >= 0.85).`
   : calendarContext.hasEventInRangeButNotWithSender
-    ? `- You have an event in this time range but the person emailing is NOT the attendee. Do NOT disclose who the meeting is with or any details. Reply vaguely that you have plans / are not available (e.g. "I have something on then", "I'm not available", "I have plans"). Never reveal the other person's name or that it's a meeting with someone else.`
+    ? `- You already have an event in this time range; the person emailing is NOT the attendee. Do NOT disclose who the meeting is with.
+- If they are asking to SCHEDULE or BOOK a meeting at this time: do NOT accept. Say you are not available then and optionally suggest another time (e.g. "I have something then – would [other time] work?"). Never double-book.
+- If they are just asking generally: reply vaguely (e.g. "I have something on then", "I'm not available").`
     : `- No matching event with this sender. ${calendarContext.context}`}
-` : ''}
+`;
+})() : ''}
 
 REQUIREMENTS:
 1. Tone: ${tone} (${tone === "formal" ? "Professional language, avoid contractions" : tone === "casual" ? "Friendly, conversational" : tone === "friendly" ? "Warm and approachable" : "Professional but approachable"})

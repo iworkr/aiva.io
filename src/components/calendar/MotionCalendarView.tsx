@@ -6,7 +6,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { useCachedData } from '@/hooks/useCachedData';
+import { useCachedData, invalidateCache } from '@/hooks/useCachedData';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -175,6 +175,8 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
     onSuccess: () => {
       toast.success('Event deleted successfully');
       setShowEventModal(false);
+      // Invalidate all calendar caches so navigating away and back doesn't show stale events
+      invalidateCache(/^calendar-events-/);
       refreshEvents();
     },
     onError: ({ error }) => {

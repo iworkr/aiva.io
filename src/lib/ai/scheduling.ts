@@ -364,6 +364,20 @@ export async function createCalendarEventFromSentEmail(
     // Create event title
     const title = message.subject || `Meeting with ${message.sender_name || message.sender_email}`;
 
+    // Prevent overlapping bookings: do not create if an event already exists at this time
+    const { data: overlapping } = await supabase
+      .from('events')
+      .select('id, title, start_time, end_time')
+      .eq('workspace_id', workspaceId)
+      .lt('start_time', endTime)
+      .gt('end_time', startTime)
+      .limit(1);
+
+    if (overlapping && overlapping.length > 0) {
+      console.log('[Calendar Event] Not creating event: overlapping booking exists:', overlapping[0].title);
+      return { success: false, message: 'Overlapping booking already exists at this time' };
+    }
+
     // Create event directly in database (we're already in a server context)
     const { data: eventData, error: eventError } = await supabase
       .from('events')

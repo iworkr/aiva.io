@@ -480,14 +480,38 @@ export async function isSchedulingConfirmation(
   // Check for question about existing plans
   const questionPatterns = [
     /we (still )?meeting/i,
-    /our (meeting|call|lunch|dinner|appointment)/i,
+    /our (meeting|call|lunch|dinner|appointment|booking)/i,
     /you (still )?available/i,
     /does .* still work/i,
+    /what time (were we|are we|is our)/i,
+    /when (are we|were we|is our) (meeting|booked)/i,
+    /(booked in for|booking for|our booking)/i,
   ];
 
   for (const pattern of questionPatterns) {
     if (pattern.test(text)) {
       return { isConfirmation: true, confidence: 0.70 };
+    }
+  }
+
+  // Proposing a new meeting time (need calendar check to avoid double-book)
+  const proposalPhrases = [
+    'book you in for',
+    'book in for',
+    'schedule for',
+    'meet at',
+    'meet on',
+    'meet tuesday',
+    'meet wednesday',
+    'can we meet',
+    'book a time',
+    'schedule a meeting',
+    '30 minutes at',
+    'an hour at',
+  ];
+  for (const phrase of proposalPhrases) {
+    if (text.includes(phrase)) {
+      return { isConfirmation: true, confidence: 0.65 };
     }
   }
 
