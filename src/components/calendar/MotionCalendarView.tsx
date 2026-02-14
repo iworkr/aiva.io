@@ -93,7 +93,7 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
   // Optimistic delete: hide event immediately, clear when refetch completes
   const [optimisticallyDeletedIds, setOptimisticallyDeletedIds] = useState<Set<string>>(new Set());
 
-  // Calculate date range based on view mode
+  // Visible date range for the current view (used by rendering only, NOT for fetching)
   const dateRange = useMemo(() => {
     let startTime: string, endTime: string;
 
@@ -116,42 +116,54 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
     return { startTime, endTime };
   }, [viewMode, currentDate]);
 
-  // Cache key includes date range for proper caching per view
+  // Fetch range: full year (6 months back, 6 months forward) for instant navigation.
+  // This is computed ONCE on mount so week/month navigation never triggers re-fetches.
+  const fetchRange = useMemo(() => {
+    const now = new Date();
+    return {
+      startTime: subMonths(now, 6).toISOString(),
+      endTime: addMonths(now, 6).toISOString(),
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Intentionally empty - computed once on mount
+
+  // Stable cache key - doesn't change with navigation
   const cacheKey = useMemo(
-    () => `calendar-events-${workspaceId}-${dateRange.startTime}-${dateRange.endTime}`,
-    [workspaceId, dateRange]
+    () => `calendar-events-${workspaceId}-year`,
+    [workspaceId]
   );
 
-  // Fetch events with caching
+  // Fetch ALL events for ±6 months in one call
   const fetchEventsData = useCallback(async () => {
     const data = await getEvents(workspaceId, userId, {
-      startTime: dateRange.startTime,
-      endTime: dateRange.endTime,
+      startTime: fetchRange.startTime,
+      endTime: fetchRange.endTime,
     });
     return data || [];
-  }, [workspaceId, userId, dateRange]);
+  }, [workspaceId, userId, fetchRange]);
 
   // Use cached data for instant load with background refresh
+  // TTL is 30 minutes since we have all events in memory
   const {
-    data: events,
+    data: allEvents,
     isLoading: loading,
     refresh: refreshEvents,
   } = useCachedData<any[]>(
     cacheKey,
     fetchEventsData,
     {
-      ttl: 5 * 60 * 1000, // 5 minutes cache
-      deps: [workspaceId, userId, dateRange],
+      ttl: 30 * 60 * 1000, // 30 minutes cache
+      deps: [workspaceId, userId],
     }
   );
 
   // Default to empty array if null; hide optimistically deleted events so UI updates immediately
-  const eventsList = (events || []).filter((e: any) => !optimisticallyDeletedIds.has(e.id));
+  const eventsList = (allEvents || []).filter((e: any) => !optimisticallyDeletedIds.has(e.id));
 
   // Clear optimistic deletes when events data updates (after refetch)
   useEffect(() => {
     setOptimisticallyDeletedIds((prev) => (prev.size === 0 ? prev : new Set()));
-  }, [events]);
+  }, [allEvents]);
 
   // Create event
   const { execute: createEvent } = useAction(createEventAction, {
@@ -394,7 +406,7 @@ export function MotionCalendarView({ workspaceId, userId }: MotionCalendarViewPr
         {/* Calendar Content */}
         <div className="flex flex-1 overflow-hidden">
           <div className="flex-1 overflow-auto">
-            {loading && !events ? (
+            {loading && !allEvents ? (
               <div className="flex h-full items-center justify-center">
                 <CalendarIcon className="h-8 w-8 animate-pulse text-muted-foreground" />
               </div>
