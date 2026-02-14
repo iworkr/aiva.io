@@ -1008,9 +1008,16 @@ export function SettingsView({ workspaceId, userId, user, billingContent }: Sett
       // Small delay to ensure state is fully set before enabling auto-save
       setTimeout(() => {
         hasInitializedRef.current = true;
+        
+        // Auto-save detected timezone if workspace doesn't have one stored yet.
+        // This ensures the AI always has a timezone for formatting calendar times.
+        const savedTz = (cachedSettings?.settings as any)?.timezone;
+        if (!savedTz && detectedTimezone) {
+          triggerSyncAutoSave({ timezone: detectedTimezone });
+        }
       }, 100);
     }
-  }, [settingsInitialized]);
+  }, [settingsInitialized, cachedSettings, detectedTimezone, triggerSyncAutoSave]);
 
   // Cleanup timers on unmount and save pending changes
   useEffect(() => {
