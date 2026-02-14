@@ -240,6 +240,44 @@ export async function GET(request: NextRequest) {
         }
         console.log(`   ✅ Message found: "${message.subject?.substring(0, 40)}..." from ${message.sender_email}`);
 
+        // Per-thread dedup: skip if we already sent a reply for this thread
+        if (message.provider_thread_id) {
+          const { data: threadMessages } = await supabase
+            .from('messages')
+            .select('id')
+            .eq('provider_thread_id', message.provider_thread_id);
+          
+          const threadMsgIds = (threadMessages || []).map((m: { id: string }) => m.id);
+          
+          if (threadMsgIds.length > 0) {
+            const { data: alreadySent } = await supabase
+              .from('auto_send_log')
+              .select('id')
+              .in('message_id', threadMsgIds)
+              .eq('action', 'sent')
+              .limit(1);
+            
+            if (alreadySent && alreadySent.length > 0) {
+              console.log(`   ⏭️ SKIPPED (thread already has auto-sent reply): thread=${message.provider_thread_id.substring(0, 10)}`);
+              await updateQueueItemStatus(item.id, 'cancelled', {
+                errorMessage: 'Thread already has an auto-sent reply',
+              });
+              
+              await supabase.from('auto_send_log').insert({
+                workspace_id: item.workspace_id,
+                message_id: item.message_id,
+                draft_id: item.draft_id,
+                action: 'skipped',
+                confidence_score: item.confidence_score,
+                details: { reason: 'thread_already_replied' },
+              });
+
+              results.skipped++;
+              continue;
+            }
+          }
+        }
+
         // NOTE: We no longer check message.requires_human_review here because:
         // 1. The draft's hold_for_review is the source of truth (checked above)
         // 2. If the draft is NOT held for review, it was evaluated as auto-sendable when queued

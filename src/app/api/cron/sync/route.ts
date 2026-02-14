@@ -494,15 +494,32 @@ export async function GET(request: NextRequest) {
 
           // Merge and dedupe by id, keep most recent first, cap at 20
           const seenIds = new Set<string>();
-          const actionableMessages: any[] = [];
+          const allActionable: any[] = [];
           for (const m of [...(actionableList || []), ...(nullActionabilityList || [])]) {
             if (m?.id && !seenIds.has(m.id)) {
               seenIds.add(m.id);
-              actionableMessages.push(m);
+              allActionable.push(m);
             }
           }
-          actionableMessages.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-          actionableMessages.splice(20);
+          allActionable.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+          allActionable.splice(20);
+
+          // Per-thread deduplication: only keep the LATEST message per thread.
+          // This prevents replying to every message in a thread with multiple
+          // incoming messages (e.g. sender sent 3 follow-ups in the same thread).
+          const seenThreads = new Set<string>();
+          const actionableMessages: any[] = [];
+          for (const m of allActionable) {
+            const threadId = m.provider_thread_id;
+            if (threadId && seenThreads.has(threadId)) {
+              console.log(`      ⏭️ SKIPPED (thread already has newer message): ${m.subject?.substring(0, 30) || 'No subject'} (thread=${threadId.substring(0, 10)})`);
+              continue;
+            }
+            if (threadId) {
+              seenThreads.add(threadId);
+            }
+            actionableMessages.push(m);
+          }
 
           if (actionableMessages.length > 0 && (nullActionabilityList?.length ?? 0) > 0) {
             console.log(`      📋 Including ${nullActionabilityList!.length} unclassified message(s) for draft attempt (will classify on the fly)`);
