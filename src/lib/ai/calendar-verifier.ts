@@ -233,6 +233,32 @@ function eventMatchesSender(
 }
 
 /**
+ * Get the hour and minute of a date in a specific timezone.
+ * Falls back to UTC if timezone is invalid or not provided.
+ */
+function getTimeInTimezone(date: Date, timezone?: string): { hour: number; minute: number } {
+  if (!timezone) {
+    return { hour: date.getUTCHours(), minute: date.getUTCMinutes() };
+  }
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false,
+    }).formatToParts(date);
+    const hourPart = parts.find(p => p.type === 'hour');
+    const minutePart = parts.find(p => p.type === 'minute');
+    return {
+      hour: hourPart ? parseInt(hourPart.value) : date.getUTCHours(),
+      minute: minutePart ? parseInt(minutePart.value) : date.getUTCMinutes(),
+    };
+  } catch {
+    return { hour: date.getUTCHours(), minute: date.getUTCMinutes() };
+  }
+}
+
+/**
  * Check if event matches time references
  */
 function eventMatchesTimeReferences(
@@ -244,7 +270,9 @@ function eventMatchesTimeReferences(
   }
 
   const eventStart = new Date(event.startTime);
-  const hour = eventStart.getHours();
+  // CRITICAL: Use event's timezone (not UTC) to get the correct local hour
+  // e.g. an event at 05:00 UTC with timezone "Australia/Brisbane" is 3pm local
+  const { hour, minute: eventMinute } = getTimeInTimezone(eventStart, event.timezone);
 
   for (const ref of timeReferences) {
     const refLower = ref.toLowerCase();
@@ -281,7 +309,6 @@ function eventMatchesTimeReferences(
       if (ampm === 'pm' && matchHour < 12) matchHour += 12;
       if (ampm === 'am' && matchHour === 12) matchHour = 0;
       
-      const eventMinute = eventStart.getMinutes();
       if (hour === matchHour && Math.abs(eventMinute - matchMinute) <= 30) {
         return { matches: true, confidence: 0.90 };
       }
@@ -506,11 +533,16 @@ export async function isSchedulingConfirmation(
     'schedule for',
     'meet at',
     'meet on',
+    'meet up',
     'meet tuesday',
     'meet wednesday',
     'meet thursday',
     'meet friday',
     'meet monday',
+    'meet saturday',
+    'meet sunday',
+    'meet tomorrow',
+    'meet next week',
     'can we meet',
     'book a time',
     'schedule a meeting',
@@ -524,12 +556,64 @@ export async function isSchedulingConfirmation(
     'let\'s meet',
     'want to meet',
     'like to meet',
+    'looking to meet',
+    'keen to meet',
     'catch up at',
     'catch up on',
+    'catch up tuesday',
+    'catch up wednesday',
+    'catch up thursday',
+    'catch up friday',
+    'catch up monday',
+    'catch up tomorrow',
+    'catch up next',
+    'coffee at',
+    'coffee on',
+    'lunch at',
+    'lunch on',
+    'dinner at',
+    'dinner on',
+    'available at',
+    'available on tuesday',
+    'available on wednesday',
+    'available on thursday',
+    'available on friday',
+    'available on monday',
+    'free at',
+    'free on tuesday',
+    'free on wednesday',
+    'free on thursday',
+    'free on friday',
+    'free on monday',
+    'pencil you in',
+    'pencil in',
+    'block out',
+    'put you down for',
   ];
   for (const phrase of proposalPhrases) {
     if (text.includes(phrase)) {
       // isProposal = true → caller knows this is a NEW meeting, not a confirmation
+      return { isConfirmation: true, isProposal: true, confidence: 0.65 };
+    }
+  }
+
+  // --- 4. Scheduling question patterns (does X work, are you free, etc.) ---
+  const proposalPatterns = [
+    /does .* work for you/i,
+    /would .* work for you/i,
+    /is .* good for you/i,
+    /are you (free|available|around)/i,
+    /you (free|available) (on|at|for)/i,
+    /how about .*(am|pm|\d{1,2}:\d{2}|monday|tuesday|wednesday|thursday|friday)/i,
+    /what about .*(am|pm|\d{1,2}:\d{2}|monday|tuesday|wednesday|thursday|friday)/i,
+    /does .*(am|pm) (work|suit)/i,
+    /would .*(am|pm) (work|suit)/i,
+    /can you do .*(am|pm|monday|tuesday|wednesday|thursday|friday)/i,
+    /let me know .*(time|when|day).*(work|suit|good)/i,
+  ];
+
+  for (const pattern of proposalPatterns) {
+    if (pattern.test(text)) {
       return { isConfirmation: true, isProposal: true, confidence: 0.65 };
     }
   }
