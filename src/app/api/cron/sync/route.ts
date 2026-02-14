@@ -466,8 +466,11 @@ export async function GET(request: NextRequest) {
           //   (null = classification failed or not run yet – we'll classify on the fly and skip only if 'none')
           // - No existing draft; recent (48h); THIS connection only
           const ts48hAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+          // NOTE: has_draft_reply is NOT included in select/filter because PostgREST's
+          // schema cache can become stale and fail to recognize the column.
+          // Instead, we use the message_drafts join to determine if a draft exists.
           const baseSelect = `
-            id, subject, actionability, has_draft_reply, sender_email, category,
+            id, subject, actionability, sender_email, category,
             provider_thread_id, labels, requires_human_review, timestamp,
             message_drafts(id, hold_for_review, auto_sent)
           `;
@@ -477,7 +480,6 @@ export async function GET(request: NextRequest) {
               .eq('workspace_id', connection.workspace_id)
               .eq('channel_connection_id', connection.id)
               .in('actionability', ['question', 'request', 'fyi', 'scheduling_intent', 'task'])
-              .or('has_draft_reply.eq.false,has_draft_reply.is.null')
               .gte('timestamp', ts48hAgo)
               .order('timestamp', { ascending: false })
               .limit(20),
@@ -485,7 +487,6 @@ export async function GET(request: NextRequest) {
               .eq('workspace_id', connection.workspace_id)
               .eq('channel_connection_id', connection.id)
               .is('actionability', null)
-              .or('has_draft_reply.eq.false,has_draft_reply.is.null')
               .gte('timestamp', ts48hAgo)
               .order('timestamp', { ascending: false })
               .limit(10),
@@ -529,7 +530,6 @@ export async function GET(request: NextRequest) {
             console.log(`      📋 Actionable messages breakdown:`, actionableMessages.map((m: any) => ({
               subject: m.subject?.substring(0, 40),
               actionability: m.actionability,
-              hasDraftReply: m.has_draft_reply,
               draftCount: (m.message_drafts || []).length,
               category: m.category,
               requiresReview: m.requires_human_review,
@@ -556,11 +556,9 @@ export async function GET(request: NextRequest) {
                 if (connectionEmailLower && senderEmailLower === connectionEmailLower) {
                   skippedByFilter++;
                   console.log(`      ⏭️ SKIPPED (self-email): ${msg.subject?.substring(0, 30) || 'No subject'}`);
-                  // Mark has_draft_reply to prevent re-processing
-                  await supabase
-                    .from('messages')
-                    .update({ has_draft_reply: true })
-                    .eq('id', msg.id);
+                  // Mark has_draft_reply via RPC to prevent re-processing
+                  // (using RPC to bypass PostgREST schema cache issue)
+                  await supabase.rpc('mark_message_self_sent', { p_message_id: msg.id });
                   continue;
                 }
                 
@@ -629,24 +627,19 @@ export async function GET(request: NextRequest) {
                 // Always generate a draft for every actionable message (SENT/self already skipped above).
                 // Eligibility only affects whether we queue for auto-send; user can always see and send the draft.
                 
-                console.log(`      🔍 PRE-CLAIM: msg=${msg.id.substring(0, 8)}, has_draft_reply=${msg.has_draft_reply}, subject="${msg.subject?.substring(0, 30)}"`);
+                console.log(`      🔍 PRE-CLAIM: msg=${msg.id.substring(0, 8)}, draftCount=${(msg.message_drafts || []).length}, subject="${msg.subject?.substring(0, 30)}"`);
                 
                 // ATOMIC CLAIM: Prevent duplicate drafts from concurrent cron runs
                 // (e.g. during Vercel deployments, both old and new deployments can fire the cron)
-                // Only one process can successfully flip has_draft_reply from false/null → true.
-                const { data: claimed, error: claimError } = await supabase
-                  .from('messages')
-                  .update({ has_draft_reply: true, updated_at: new Date().toISOString() })
-                  .eq('id', msg.id)
-                  .or('has_draft_reply.eq.false,has_draft_reply.is.null')
-                  .select('id')
-                  .single();
+                // Uses RPC function to bypass PostgREST schema cache issue with has_draft_reply
+                const { data: claimResult, error: claimError } = await supabase
+                  .rpc('claim_message_for_draft', { p_message_id: msg.id });
                 
                 if (claimError) {
                   console.log(`      ⚠️ CLAIM ERROR for ${msg.id.substring(0, 8)}: ${claimError.message} (code: ${claimError.code})`);
                 }
                 
-                if (!claimed) {
+                if (!claimResult) {
                   console.log(`      ⏭️ SKIPPED (already claimed by another sync): ${msg.subject?.substring(0, 30) || 'No subject'}`);
                   continue;
                 }
@@ -678,10 +671,8 @@ export async function GET(request: NextRequest) {
                 console.error(`         ❌ Failed to generate draft for ${msg.id}:`, draftErr instanceof Error ? draftErr.message : draftErr);
                 console.error(`         ❌ Stack:`, draftErr instanceof Error ? draftErr.stack?.substring(0, 300) : 'no stack');
                 // Release the claim so the message can be retried on the next sync
-                await supabase
-                  .from('messages')
-                  .update({ has_draft_reply: false })
-                  .eq('id', msg.id);
+                // Uses RPC to bypass PostgREST schema cache issue
+                await supabase.rpc('release_message_draft_claim', { p_message_id: msg.id });
               }
             }
             
