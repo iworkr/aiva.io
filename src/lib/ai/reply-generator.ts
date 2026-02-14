@@ -902,9 +902,11 @@ REMEMBER: Missing information handling:
 
     // Update message to indicate draft exists
     // has_draft_reply is set via RPC to bypass PostgREST schema cache issues
-    await supabase.rpc('claim_message_for_draft', { p_message_id: messageId }).catch(() => {
+    try {
+      await supabase.rpc('claim_message_for_draft', { p_message_id: messageId });
+    } catch {
       // Silently ignore - claim was likely already set by the sync cron
-    });
+    }
 
     // If draft is held for review, also mark message as requiring human review
     const messageUpdate: any = {

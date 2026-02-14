@@ -3801,6 +3801,10 @@ export type Database = {
         Args: { p_limit: number; p_usage_type: string; p_workspace_id: string }
         Returns: boolean
       }
+      claim_message_for_draft: {
+        Args: { p_message_id: string }
+        Returns: boolean
+      }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       decrement_credits: {
         Args: { amount: number; org_id: string }
@@ -3879,6 +3883,14 @@ export type Database = {
         Returns: boolean
       }
       make_user_app_admin: { Args: { user_id_arg: string }; Returns: undefined }
+      mark_message_self_sent: {
+        Args: { p_message_id: string }
+        Returns: undefined
+      }
+      release_message_draft_claim: {
+        Args: { p_message_id: string }
+        Returns: undefined
+      }
       remove_app_admin_privilege_for_user: {
         Args: { user_id_arg: string }
         Returns: undefined
