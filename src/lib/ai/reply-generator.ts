@@ -344,10 +344,19 @@ export async function generateReplyDraft(
         });
 
         // Refine proposal vs confirmation using the calendar verification result.
-        // This is more reliable than keyword guessing: if the calendar has an event
-        // WITH this sender, it's a confirmation; otherwise it's a new proposal.
-        const refinedIsProposal = calendarContext.hasMatchingEvent ? false : isNewProposal;
+        // This is the definitive source of truth:
+        //   - hasMatchingEvent = true → existing event with this sender → confirmation
+        //   - hasMatchingEvent = false → no event with sender → treat as new proposal
+        //     (even if keywords said "still on for" – you can't confirm what doesn't exist)
+        const refinedIsProposal = !calendarContext.hasMatchingEvent;
         isProposalForPrompt = refinedIsProposal;
+
+        console.log('[AI Reply] Refined scheduling type:', {
+          refinedIsProposal,
+          hasMatchingEvent: calendarContext.hasMatchingEvent,
+          hasEventInRangeButNotWithSender: calendarContext.hasEventInRangeButNotWithSender,
+          keywordSaidProposal: isNewProposal,
+        });
 
         if (calendarContext.suggestedAction === 'no_calendar') {
           // No calendar connected at all → hold for review
@@ -355,22 +364,23 @@ export async function generateReplyDraft(
           reviewReason = 'no_calendar_connected';
           aiUncertaintyNotes = 'No calendar connected to verify this scheduling message';
         } else if (refinedIsProposal) {
-          // NEW PROPOSAL: someone is asking to schedule a meeting.
-          // No matching event is EXPECTED (it doesn't exist yet).
-          // Calendar context is still passed to the AI for conflict detection
-          // (hasEventInRangeButNotWithSender → the AI prompt will decline / suggest alternative).
+          // NEW PROPOSAL (or no matching event found for a "confirmation" phrasing).
+          // Calendar context is still passed to the AI for conflict detection:
+          //   - hasEventInRangeButNotWithSender → AI will decline / suggest alternative
+          //   - No events at all → AI will accept and confirm the meeting
           // Do NOT hold for review – let it auto-send so the calendar event is created after send.
-          console.log('[AI Reply] New scheduling proposal – will NOT hold for calendar mismatch.',
+          console.log('[AI Reply] Treating as new scheduling proposal.',
             calendarContext.hasEventInRangeButNotWithSender
               ? 'Conflict detected – AI will decline/suggest alternative.'
-              : 'No conflict – AI will confirm.');
+              : 'No conflict – AI will confirm and event will be created after send.');
         } else {
-          // CONFIRMATION about an existing meeting
-          if (!calendarContext.hasMatchingEvent || calendarContext.suggestedAction === 'ask_human') {
+          // CONFIRMATION about an existing meeting (event found with this sender)
+          if (calendarContext.suggestedAction === 'ask_human') {
             needsHumanReview = true;
             reviewReason = 'calendar_mismatch';
             aiUncertaintyNotes = calendarContext.context;
           }
+          // Otherwise: event found, confidence is good → auto-send confirmation
         }
       } catch (calError) {
         console.error('[AI Reply] Calendar verification error:', calError);
