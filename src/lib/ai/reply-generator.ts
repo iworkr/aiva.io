@@ -256,6 +256,37 @@ export async function generateReplyDraft(
     }
 
     // ============================================
+    // WORKSPACE SETTINGS (timezone, AI context, rules)
+    // Fetched early so timezone is available for calendar verification
+    // ============================================
+    let workspaceAIContext = "";
+    let workspaceAIRules = "";
+    let userTimeZone = "UTC";
+    
+    try {
+      const { data: wsSettings } = await supabase
+        .from('workspace_settings')
+        .select('workspace_settings')
+        .eq('workspace_id', workspaceId)
+        .single();
+
+      if (wsSettings?.workspace_settings) {
+        const ws = wsSettings.workspace_settings as any;
+        const aiSettings = ws?.ai || {};
+        workspaceAIContext = aiSettings.context || "";
+        workspaceAIRules = aiSettings.rules || "";
+        // Extract timezone for accurate calendar time formatting
+        if (typeof ws?.timezone === 'string' && ws.timezone.length > 0) {
+          userTimeZone = ws.timezone;
+        }
+      }
+    } catch (error) {
+      console.warn('[AI Reply] Failed to fetch workspace AI settings:', error);
+    }
+    
+    console.log('[AI Reply] Using timezone for calendar context:', userTimeZone);
+
+    // ============================================
     // HUMAN REVIEW DETECTION
     // ============================================
     let needsHumanReview = false;
@@ -290,7 +321,7 @@ export async function generateReplyDraft(
           workspaceId,
           message.sender_email,
           message.sender_name || undefined,
-          { useAdminClient: options.useAdminClient }
+          { useAdminClient: options.useAdminClient, timeZone: userTimeZone }
         );
 
         console.log('[AI Reply] Calendar verification result:', {
@@ -402,34 +433,17 @@ export async function generateReplyDraft(
         conversationContext = threadMessages
           .map(
             (m) =>
-              `From ${m.sender_email} at ${new Date(m.timestamp).toLocaleString()}:\n${m.body.substring(0, 200)}`,
+              `From ${m.sender_email} at ${new Date(m.timestamp).toLocaleString('en-US', { timeZone: userTimeZone })}:\n${m.body.substring(0, 200)}`,
           )
           .join("\n\n");
       }
     }
 
-    // Get workspace AI context and rules
-    let workspaceAIContext = "";
-    let workspaceAIRules = "";
-    
-    try {
-      const { data: wsSettings } = await supabase
-        .from('workspace_settings')
-        .select('workspace_settings')
-        .eq('workspace_id', workspaceId)
-        .single();
-
-      if (wsSettings?.workspace_settings) {
-        const aiSettings = (wsSettings.workspace_settings as any)?.ai || {};
-        workspaceAIContext = aiSettings.context || "";
-        workspaceAIRules = aiSettings.rules || "";
-      }
-    } catch (error) {
-      console.warn('[AI Reply] Failed to fetch workspace AI settings:', error);
-    }
-
     // Build prompt
+    const currentLocalTime = new Date().toLocaleString('en-US', { timeZone: userTimeZone, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     const prompt = `Generate a ${tone} email reply to the following message:
+
+Current date/time: ${currentLocalTime} (${userTimeZone})
 
 Subject: ${message.subject || "(no subject)"}
 From: ${message.sender_name || message.sender_email}
@@ -451,8 +465,10 @@ ${workspaceAIRules ? `- FOLLOW WORKSPACE RULES above STRICTLY. These rules overr
 ` : ''}
 ${calendarContext ? (() => {
   const e = calendarContext.matchedEvent;
+  // Use the event's own timezone first (most accurate), then workspace timezone, then UTC
+  const eventTz = e?.timezone || userTimeZone;
   const timeStr = e?.startTime
-    ? `${new Date(e.startTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} – ${new Date(e.endTime).toLocaleString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+    ? `${new Date(e.startTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: eventTz })} – ${new Date(e.endTime).toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: eventTz })}`
     : '';
   const isProposal = schedulingCheck.isConfirmation && schedulingCheck.isProposal;
   return `

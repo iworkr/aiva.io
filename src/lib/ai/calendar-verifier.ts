@@ -31,6 +31,7 @@ export interface CalendarEvent {
   description?: string;
   startTime: string;
   endTime: string;
+  timezone?: string;
   attendees?: Array<{ email: string; name?: string }>;
   location?: string;
 }
@@ -159,7 +160,7 @@ async function getCalendarEvents(
 
   const { data: events, error } = await supabase
     .from('events')
-    .select('id, title, description, start_time, end_time, attendees, location')
+    .select('id, title, description, start_time, end_time, timezone, attendees, location')
     .eq('workspace_id', workspaceId)
     .gte('start_time', startDate.toISOString())
     .lte('start_time', endDate.toISOString())
@@ -176,6 +177,7 @@ async function getCalendarEvents(
     description: e.description || undefined,
     startTime: e.start_time,
     endTime: e.end_time,
+    timezone: e.timezone || undefined,
     attendees: (e.attendees as any[])?.map(a => ({ 
       email: a.email || '', 
       name: a.name 
@@ -297,7 +299,7 @@ export async function verifySchedulingConfirmation(
   workspaceId: string,
   senderEmail: string,
   senderName?: string,
-  options: { useAdminClient?: boolean } = {}
+  options: { useAdminClient?: boolean; timeZone?: string } = {}
 ): Promise<CalendarVerificationResult> {
   const supabase = options.useAdminClient 
     ? supabaseAdminClient 
@@ -342,10 +344,11 @@ export async function verifySchedulingConfirmation(
     };
   }
 
-  // Extract date/time references from the message
+  // Extract date/time references from the message (using user's timezone for "Tuesday" / "3pm" resolution)
   const dateTimeInfo = await extractDateTimeReferences(
     message.subject || '',
-    message.body || ''
+    message.body || '',
+    options.timeZone
   );
 
   if (!dateTimeInfo.hasDateTime && dateTimeInfo.parsedDates.length === 0) {
