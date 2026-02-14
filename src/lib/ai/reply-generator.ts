@@ -293,6 +293,7 @@ export async function generateReplyDraft(
     let reviewReason: string | undefined;
     let calendarContext: CalendarVerificationResult | undefined;
     let aiUncertaintyNotes: string | undefined;
+    let isProposalForPrompt = false; // Tracks whether this is a new meeting proposal (used in prompt template)
 
     // Check if message was already flagged for review by classifier or thread limit
     if (message.requires_human_review) {
@@ -302,17 +303,27 @@ export async function generateReplyDraft(
       console.log('[AI Reply] Message flagged for human review:', reviewReason);
     }
 
-    // Check for scheduling confirmation OR proposal (even if not flagged by classifier)
+    // Check for scheduling message using the AI classifier's actionability field
+    // as the PRIMARY signal (robust GPT-based classification), with keyword
+    // matching as a SECONDARY fallback.
+    const isSchedulingByClassifier = message.actionability === 'scheduling_intent';
     const schedulingCheck = await isSchedulingConfirmation(
       message.subject || '',
       message.body || ''
     );
+    const isSchedulingByKeywords = schedulingCheck.isConfirmation && schedulingCheck.confidence >= 0.6;
+    const isSchedulingMessage = isSchedulingByClassifier || isSchedulingByKeywords;
 
-    if (schedulingCheck.isConfirmation && schedulingCheck.confidence >= 0.6) {
-      const isNewProposal = schedulingCheck.isProposal;
+    if (isSchedulingMessage) {
+      // Determine if this is a NEW proposal or a confirmation of existing plans.
+      // Keyword check provides a hint; calendar verification gives the definitive answer
+      // (if there's an existing event with this sender → confirmation, otherwise → proposal).
+      const isNewProposal = isSchedulingByKeywords ? schedulingCheck.isProposal : true; // Default to proposal for classifier-detected; calendar verifier will refine
       console.log('[AI Reply] Detected scheduling message:', {
+        detectedBy: isSchedulingByClassifier ? 'classifier' : 'keywords',
         isNewProposal,
-        confidence: schedulingCheck.confidence,
+        actionability: message.actionability,
+        keywordConfidence: schedulingCheck.confidence,
       });
       
       try {
@@ -332,12 +343,18 @@ export async function generateReplyDraft(
           isNewProposal,
         });
 
+        // Refine proposal vs confirmation using the calendar verification result.
+        // This is more reliable than keyword guessing: if the calendar has an event
+        // WITH this sender, it's a confirmation; otherwise it's a new proposal.
+        const refinedIsProposal = calendarContext.hasMatchingEvent ? false : isNewProposal;
+        isProposalForPrompt = refinedIsProposal;
+
         if (calendarContext.suggestedAction === 'no_calendar') {
           // No calendar connected at all → hold for review
           needsHumanReview = true;
           reviewReason = 'no_calendar_connected';
           aiUncertaintyNotes = 'No calendar connected to verify this scheduling message';
-        } else if (isNewProposal) {
+        } else if (refinedIsProposal) {
           // NEW PROPOSAL: someone is asking to schedule a meeting.
           // No matching event is EXPECTED (it doesn't exist yet).
           // Calendar context is still passed to the AI for conflict detection
@@ -470,7 +487,7 @@ ${calendarContext ? (() => {
   const timeStr = e?.startTime
     ? `${new Date(e.startTime).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: eventTz })} – ${new Date(e.endTime).toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: eventTz })}`
     : '';
-  const isProposal = schedulingCheck.isConfirmation && schedulingCheck.isProposal;
+  const isProposal = isProposalForPrompt;
   return `
 📅 CALENDAR CONTEXT (scheduling – follow strictly):
 ${calendarContext.hasMatchingEvent && e
