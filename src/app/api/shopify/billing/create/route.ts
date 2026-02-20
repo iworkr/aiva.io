@@ -105,12 +105,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Determine if we're in test mode
-    // For dev stores, test mode must be true
-    const isTestMode = process.env.NODE_ENV === 'development' || 
-      process.env.SHOPIFY_TEST_MODE === 'true' ||
-      shop.includes('test') || // dev stores often have 'test' in name
-      true; // Always use test mode for now during development
+    // Test mode: only in development or when explicitly enabled.
+    // In production, use live subscriptions so real subscribers are charged.
+    const isTestMode =
+      process.env.NODE_ENV === 'development' ||
+      process.env.SHOPIFY_TEST_MODE === 'true';
 
     // Get the return URL (where Shopify redirects after approval)
     const host = request.headers.get('x-shopify-host') || 
