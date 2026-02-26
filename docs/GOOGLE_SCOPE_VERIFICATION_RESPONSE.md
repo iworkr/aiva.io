@@ -1,11 +1,26 @@
 # Google OAuth scope verification – how to respond
 
-Google asked you to either confirm narrower scopes or justify keeping `gmail.modify`.
+Google asked you to either confirm narrower scopes or justify keeping `gmail.modify`. If you kept `gmail.modify`, Google then required a **CASA Tier 2 security assessment** (by May 24, 2026, annually) — typically ~\$600/year. To avoid that cost, we switched to **Option 1** (narrower scopes) in code.
 
-## What’s changing
+## CASA requirement (why we chose Option 1)
 
-- **You requested:** `gmail.modify`, `gmail.readonly`, `gmail.send`, `calendar.readonly`, `calendar.events`
-- **Google recommends:** `gmail.readonly`, `gmail.send`, `calendar.readonly`, `calendar.events` (i.e. **drop `gmail.modify`**)
+- **Option 2 (keep gmail.modify):** Google required CASA Tier 2 by May 24, 2026, and annually after that (~\$600/year with an authorized lab).
+- **Option 1 (narrower scopes):** Use only `gmail.readonly` + `gmail.send` (no `gmail.modify`). This usually allows verification **without** CASA Tier 2. The app has been updated to use Option 1.
+
+## What’s changing in the app (Option 1)
+
+- **You now request:** `gmail.readonly`, `gmail.send`, `userinfo.email`, `userinfo.profile` (no `gmail.modify`).
+- **Still works:** Read mail, send/reply, all Aiva features, “Mark as handled” and “Archive” **inside Aiva** (DB + UI; items leave “Needs your attention”).
+- **No longer synced to Gmail:** Mark as read, archive in Gmail, “Handled by Aiva” label, restore to Inbox. So the user’s Gmail Inbox is unchanged; only Aiva’s view is “zero inbox.”
+
+**Selling/messaging:** You can still say “Get to Inbox Zero in Aiva” — handled items are cleared from Aiva’s queue and marked handled in Aiva. Be clear that we don’t change Gmail’s Inbox (e.g. “We organize and act inside Aiva; your Gmail Inbox stays as-is unless you move messages yourself”).
+
+---
+
+## What’s changing (scope comparison)
+
+- **Previously requested:** `gmail.modify`, `gmail.readonly`, `gmail.send`, `calendar.readonly`, `calendar.events`
+- **Now (Option 1):** `gmail.readonly`, `gmail.send`, `calendar.readonly`, `calendar.events` (no `gmail.modify`)
 
 If you drop `gmail.modify`, the app can still **read** mail and **send** replies. It will **no longer** be able to:
 
@@ -14,32 +29,32 @@ If you drop `gmail.modify`, the app can still **read** mail and **send** replies
 - Apply the “Aiva” label in Gmail
 - Restore messages to Inbox in Gmail
 
-In Aiva we will still “mark as handled” and “archive” **inside Aiva** (DB + UI). Those actions just won’t be synced back to Gmail (messages stay unread/in Inbox in Gmail).
+In Aiva we still “mark as handled” and “archive” **inside Aiva** (DB + UI). Those actions just won’t sync back to Gmail (messages stay unread/in Inbox in Gmail).
 
 ---
 
-## Option 1: Accept narrower scopes (recommended for faster approval)
+## Option 1: Accept narrower scopes (implemented in code)
 
-Use this if you’re okay with Gmail read/send only and no syncing of read/archive/labels back to Gmail.
+Use this to avoid CASA Tier 2 cost. **Code is already updated** to request only the narrower scopes and to handle missing `gmail.modify` (403) gracefully.
 
-### Steps
+### Your next steps
 
 1. **In Google Cloud Console (project aiva-io, 385305030522)**  
    - Open **APIs & Services → OAuth consent screen**.  
-   - Under **Scopes**, add **only** these if not already present:  
+   - Under **Scopes**, ensure these are present (add if missing):  
      - `https://www.googleapis.com/auth/gmail.readonly`  
      - `https://www.googleapis.com/auth/gmail.send`  
      - `https://www.googleapis.com/auth/calendar.readonly`  
      - `https://www.googleapis.com/auth/calendar.events`  
-   - Do **not** remove any existing scopes.  
-   - **Save and submit** for verification (or re-submit if already in review).
+   - Do **not** remove existing scopes.  
+   - **Save**, then **Save and submit** for verification (or re-submit).
 
-2. **Reply to Google’s email** with exactly:
+2. **Reply to Google’s email** (the one that mentioned CASA) with:
    ```
-   Confirming narrower scopes
+   We are switching to the recommended narrower scopes. We have updated our app to request only gmail.readonly, gmail.send, calendar.readonly, and calendar.events. We no longer request gmail.modify. Please proceed with verification using these scopes. Confirming narrower scopes.
    ```
 
-3. **Do not** change your app code or stop requesting `gmail.modify` in your app **until** Google has **approved** the verification. After approval, update the app to request only the four scopes above and deploy (see “Code changes after verification” below).
+3. **Deploy** the app (the code in this repo already uses the narrower scopes). Existing Gmail users may need to re-authorize Gmail so their token matches the new scopes.
 
 ---
 
@@ -68,24 +83,18 @@ Note: Google may still insist on the narrower set. If they do, you can then foll
 
 ---
 
-## Code changes after verification (Option 1 only)
+## Code changes (Option 1) — already done
 
-**Only after Google has approved the app with the narrower scopes**, do the following:
+1. **Removed `gmail.modify`** from `src/app/api/auth/gmail/route.ts`. OAuth now requests only `gmail.readonly`, `gmail.send`, `userinfo.email`, `userinfo.profile`.
 
-1. **Remove `gmail.modify` from the OAuth request**  
-   - File: `src/app/api/auth/gmail/route.ts`  
-   - Remove the line:  
-     `'https://www.googleapis.com/auth/gmail.modify',`
+2. **Gmail modify operations** in `src/lib/gmail/actions.ts` now treat **403** (missing scope) as a soft failure: they log “missing gmail.modify scope” and return false. The app still marks messages as handled in the DB and removes them from “Needs your attention”; only the sync to Gmail (read/archive/label/restore) is skipped.
 
-2. **Make Gmail “modify” operations safe without the scope**  
-   - When calling Gmail `messages.modify` (mark read, archive, label, restore), catch 403/insufficient permissions and treat as “success” for our flow (we still mark as handled in our DB; we just don’t sync to Gmail).  
-   - Optionally show a short in-app note that “Gmail sync (mark read/archive) is not available” if you want to set user expectations.
-
-3. **Redeploy** so the app only requests the four approved scopes. Existing users may need to re-authorize Gmail to get a token without `gmail.modify`.
+3. **Redeploy** so production uses the new scope set. Existing users may need to re-authorize Gmail to get a token without `gmail.modify`.
 
 ---
 
 ## Summary
 
-- **Fastest path:** Option 1 — add recommended scopes in Console, reply “Confirming narrower scopes”, then after approval update the app and deploy.  
-- **If you need Inbox Zero in Gmail:** Option 2 — send the justification; if Google still requires narrower scopes, fall back to Option 1 and the code changes above.
+- **We chose Option 1** to avoid CASA Tier 2 (~\$600/year). The app now requests only `gmail.readonly` and `gmail.send` for Gmail; mark-as-read and archive in Gmail are no longer used.
+- **Your steps:** Add the recommended scopes in Console (if needed), reply to Google that you’re switching to narrower scopes, deploy the app, and have users re-authorize Gmail if necessary.
+- **If you later want Gmail Inbox sync again:** You would need to request `gmail.modify` again and complete CASA Tier 2 (and pay the annual assessment cost).

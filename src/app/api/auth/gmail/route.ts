@@ -113,11 +113,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Gmail API scopes
+    // Gmail API scopes (narrower set for verification; no gmail.modify to avoid CASA Tier 2)
     const scopes = [
       'https://www.googleapis.com/auth/gmail.readonly',
       'https://www.googleapis.com/auth/gmail.send',
-      'https://www.googleapis.com/auth/gmail.modify',
       'https://www.googleapis.com/auth/userinfo.email',
       'https://www.googleapis.com/auth/userinfo.profile',
     ];

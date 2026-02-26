@@ -13,6 +13,7 @@ const labelIdCache = new Map<string, string>();
 
 /**
  * Mark a Gmail message as read
+ * Requires gmail.modify scope; returns false if scope not granted (e.g. narrower scopes).
  */
 export async function markGmailMessageRead(
   accessToken: string,
@@ -33,6 +34,10 @@ export async function markGmailMessageRead(
       }
     );
 
+    if (response.status === 403) {
+      console.warn('[Gmail Actions] Mark as read skipped (missing gmail.modify scope)');
+      return false;
+    }
     if (!response.ok) {
       const error = await response.text();
       console.error('[Gmail Actions] Failed to mark as read:', error);
@@ -48,6 +53,7 @@ export async function markGmailMessageRead(
 
 /**
  * Archive a Gmail message (remove INBOX label)
+ * Requires gmail.modify scope; returns false if scope not granted.
  */
 export async function archiveGmailMessage(
   accessToken: string,
@@ -68,6 +74,10 @@ export async function archiveGmailMessage(
       }
     );
 
+    if (response.status === 403) {
+      console.warn('[Gmail Actions] Archive skipped (missing gmail.modify scope)');
+      return false;
+    }
     if (!response.ok) {
       const error = await response.text();
       console.error('[Gmail Actions] Failed to archive:', error);
@@ -83,6 +93,7 @@ export async function archiveGmailMessage(
 
 /**
  * Apply a label to a Gmail message
+ * Requires gmail.modify scope; returns false if scope not granted.
  */
 export async function applyGmailLabel(
   accessToken: string,
@@ -104,6 +115,10 @@ export async function applyGmailLabel(
       }
     );
 
+    if (response.status === 403) {
+      console.warn('[Gmail Actions] Apply label skipped (missing gmail.modify scope)');
+      return false;
+    }
     if (!response.ok) {
       const error = await response.text();
       console.error('[Gmail Actions] Failed to apply label:', error);
@@ -144,6 +159,7 @@ async function getGmailLabels(
 
 /**
  * Create a Gmail label
+ * Requires gmail.modify scope; returns null if scope not granted.
  */
 async function createGmailLabel(
   accessToken: string,
@@ -167,6 +183,10 @@ async function createGmailLabel(
       }),
     });
 
+    if (response.status === 403) {
+      console.warn('[Gmail Actions] Create label skipped (missing gmail.modify scope)');
+      return null;
+    }
     if (!response.ok) {
       const error = await response.text();
       console.error('[Gmail Actions] Failed to create label:', error);
@@ -334,6 +354,7 @@ export async function batchHandleGmailMessages(
 
 /**
  * Undo handling - restore message to inbox
+ * Requires gmail.modify scope; returns false if scope not granted.
  */
 export async function restoreGmailMessage(
   connectionId: string,
@@ -355,6 +376,11 @@ export async function restoreGmailMessage(
         }),
       }
     );
+
+    if (response.status === 403) {
+      console.warn('[Gmail Actions] Restore skipped (missing gmail.modify scope)');
+      return false;
+    }
 
     return response.ok;
   } catch (error) {
