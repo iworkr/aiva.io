@@ -55,7 +55,7 @@
   "crons": [
     {
       "path": "/api/cron/sync",
-      "schedule": "0 * * * *"
+      "schedule": "0 0 * * *"
     },
     {
       "path": "/api/cron/renew-webhooks",
@@ -63,15 +63,15 @@
     },
     {
       "path": "/api/cron/auto-send",
-      "schedule": "0 * * * *"
+      "schedule": "0 0 * * *"
     },
     {
       "path": "/api/cron/shopify-sync",
-      "schedule": "0 */6 * * *"
+      "schedule": "0 0 * * *"
     },
     {
       "path": "/api/cron/daily-digest",
-      "schedule": "0 8 * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
